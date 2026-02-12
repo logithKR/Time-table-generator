@@ -1,0 +1,34 @@
+# Systems
+.DS_Store
+Thumbs.db
+
+# Environments
+venv/
+venv2/
+node_modules/
+__pycache__/
+
+# Logs & temp output
+*.log
+*.txt
+!requirements.txt
+!RUN_GUIDE.md
+
+# Excel/Data files (User requested exclusion of excel/checks)
+*.xlsx
+*.csv
+backend/data/
+
+# Debug scripts
+backend/check_*.py
+backend/debug_*.py
+backend/test_*.py
+debug_db.py
+
+# Editor temporaries
+.vscode/
+.idea/
+
+# Build artifacts
+dist/
+build/

@@ -623,7 +623,7 @@ function App() {
                                 <div className="flex flex-wrap gap-2">
                                     {data.faculty.map((f, i) => (
                                         <div key={i} className="flex items-center gap-2 bg-purple-50/50 rounded-xl px-3.5 py-2.5 border border-violet-100 group hover:border-violet-300 hover:bg-violet-50 transition-all duration-200">
-                                            <div className="w-8 h-8 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl flex items-center justify-center text-white text-xs font-bold shadow-sm">
+                                            <div className="w-8 h-8 bg-violet-600 rounded-xl flex items-center justify-center text-white text-xs font-bold shadow-sm">
                                                 {(f.faculty_name || '?').charAt(0)}
                                             </div>
                                             <div>

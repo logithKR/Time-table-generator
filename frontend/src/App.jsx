@@ -1,6 +1,29 @@
-```
 import { useState, useEffect } from 'react';
-import { LayoutDashboard, BookOpen, Users, GraduationCap, Clock, Calendar, Menu, X, Plus, Trash2, Edit2, Check, ChevronDown, RotateCw, Monitor, Download, Share2, Layers, Filter, Pencil, ChevronLeft, ChevronRight } from 'lucide-react';
+import { 
+  LayoutDashboard, 
+  BookOpen, 
+  Users, 
+  GraduationCap, 
+  Clock, 
+  Calendar, 
+  Menu, 
+  X, 
+  Plus, 
+  Trash2, 
+  Edit2, 
+  Check, 
+  ChevronDown, 
+  RotateCw, 
+  Monitor, 
+  Download, 
+  Share2, 
+  Layers, 
+  Filter, 
+  Pencil, 
+  ChevronLeft, 
+  ChevronRight,
+  Search // Added missing import
+} from 'lucide-react';
 import TimetableEditor from './components/TimetableEditor';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -8,7 +31,7 @@ import * as api from './utils/api';
 
 function App() {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-    const [isCollapsed, setIsCollapsed] = useState(false); // New state for collapsed sidebar
+    const [isCollapsed, setIsCollapsed] = useState(false);
     const [activeTab, setActiveTab] = useState('dashboard');
 
     // Master Data
@@ -424,7 +447,7 @@ function App() {
                         </thead>
                         <tbody>
                             {filtered.map((c, i) => (
-                                <tr key={c.course_code} className={`border - b border - violet - 50 hover: bg - violet - 50 / 40 transition - colors duration - 200 ${ i % 2 === 0 ? 'bg-white' : 'bg-purple-50/20' } `}>
+                                <tr key={c.course_code} className={`border-b border-violet-50 hover:bg-violet-50/40 transition-colors duration-200 ${ i % 2 === 0 ? 'bg-white' : 'bg-purple-50/20' }`}>
                                     <td className="p-3.5 font-mono font-bold text-violet-800">{c.course_code}</td>
                                     <td className="p-3.5 text-gray-800 font-medium">{c.course_name}</td>
                                     <td className="p-3.5 text-center"><span className="bg-violet-50 text-violet-700 px-2.5 py-1 rounded-lg text-xs font-semibold border border-violet-100">{c.department_code}</span></td>
@@ -512,7 +535,7 @@ function App() {
                                     <p className="text-xs text-gray-400 font-mono mt-0.5">{f.faculty_id}</p>
                                     <div className="flex items-center gap-2 mt-2.5">
                                         <span className="bg-violet-50 text-violet-700 px-2.5 py-1 rounded-lg text-xs font-semibold border border-violet-100">{f.department_code}</span>
-                                        <span className={`px - 2.5 py - 1 rounded - lg text - xs font - semibold ${ (f.status || '') === 'Active' || (f.status || '') === 'ACTIVE' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-red-50 text-red-700 border border-red-100' } `}>
+                                        <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${ (f.status || '') === 'Active' || (f.status || '') === 'ACTIVE' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-red-50 text-red-700 border border-red-100' }`}>
                                             {f.status || 'Active'}
                                         </span>
                                     </div>
@@ -527,9 +550,6 @@ function App() {
         );
     };
 
-    // ============================================
-    // COURSE-FACULTY MAPPINGS PAGE
-    // ============================================
     // ============================================
     // COURSE-FACULTY MAPPINGS PAGE
     // ============================================
@@ -603,7 +623,7 @@ function App() {
                                             const facDepts = new Set(data.faculty.map(f => f.faculty_dept).filter(d => d && d !== '?'));
                                             const offeringDept = facDepts.size === 1 ? Array.from(facDepts)[0] : (facDepts.size > 1 ? 'Mixed' : data.course_dept);
                                             return (
-                                                <span className={`px - 2 py - 0.5 rounded text - xs font - medium border ${ offeringDept === '?' ? 'bg-gray-100 text-gray-500' : 'bg-slate-100 text-slate-700' } `}>
+                                                <span className={`px-2 py-0.5 rounded text-xs font-medium border ${ offeringDept === '?' ? 'bg-gray-100 text-gray-500' : 'bg-slate-100 text-slate-700' }`}>
                                                     {offeringDept}
                                                 </span>
                                             );
@@ -686,7 +706,7 @@ function App() {
                 <div className="flex-1 relative">
                     {editorDept && editorSem ? (
                         <TimetableEditor
-                            key={`${ editorDept } -${ editorSem } `}
+                            key={`${ editorDept }-${ editorSem }`}
                             department={editorDept}
                             semester={editorSem}
                             onSave={() => { }}
@@ -858,7 +878,7 @@ function App() {
                                                         <option value="SPECIAL">Special</option>
                                                     </select>
                                                 ) : (
-                                                    <span className={`px - 2 py - 0.5 rounded text - xs font - medium ${ slot.slot_type === 'REGULAR' ? 'bg-green-100 text-green-700' : slot.slot_type === 'BREAK' ? 'bg-orange-100 text-orange-700' : slot.slot_type === 'LUNCH' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700' } `}>
+                                                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${ slot.slot_type === 'REGULAR' ? 'bg-green-100 text-green-700' : slot.slot_type === 'BREAK' ? 'bg-orange-100 text-orange-700' : slot.slot_type === 'LUNCH' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700' }`}>
                                                         {slot.slot_type}
                                                     </span>
                                                 )}
@@ -870,8 +890,8 @@ function App() {
                                                         <span className="text-xs">{editingSlotData.is_active ? 'Active' : 'Inactive'}</span>
                                                     </label>
                                                 ) : (
-                                                    <span className={`inline - flex items - center gap - 1 px - 2 py - 0.5 rounded text - xs font - medium ${ slot.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600' } `}>
-                                                        <span className={`w - 1.5 h - 1.5 rounded - full ${ slot.is_active ? 'bg-emerald-500' : 'bg-red-400' } `}></span>
+                                                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${ slot.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600' }`}>
+                                                        <span className={`w-1.5 h-1.5 rounded-full ${ slot.is_active ? 'bg-emerald-500' : 'bg-red-400' }`}></span>
                                                         {slot.is_active ? 'Active' : 'Inactive'}
                                                     </span>
                                                 )}
@@ -936,7 +956,7 @@ function App() {
                         <label className="block text-sm font-semibold text-gray-700 mb-1.5">Mentor Period</label>
                         <input type="number" className="w-full p-2.5 border border-violet-200 rounded-xl focus:ring-2 focus:ring-violet-400 focus:border-violet-400 focus:outline-none shadow-sm bg-white font-medium text-gray-700" value={mentorPeriod} onChange={e => setMentorPeriod(e.target.value)} min="1" max="8" />
                     </div>
-                    <button onClick={handleGenerate} disabled={loading} className={`w - full py - 2.5 px - 4 rounded - xl text - white font - bold flex items - center justify - center space - x - 2 transition - all ${ loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-violet-600 hover:bg-violet-700 shadow-lg shadow-violet-200 hover:shadow-violet-300 hover:-translate-y-0.5 active:scale-95' } `}>
+                    <button onClick={handleGenerate} disabled={loading} className={`w-full py-2.5 px-4 rounded-xl text-white font-bold flex items-center justify-center space-x-2 transition-all ${ loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-violet-600 hover:bg-violet-700 shadow-lg shadow-violet-200 hover:shadow-violet-300 hover:-translate-y-0.5 active:scale-95' }`}>
                         {loading ? <RotateCw className="w-5 h-5 animate-spin" /> : <Monitor className="w-5 h-5" />}
                         <span>{loading ? 'Processing...' : 'Generate'}</span>
                     </button>
@@ -972,13 +992,13 @@ function App() {
 
     return (
         <div className="flex h-screen bg-slate-50 font-sans text-gray-900 overflow-hidden">
-            <aside className={`fixed inset - y - 0 left - 0 z - 50 ${ isCollapsed ? 'w-20' : 'w-64' } bg - white border - r border - gray - 100 transform transition - all duration - 300 ease -in -out ${ isSidebarOpen ? 'translate-x-0' : '-translate-x-full' } lg:relative lg: translate - x - 0 shadow - xl shadow - gray - 200 / 50 flex flex - col`}>
-                <div className={`flex items - center ${ isCollapsed ? 'justify-center' : 'justify-between' } p - 6 border - b border - gray - 50 transition - all duration - 300`}>
+            <aside className={`fixed inset-y-0 left-0 z-50 ${ isCollapsed ? 'w-20' : 'w-64' } bg-white border-r border-gray-100 transform transition-all duration-300 ease-in-out ${ isSidebarOpen ? 'translate-x-0' : '-translate-x-full' } lg:relative lg:translate-x-0 shadow-xl shadow-gray-200/50 flex flex-col`}>
+                <div className={`flex items-center ${ isCollapsed ? 'justify-center' : 'justify-between' } p-6 border-b border-gray-50 transition-all duration-300`}>
                     <div className="flex items-center space-x-3 overflow-hidden">
                         <div className="w-8 h-8 bg-violet-600 rounded-lg flex items-center justify-center shadow-lg shadow-violet-200 flex-shrink-0">
                             <Calendar className="w-5 h-5 text-white" />
                         </div>
-                        <span className={`text - xl font - bold tracking - tight text - gray - 800 whitespace - nowrap transition - opacity duration - 300 ${ isCollapsed ? 'opacity-0 w-0 hidden' : 'opacity-100' } `}>
+                        <span className={`text-xl font-bold tracking-tight text-gray-800 whitespace-nowrap transition-opacity duration-300 ${ isCollapsed ? 'opacity-0 w-0 hidden' : 'opacity-100' }`}>
                             Time Table
                         </span>
                     </div>
@@ -1001,16 +1021,16 @@ function App() {
                     ].map(item => (
                         <button key={item.id} onClick={() => switchTab(item.id)}
                             title={isCollapsed ? item.label : ''}
-                            className={`flex items - center ${ isCollapsed ? 'justify-center px-0' : 'space-x-3 px-3' } w - full py - 3 rounded - xl transition - all duration - 200 font - medium ${ activeTab === item.id ? 'bg-violet-600 text-white shadow-lg shadow-violet-200' : 'text-gray-500 hover:bg-gray-50 hover:text-violet-600' } `}>
+                            className={`flex items-center ${ isCollapsed ? 'justify-center px-0' : 'space-x-3 px-3' } w-full py-3 rounded-xl transition-all duration-200 font-medium ${ activeTab === item.id ? 'bg-violet-600 text-white shadow-lg shadow-violet-200' : 'text-gray-500 hover:bg-gray-50 hover:text-violet-600' }`}>
                             <item.icon className="w-5 h-5 flex-shrink-0" />
-                            <span className={`whitespace - nowrap transition - all duration - 300 ${ isCollapsed ? 'opacity-0 w-0 hidden' : 'opacity-100' } `}>{item.label}</span>
+                            <span className={`whitespace-nowrap transition-all duration-300 ${ isCollapsed ? 'opacity-0 w-0 hidden' : 'opacity-100' }`}>{item.label}</span>
                         </button>
                     ))}
                 </nav>
                 <div className="p-4 border-t border-gray-100">
-                    <div className={`bg - slate - 50 rounded - xl p - 3 border border - slate - 100 flex items - center ${ isCollapsed ? 'justify-center' : 'gap-3' } transition - all duration - 300`}>
+                    <div className={`bg-slate-50 rounded-xl p-3 border border-slate-100 flex items-center ${ isCollapsed ? 'justify-center' : 'gap-3' } transition-all duration-300`}>
                         <div className="h-9 w-9 rounded-full bg-violet-100 flex items-center justify-center text-violet-600 font-bold text-xs flex-shrink-0">LK</div>
-                        <div className={`overflow - hidden transition - all duration - 300 ${ isCollapsed ? 'w-0 opacity-0 hidden' : 'w-auto opacity-100' } `}>
+                        <div className={`overflow-hidden transition-all duration-300 ${ isCollapsed ? 'w-0 opacity-0 hidden' : 'w-auto opacity-100' }`}>
                             <p className="text-sm font-bold text-gray-800 truncate">LogithKumar</p>
                             <p className="text-xs text-gray-500">Admin</p>
                         </div>

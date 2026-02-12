@@ -323,29 +323,29 @@ function App() {
     // FILTER BAR (render function, NOT component)
     // ============================================
     const renderFilterBar = (showSem, filteredCount, totalCount) => (
-        <div className="flex flex-wrap gap-3 items-center mb-4 bg-gray-50 p-3 rounded-lg border">
+        <div className="flex flex-wrap gap-3 items-center mb-4 bg-gradient-to-r from-violet-50/80 to-purple-50/60 p-4 rounded-2xl border border-violet-100 shadow-sm">
             <div className="flex items-center gap-2">
-                <Layers className="w-4 h-4 text-gray-500" />
-                <span className="text-sm font-medium text-gray-600">Filter:</span>
+                <Layers className="w-4 h-4 text-violet-500" />
+                <span className="text-sm font-semibold text-violet-700">Filter:</span>
             </div>
-            <select className="p-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-yellow-500" value={filterDept} onChange={e => setFilterDept(e.target.value)}>
+            <select className="p-2.5 border border-violet-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-violet-400 focus:border-violet-400 focus:outline-none shadow-sm font-medium text-gray-700 cursor-pointer transition-all hover:border-violet-300" value={filterDept} onChange={e => setFilterDept(e.target.value)}>
                 <option value="">All Departments</option>
                 {departments.map(d => <option key={d.department_code} value={d.department_code}>{d.department_code}</option>)}
             </select>
             {showSem && (
-                <select className="p-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-yellow-500" value={filterSem} onChange={e => setFilterSem(e.target.value)}>
+                <select className="p-2.5 border border-violet-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-violet-400 focus:border-violet-400 focus:outline-none shadow-sm font-medium text-gray-700 cursor-pointer transition-all hover:border-violet-300" value={filterSem} onChange={e => setFilterSem(e.target.value)}>
                     <option value="">All Semesters</option>
                     {semesters.map(s => <option key={s.semester_number} value={s.semester_number}>Semester {s.semester_number}</option>)}
                 </select>
             )}
             <div className="flex-1 min-w-[200px]">
-                <div className="relative">
-                    <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                    <input type="text" placeholder="Search by name, code..." className="w-full pl-9 p-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-yellow-500"
+                <div className="relative group">
+                    <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-violet-500 transition-colors" />
+                    <input type="text" placeholder="Search by name, code..." className="w-full pl-10 p-2.5 border border-violet-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm placeholder:text-gray-400 font-medium text-gray-700 transition-all hover:border-violet-300"
                         value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
                 </div>
             </div>
-            <div className="text-xs text-gray-500 bg-white px-3 py-2 rounded border">
+            <div className="text-xs text-violet-600 font-semibold bg-white px-4 py-2.5 rounded-xl border border-violet-100 shadow-sm">
                 Showing {filteredCount} of {totalCount}
             </div>
         </div>
@@ -365,91 +365,91 @@ function App() {
             <div className="space-y-4">
                 <div className="flex justify-between items-center">
                     <div className="flex-1">{renderFilterBar(true, filtered.length, allCourses.length)}</div>
-                    <button onClick={() => setShowAddCourse(!showAddCourse)} className="ml-3 flex items-center gap-2 bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow transition-all whitespace-nowrap">
+                    <button onClick={() => setShowAddCourse(!showAddCourse)} className="ml-3 flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-violet-200 hover:shadow-violet-300 transition-all whitespace-nowrap hover:-translate-y-0.5 active:scale-95">
                         <Plus className="w-4 h-4" /> Add Course
                     </button>
                 </div>
 
                 {showAddCourse && (
-                    <div className="bg-white rounded-xl border-2 border-yellow-300 shadow-lg p-5">
-                        <h4 className="font-bold text-gray-800 mb-3 flex items-center gap-2"><Plus className="w-4 h-4 text-yellow-600" /> Add New Course</h4>
+                    <div className="bg-white rounded-2xl border-2 border-violet-200 shadow-xl shadow-violet-100/50 p-6">
+                        <h4 className="font-bold text-gray-800 mb-4 flex items-center gap-2"><Plus className="w-4 h-4 text-violet-600" /> Add New Course</h4>
                         <form onSubmit={handleAddCourse} className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                            <input name="course_code" placeholder="Course Code *" required className="p-2 border rounded-lg text-sm" />
-                            <input name="course_name" placeholder="Course Name *" required className="p-2 border rounded-lg text-sm col-span-2" />
-                            <select name="department_code" required className="p-2 border rounded-lg text-sm">
+                            <input name="course_code" placeholder="Course Code *" required className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
+                            <input name="course_name" placeholder="Course Name *" required className="p-2.5 border border-violet-200 rounded-xl text-sm col-span-2 focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
+                            <select name="department_code" required className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm">
                                 <option value="">Department *</option>
                                 {departments.map(d => <option key={d.department_code} value={d.department_code}>{d.department_code}</option>)}
                             </select>
-                            <select name="semester" required className="p-2 border rounded-lg text-sm">
+                            <select name="semester" required className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm">
                                 <option value="">Semester *</option>
                                 {semesters.map(s => <option key={s.semester_number} value={s.semester_number}>Sem {s.semester_number}</option>)}
                             </select>
-                            <input name="lecture_hours" type="number" placeholder="L hours" defaultValue="0" min="0" className="p-2 border rounded-lg text-sm" />
-                            <input name="tutorial_hours" type="number" placeholder="T hours" defaultValue="0" min="0" className="p-2 border rounded-lg text-sm" />
-                            <input name="practical_hours" type="number" placeholder="P hours" defaultValue="0" min="0" className="p-2 border rounded-lg text-sm" />
-                            <input name="credits" type="number" placeholder="Credits" defaultValue="0" min="0" className="p-2 border rounded-lg text-sm" />
-                            <input name="weekly_sessions" type="number" placeholder="Weekly Sessions *" defaultValue="1" min="1" required className="p-2 border rounded-lg text-sm" />
-                            <div className="flex flex-wrap gap-3 items-center col-span-2">
-                                <label className="flex items-center gap-1 text-xs"><input name="is_lab" type="checkbox" /> Lab</label>
-                                <label className="flex items-center gap-1 text-xs"><input name="is_honours" type="checkbox" /> Honours</label>
-                                <label className="flex items-center gap-1 text-xs"><input name="is_minor" type="checkbox" /> Minor</label>
-                                <label className="flex items-center gap-1 text-xs"><input name="is_elective" type="checkbox" /> Elective</label>
+                            <input name="lecture_hours" type="number" placeholder="L hours" defaultValue="0" min="0" className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
+                            <input name="tutorial_hours" type="number" placeholder="T hours" defaultValue="0" min="0" className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
+                            <input name="practical_hours" type="number" placeholder="P hours" defaultValue="0" min="0" className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
+                            <input name="credits" type="number" placeholder="Credits" defaultValue="0" min="0" className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
+                            <input name="weekly_sessions" type="number" placeholder="Weekly Sessions *" defaultValue="1" min="1" required className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
+                            <div className="flex flex-wrap gap-4 items-center col-span-2">
+                                <label className="flex items-center gap-1.5 text-xs font-medium text-gray-600 cursor-pointer"><input name="is_lab" type="checkbox" className="rounded border-violet-300 text-violet-600 focus:ring-violet-400" /> Lab</label>
+                                <label className="flex items-center gap-1.5 text-xs font-medium text-gray-600 cursor-pointer"><input name="is_honours" type="checkbox" className="rounded border-violet-300 text-violet-600 focus:ring-violet-400" /> Honours</label>
+                                <label className="flex items-center gap-1.5 text-xs font-medium text-gray-600 cursor-pointer"><input name="is_minor" type="checkbox" className="rounded border-violet-300 text-violet-600 focus:ring-violet-400" /> Minor</label>
+                                <label className="flex items-center gap-1.5 text-xs font-medium text-gray-600 cursor-pointer"><input name="is_elective" type="checkbox" className="rounded border-violet-300 text-violet-600 focus:ring-violet-400" /> Elective</label>
                             </div>
                             <div className="flex gap-2">
-                                <button type="submit" className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-semibold">Save</button>
-                                <button type="button" onClick={() => setShowAddCourse(false)} className="bg-gray-300 hover:bg-gray-400 text-gray-700 px-4 py-2 rounded-lg text-sm">Cancel</button>
+                                <button type="submit" className="bg-violet-600 hover:bg-violet-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-violet-200 transition-all">Save</button>
+                                <button type="button" onClick={() => setShowAddCourse(false)} className="bg-gray-100 hover:bg-gray-200 text-gray-600 px-4 py-2.5 rounded-xl text-sm font-medium transition-all">Cancel</button>
                             </div>
                         </form>
                     </div>
                 )}
 
-                <div className="overflow-x-auto bg-white rounded-lg border shadow-sm">
+                <div className="overflow-x-auto bg-white rounded-2xl border border-violet-100 shadow-lg shadow-violet-50/50">
                     <table className="min-w-full text-sm">
                         <thead>
-                            <tr className="bg-gradient-to-r from-slate-800 to-slate-700 text-white">
-                                <th className="p-3 text-left font-semibold">Code</th>
-                                <th className="p-3 text-left font-semibold">Course Name</th>
-                                <th className="p-3 text-center font-semibold">Dept</th>
-                                <th className="p-3 text-center font-semibold">Sem</th>
-                                <th className="p-3 text-center font-semibold">L</th>
-                                <th className="p-3 text-center font-semibold">T</th>
-                                <th className="p-3 text-center font-semibold">P</th>
-                                <th className="p-3 text-center font-semibold">Cr</th>
-                                <th className="p-3 text-center font-semibold">Weekly</th>
-                                <th className="p-3 text-center font-semibold">Type</th>
-                                <th className="p-3 text-center font-semibold w-16">Actions</th>
+                            <tr className="bg-gradient-to-r from-violet-700 via-purple-700 to-indigo-800 text-white">
+                                <th className="p-3.5 text-left font-semibold text-xs uppercase tracking-wider">Code</th>
+                                <th className="p-3.5 text-left font-semibold text-xs uppercase tracking-wider">Course Name</th>
+                                <th className="p-3.5 text-center font-semibold text-xs uppercase tracking-wider">Dept</th>
+                                <th className="p-3.5 text-center font-semibold text-xs uppercase tracking-wider">Sem</th>
+                                <th className="p-3.5 text-center font-semibold text-xs uppercase tracking-wider">L</th>
+                                <th className="p-3.5 text-center font-semibold text-xs uppercase tracking-wider">T</th>
+                                <th className="p-3.5 text-center font-semibold text-xs uppercase tracking-wider">P</th>
+                                <th className="p-3.5 text-center font-semibold text-xs uppercase tracking-wider">Cr</th>
+                                <th className="p-3.5 text-center font-semibold text-xs uppercase tracking-wider">Weekly</th>
+                                <th className="p-3.5 text-center font-semibold text-xs uppercase tracking-wider">Type</th>
+                                <th className="p-3.5 text-center font-semibold text-xs uppercase tracking-wider w-16">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             {filtered.map((c, i) => (
-                                <tr key={c.course_code} className={`border-b hover:bg-yellow-50 transition-colors ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
-                                    <td className="p-3 font-mono font-bold text-blue-800">{c.course_code}</td>
-                                    <td className="p-3 text-gray-800 font-medium">{c.course_name}</td>
-                                    <td className="p-3 text-center"><span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-xs font-medium">{c.department_code}</span></td>
-                                    <td className="p-3 text-center font-medium">{c.semester}</td>
-                                    <td className="p-3 text-center">{c.lecture_hours || 0}</td>
-                                    <td className="p-3 text-center">{c.tutorial_hours || 0}</td>
-                                    <td className="p-3 text-center">{c.practical_hours || 0}</td>
-                                    <td className="p-3 text-center font-medium">{c.credits || '-'}</td>
-                                    <td className="p-3 text-center"><span className="bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full text-xs font-bold">{c.weekly_sessions}</span></td>
-                                    <td className="p-3 text-center">
+                                <tr key={c.course_code} className={`border-b border-violet-50 hover:bg-violet-50/40 transition-colors duration-200 ${i % 2 === 0 ? 'bg-white' : 'bg-purple-50/20'}`}>
+                                    <td className="p-3.5 font-mono font-bold text-violet-800">{c.course_code}</td>
+                                    <td className="p-3.5 text-gray-800 font-medium">{c.course_name}</td>
+                                    <td className="p-3.5 text-center"><span className="bg-violet-50 text-violet-700 px-2.5 py-1 rounded-lg text-xs font-semibold border border-violet-100">{c.department_code}</span></td>
+                                    <td className="p-3.5 text-center font-semibold text-gray-700">{c.semester}</td>
+                                    <td className="p-3.5 text-center text-gray-600">{c.lecture_hours || 0}</td>
+                                    <td className="p-3.5 text-center text-gray-600">{c.tutorial_hours || 0}</td>
+                                    <td className="p-3.5 text-center text-gray-600">{c.practical_hours || 0}</td>
+                                    <td className="p-3.5 text-center font-semibold text-gray-700">{c.credits || '-'}</td>
+                                    <td className="p-3.5 text-center"><span className="bg-violet-100 text-violet-800 px-2.5 py-1 rounded-full text-xs font-bold">{c.weekly_sessions}</span></td>
+                                    <td className="p-3.5 text-center">
                                         <div className="flex flex-wrap gap-1 justify-center">
-                                            {c.is_honours && <span className="bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded text-[10px] font-medium">Honours</span>}
-                                            {c.is_minor && <span className="bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded text-[10px] font-medium">Minor</span>}
-                                            {c.is_lab && <span className="bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded text-[10px] font-medium">Lab</span>}
-                                            {c.is_elective && <span className="bg-green-100 text-green-700 px-1.5 py-0.5 rounded text-[10px] font-medium">Elective</span>}
-                                            {c.is_open_elective && <span className="bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded text-[10px] font-medium">Open Elec</span>}
-                                            {!c.is_honours && !c.is_minor && !c.is_lab && !c.is_elective && !c.is_open_elective && <span className="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded text-[10px]">Regular</span>}
+                                            {c.is_honours && <span className="bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-lg text-[10px] font-semibold">Honours</span>}
+                                            {c.is_minor && <span className="bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded-lg text-[10px] font-semibold">Minor</span>}
+                                            {c.is_lab && <span className="bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-lg text-[10px] font-semibold">Lab</span>}
+                                            {c.is_elective && <span className="bg-green-100 text-green-700 px-1.5 py-0.5 rounded-lg text-[10px] font-semibold">Elective</span>}
+                                            {c.is_open_elective && <span className="bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded-lg text-[10px] font-semibold">Open Elec</span>}
+                                            {!c.is_honours && !c.is_minor && !c.is_lab && !c.is_elective && !c.is_open_elective && <span className="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-lg text-[10px] font-medium">Regular</span>}
                                         </div>
                                     </td>
-                                    <td className="p-3 text-center">
-                                        <button onClick={() => handleDeleteCourse(c.course_code)} className="text-red-400 hover:text-red-600 transition-colors" title="Delete"><Trash2 className="w-4 h-4" /></button>
+                                    <td className="p-3.5 text-center">
+                                        <button onClick={() => handleDeleteCourse(c.course_code)} className="text-red-300 hover:text-red-600 transition-colors p-1 rounded-lg hover:bg-red-50" title="Delete"><Trash2 className="w-4 h-4" /></button>
                                     </td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
-                    {filtered.length === 0 && <div className="p-8 text-center text-gray-400">No courses found.</div>}
+                    {filtered.length === 0 && <div className="p-10 text-center text-gray-400 text-sm">No courses found.</div>}
                 </div>
             </div>
         );
@@ -469,25 +469,25 @@ function App() {
             <div className="space-y-4">
                 <div className="flex justify-between items-center">
                     <div className="flex-1">{renderFilterBar(false, filtered.length, allFaculty.length)}</div>
-                    <button onClick={() => setShowAddFaculty(!showAddFaculty)} className="ml-3 flex items-center gap-2 bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow transition-all whitespace-nowrap">
+                    <button onClick={() => setShowAddFaculty(!showAddFaculty)} className="ml-3 flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-violet-200 hover:shadow-violet-300 transition-all whitespace-nowrap hover:-translate-y-0.5 active:scale-95">
                         <Plus className="w-4 h-4" /> Add Faculty
                     </button>
                 </div>
 
                 {showAddFaculty && (
-                    <div className="bg-white rounded-xl border-2 border-yellow-300 shadow-lg p-5">
-                        <h4 className="font-bold text-gray-800 mb-3 flex items-center gap-2"><Plus className="w-4 h-4 text-yellow-600" /> Add New Faculty</h4>
+                    <div className="bg-white rounded-2xl border-2 border-violet-200 shadow-xl shadow-violet-100/50 p-6">
+                        <h4 className="font-bold text-gray-800 mb-4 flex items-center gap-2"><Plus className="w-4 h-4 text-violet-600" /> Add New Faculty</h4>
                         <form onSubmit={handleAddFaculty} className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                            <input name="faculty_id" placeholder="Faculty ID *" required className="p-2 border rounded-lg text-sm" />
-                            <input name="faculty_name" placeholder="Faculty Name *" required className="p-2 border rounded-lg text-sm" />
-                            <input name="faculty_email" placeholder="Email (optional)" type="email" className="p-2 border rounded-lg text-sm" />
-                            <select name="department_code" required className="p-2 border rounded-lg text-sm">
+                            <input name="faculty_id" placeholder="Faculty ID *" required className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
+                            <input name="faculty_name" placeholder="Faculty Name *" required className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
+                            <input name="faculty_email" placeholder="Email (optional)" type="email" className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
+                            <select name="department_code" required className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm">
                                 <option value="">Department *</option>
                                 {departments.map(d => <option key={d.department_code} value={d.department_code}>{d.department_code}</option>)}
                             </select>
                             <div className="flex gap-2">
-                                <button type="submit" className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-semibold">Save</button>
-                                <button type="button" onClick={() => setShowAddFaculty(false)} className="bg-gray-300 hover:bg-gray-400 text-gray-700 px-4 py-2 rounded-lg text-sm">Cancel</button>
+                                <button type="submit" className="bg-violet-600 hover:bg-violet-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-violet-200 transition-all">Save</button>
+                                <button type="button" onClick={() => setShowAddFaculty(false)} className="bg-gray-100 hover:bg-gray-200 text-gray-600 px-4 py-2.5 rounded-xl text-sm font-medium transition-all">Cancel</button>
                             </div>
                         </form>
                     </div>
@@ -495,32 +495,32 @@ function App() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {filtered.map(f => (
-                        <div key={f.faculty_id} className="bg-white rounded-xl border shadow-sm hover:shadow-md transition-shadow p-4 group">
+                        <div key={f.faculty_id} className="bg-white rounded-2xl border border-violet-100 shadow-md shadow-violet-50/30 hover:shadow-xl hover:shadow-violet-100/50 hover:border-violet-200 transition-all duration-300 p-5 group">
                             <div className="flex items-start gap-3">
-                                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-700 rounded-full flex items-center justify-center text-white font-bold text-lg shadow flex-shrink-0">
+                                <div className="w-12 h-12 bg-gradient-to-br from-violet-500 to-purple-700 rounded-2xl flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-violet-200 flex-shrink-0">
                                     {(f.faculty_name || '?').charAt(0).toUpperCase()}
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center justify-between">
-                                        <h4 className="font-semibold text-gray-900 text-sm truncate">{f.faculty_name || 'Unknown'}</h4>
-                                        <button onClick={() => handleDeleteFaculty(f.faculty_id)} className="text-red-300 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-all" title="Delete">
+                                        <h4 className="font-bold text-gray-900 text-sm truncate">{f.faculty_name || 'Unknown'}</h4>
+                                        <button onClick={() => handleDeleteFaculty(f.faculty_id)} className="text-red-300 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-all p-1 rounded-lg hover:bg-red-50" title="Delete">
                                             <Trash2 className="w-4 h-4" />
                                         </button>
                                     </div>
-                                    <p className="text-xs text-gray-500 font-mono mt-0.5">{f.faculty_id}</p>
-                                    <div className="flex items-center gap-2 mt-2">
-                                        <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-xs font-medium">{f.department_code}</span>
-                                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${(f.status || '') === 'Active' || (f.status || '') === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                    <p className="text-xs text-gray-400 font-mono mt-0.5">{f.faculty_id}</p>
+                                    <div className="flex items-center gap-2 mt-2.5">
+                                        <span className="bg-violet-50 text-violet-700 px-2.5 py-1 rounded-lg text-xs font-semibold border border-violet-100">{f.department_code}</span>
+                                        <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${(f.status || '') === 'Active' || (f.status || '') === 'ACTIVE' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-red-50 text-red-700 border border-red-100'}`}>
                                             {f.status || 'Active'}
                                         </span>
                                     </div>
-                                    {f.faculty_email && <p className="text-xs text-blue-600 mt-1.5 truncate">{f.faculty_email}</p>}
+                                    {f.faculty_email && <p className="text-xs text-violet-500 mt-2 truncate font-medium">{f.faculty_email}</p>}
                                 </div>
                             </div>
                         </div>
                     ))}
                 </div>
-                {filtered.length === 0 && <div className="p-8 text-center text-gray-400 bg-white rounded-xl border">No faculty found.</div>}
+                {filtered.length === 0 && <div className="p-10 text-center text-gray-400 bg-white rounded-2xl border border-violet-100 text-sm">No faculty found.</div>}
             </div>
         );
     };
@@ -561,41 +561,41 @@ function App() {
             <div className="space-y-4">
                 <div className="flex justify-between items-center">
                     <div className="flex-1">{renderFilterBar(false, Object.keys(grouped).length, [...new Set(courseFacultyMappings.map(m => m.course_code))].length)}</div>
-                    <button onClick={() => setShowAddMapping(!showAddMapping)} className="ml-3 flex items-center gap-2 bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow transition-all whitespace-nowrap">
+                    <button onClick={() => setShowAddMapping(!showAddMapping)} className="ml-3 flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-violet-200 hover:shadow-violet-300 transition-all whitespace-nowrap hover:-translate-y-0.5 active:scale-95">
                         <Plus className="w-4 h-4" /> Add Mapping
                     </button>
                 </div>
 
                 {showAddMapping && (
-                    <div className="bg-white rounded-xl border-2 border-yellow-300 shadow-lg p-5">
-                        <h4 className="font-bold text-gray-800 mb-3 flex items-center gap-2"><Plus className="w-4 h-4 text-yellow-600" /> Add Course-Faculty Mapping</h4>
+                    <div className="bg-white rounded-2xl border-2 border-violet-200 shadow-xl shadow-violet-100/50 p-6">
+                        <h4 className="font-bold text-gray-800 mb-4 flex items-center gap-2"><Plus className="w-4 h-4 text-violet-600" /> Add Course-Faculty Mapping</h4>
                         <form onSubmit={handleAddMapping} className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                            <input name="course_code" placeholder="Course Code *" required className="p-2 border rounded-lg text-sm" />
-                            <input name="faculty_id" placeholder="Faculty ID *" required className="p-2 border rounded-lg text-sm" />
-                            <select name="department_code" required className="p-2 border rounded-lg text-sm">
+                            <input name="course_code" placeholder="Course Code *" required className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
+                            <input name="faculty_id" placeholder="Faculty ID *" required className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
+                            <select name="department_code" required className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm">
                                 <option value="">Taught To (Dept) *</option>
                                 {departments.map(d => <option key={d.department_code} value={d.department_code}>{d.department_code}</option>)}
                             </select>
-                            <select name="delivery_type" className="p-2 border rounded-lg text-sm">
+                            <select name="delivery_type" className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm">
                                 <option value="Theory">Theory</option>
                                 <option value="Lab">Lab</option>
                                 <option value="Both">Both</option>
                             </select>
                             <div className="flex gap-2">
-                                <button type="submit" className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-semibold">Save</button>
-                                <button type="button" onClick={() => setShowAddMapping(false)} className="bg-gray-300 hover:bg-gray-400 text-gray-700 px-4 py-2 rounded-lg text-sm">Cancel</button>
+                                <button type="submit" className="bg-violet-600 hover:bg-violet-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-violet-200 transition-all">Save</button>
+                                <button type="button" onClick={() => setShowAddMapping(false)} className="bg-gray-100 hover:bg-gray-200 text-gray-600 px-4 py-2.5 rounded-xl text-sm font-medium transition-all">Cancel</button>
                             </div>
                         </form>
                     </div>
                 )}
 
-                <div className="space-y-3">
+                <div className="space-y-4">
                     {Object.entries(grouped).map(([code, data]) => (
-                        <div key={code} className="bg-white rounded-xl border shadow-sm overflow-hidden">
-                            <div className="bg-gradient-to-r from-slate-50 to-white p-4 border-b flex items-center justify-between">
+                        <div key={code} className="bg-white rounded-2xl border border-violet-100 shadow-md shadow-violet-50/30 overflow-hidden hover:shadow-lg transition-shadow duration-300">
+                            <div className="bg-gradient-to-r from-violet-50/80 to-purple-50/40 p-4 border-b border-violet-100 flex items-center justify-between">
                                 <div>
                                     <div className="flex items-center gap-2">
-                                        <span className="font-mono font-bold text-blue-800 text-sm">{code}</span>
+                                        <span className="font-mono font-bold text-violet-800 text-sm">{code}</span>
                                         {/* Logic to determine offering department from faculty */}
                                         {(() => {
                                             const facDepts = new Set(data.faculty.map(f => f.faculty_dept).filter(d => d && d !== '?'));
@@ -615,15 +615,15 @@ function App() {
                                     </div>
                                     <p className="text-sm text-gray-700 mt-0.5 font-medium">{data.course_name}</p>
                                 </div>
-                                <div className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-xs font-medium">
+                                <div className="bg-violet-100 text-violet-700 px-3.5 py-1.5 rounded-full text-xs font-bold border border-violet-200">
                                     {data.faculty.length} faculty
                                 </div>
                             </div>
                             <div className="p-3">
                                 <div className="flex flex-wrap gap-2">
                                     {data.faculty.map((f, i) => (
-                                        <div key={i} className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2 border group hover:border-blue-300 transition-colors">
-                                            <div className="w-8 h-8 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-sm">
+                                        <div key={i} className="flex items-center gap-2 bg-purple-50/50 rounded-xl px-3.5 py-2.5 border border-violet-100 group hover:border-violet-300 hover:bg-violet-50 transition-all duration-200">
+                                            <div className="w-8 h-8 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl flex items-center justify-center text-white text-xs font-bold shadow-sm">
                                                 {(f.faculty_name || '?').charAt(0)}
                                             </div>
                                             <div>
@@ -644,7 +644,7 @@ function App() {
                             </div>
                         </div>
                     ))}
-                    {Object.keys(grouped).length === 0 && <div className="p-8 text-center text-gray-400 bg-white rounded-xl border">No mappings found.</div>}
+                    {Object.keys(grouped).length === 0 && <div className="p-10 text-center text-gray-400 bg-white rounded-2xl border border-violet-100 text-sm">No mappings found.</div>}
                 </div>
             </div>
         );
@@ -774,62 +774,62 @@ function App() {
                     <div>
                         <p className="text-sm text-gray-500 mt-1">Manage period timings, types, and active status for each day of the week.</p>
                     </div>
-                    <button onClick={() => setShowAddSlot(!showAddSlot)} className="flex items-center gap-2 px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-semibold shadow-md transition-all">
+                    <button onClick={() => setShowAddSlot(!showAddSlot)} className="flex items-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-bold shadow-lg shadow-violet-200 hover:shadow-violet-300 transition-all hover:-translate-y-0.5 active:scale-95">
                         <Plus className="w-4 h-4" /> Add Slot
                     </button>
                 </div>
 
                 {showAddSlot && (
-                    <div className="bg-white rounded-xl border-2 border-yellow-300 shadow-lg p-5">
-                        <h4 className="font-bold text-gray-800 mb-3 flex items-center gap-2"><Plus className="w-4 h-4 text-yellow-600" /> Add New Time Slot</h4>
+                    <div className="bg-white rounded-2xl border-2 border-violet-200 shadow-xl shadow-violet-100/50 p-6">
+                        <h4 className="font-bold text-gray-800 mb-4 flex items-center gap-2"><Plus className="w-4 h-4 text-violet-600" /> Add New Time Slot</h4>
                         <form onSubmit={handleAddSlot} className="grid grid-cols-2 md:grid-cols-6 gap-3">
-                            <select name="day_of_week" required className="p-2 border rounded-lg text-sm">
+                            <select name="day_of_week" required className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm">
                                 <option value="">Day *</option>
-                                {dayOrder.map(d => <option key={d} value={d}>{d}</option>)}
+                                {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map(d => <option key={d} value={d}>{d}</option>)}
                             </select>
-                            <input name="period_number" type="number" placeholder="Period # *" required min="1" max="10" className="p-2 border rounded-lg text-sm" />
-                            <input name="start_time" type="time" required className="p-2 border rounded-lg text-sm" />
-                            <input name="end_time" type="time" required className="p-2 border rounded-lg text-sm" />
-                            <select name="slot_type" className="p-2 border rounded-lg text-sm">
+                            <input name="period_number" type="number" placeholder="Period # *" required min="1" className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
+                            <input name="start_time" type="time" required className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
+                            <input name="end_time" type="time" required className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
+                            <select name="slot_type" className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm">
                                 <option value="REGULAR">Regular</option>
                                 <option value="BREAK">Break</option>
                                 <option value="LUNCH">Lunch</option>
                                 <option value="SPECIAL">Special</option>
                             </select>
                             <div className="flex gap-2">
-                                <button type="submit" className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-semibold">Save</button>
-                                <button type="button" onClick={() => setShowAddSlot(false)} className="bg-gray-300 hover:bg-gray-400 text-gray-700 px-4 py-2 rounded-lg text-sm">Cancel</button>
+                                <button type="submit" className="bg-violet-600 hover:bg-violet-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-violet-200 transition-all">Save</button>
+                                <button type="button" onClick={() => setShowAddSlot(false)} className="bg-gray-100 hover:bg-gray-200 text-gray-600 px-4 py-2.5 rounded-xl text-sm font-medium transition-all">Cancel</button>
                             </div>
                         </form>
                     </div>
                 )}
 
                 {sortedDays.map(day => (
-                    <div key={day} className="bg-white rounded-xl border shadow-sm overflow-hidden">
-                        <div className="bg-gradient-to-r from-slate-50 to-white p-4 border-b">
+                    <div key={day} className="bg-white rounded-2xl border border-violet-100 shadow-md shadow-violet-50/30 overflow-hidden">
+                        <div className="bg-gradient-to-r from-violet-50/80 to-purple-50/40 p-4 border-b border-violet-100">
                             <h3 className="font-bold text-gray-800 flex items-center gap-2">
-                                <Calendar className="w-4 h-4 text-yellow-600" />
+                                <Calendar className="w-4 h-4 text-violet-600" />
                                 {day}
-                                <span className="ml-2 text-xs font-normal bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">{grouped[day].length} periods</span>
+                                <span className="ml-2 text-xs font-semibold bg-violet-100 text-violet-700 px-2.5 py-1 rounded-full border border-violet-200">{grouped[day].length} periods</span>
                             </h3>
                         </div>
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">
                                 <thead>
-                                    <tr className="bg-gray-50 text-gray-600 text-xs uppercase">
-                                        <th className="px-4 py-3 text-left">Period</th>
-                                        <th className="px-4 py-3 text-left">Start Time</th>
-                                        <th className="px-4 py-3 text-left">End Time</th>
-                                        <th className="px-4 py-3 text-left">Type</th>
-                                        <th className="px-4 py-3 text-left">Status</th>
-                                        <th className="px-4 py-3 text-right">Actions</th>
+                                    <tr className="bg-gradient-to-r from-violet-700 via-purple-700 to-indigo-800 text-white">
+                                        <th className="px-4 py-3 text-left font-semibold text-xs uppercase tracking-wider">Period</th>
+                                        <th className="px-4 py-3 text-left font-semibold text-xs uppercase tracking-wider">Start Time</th>
+                                        <th className="px-4 py-3 text-left font-semibold text-xs uppercase tracking-wider">End Time</th>
+                                        <th className="px-4 py-3 text-left font-semibold text-xs uppercase tracking-wider">Type</th>
+                                        <th className="px-4 py-3 text-left font-semibold text-xs uppercase tracking-wider">Status</th>
+                                        <th className="px-4 py-3 text-right font-semibold text-xs uppercase tracking-wider">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {grouped[day].map(slot => (
-                                        <tr key={slot.slot_id} className="border-t hover:bg-gray-50 transition-colors">
+                                        <tr key={slot.slot_id} className="border-b border-violet-50 hover:bg-violet-50/40 transition-colors duration-200">
                                             <td className="px-4 py-3">
-                                                <span className="inline-flex items-center justify-center w-8 h-8 bg-yellow-100 text-yellow-800 rounded-full font-bold text-sm">
+                                                <span className="inline-flex items-center justify-center w-8 h-8 bg-violet-100 text-violet-800 rounded-xl font-bold text-sm border border-violet-200">
                                                     P{slot.period_number}
                                                 </span>
                                             </td>
@@ -894,7 +894,7 @@ function App() {
                         </div>
                     </div>
                 ))}
-                {sortedDays.length === 0 && <div className="p-8 text-center text-gray-400 bg-white rounded-xl border">No time slots configured. Click "Add Slot" to create one.</div>}
+                {sortedDays.length === 0 && <div className="p-10 text-center text-gray-400 bg-white rounded-2xl border border-violet-100 text-sm">No time slots configured. Click "Add Slot" to create one.</div>}
             </div>
         );
     };
@@ -904,46 +904,46 @@ function App() {
     // ============================================
     const renderDashboard = () => (
         <div className="space-y-6">
-            <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
+            <div className="bg-white p-6 rounded-2xl shadow-lg shadow-violet-50/50 border border-violet-100">
                 <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-                    <Monitor className="w-5 h-5 text-yellow-600" />
+                    <Monitor className="w-5 h-5 text-violet-600" />
                     <span>Generate Timetable</span>
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Department</label>
-                        <select className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500" value={selectedDept} onChange={e => setSelectedDept(e.target.value)}>
+                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">Department</label>
+                        <select className="w-full p-2.5 border border-violet-200 rounded-xl focus:ring-2 focus:ring-violet-400 focus:border-violet-400 focus:outline-none shadow-sm bg-white font-medium text-gray-700 cursor-pointer transition-all hover:border-violet-300" value={selectedDept} onChange={e => setSelectedDept(e.target.value)}>
                             <option value="">Select Dept</option>
                             {departments.map(d => <option key={d.department_code} value={d.department_code}>{d.department_code}</option>)}
                         </select>
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Semester</label>
-                        <select className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500" value={selectedSem} onChange={e => setSelectedSem(e.target.value)}>
+                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">Semester</label>
+                        <select className="w-full p-2.5 border border-violet-200 rounded-xl focus:ring-2 focus:ring-violet-400 focus:border-violet-400 focus:outline-none shadow-sm bg-white font-medium text-gray-700 cursor-pointer transition-all hover:border-violet-300" value={selectedSem} onChange={e => setSelectedSem(e.target.value)}>
                             <option value="">Select Sem</option>
                             {semesters.map(s => <option key={s.semester_number} value={s.semester_number}>Semester {s.semester_number}</option>)}
                         </select>
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Mentor Day</label>
-                        <select className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500" value={mentorDay} onChange={e => setMentorDay(e.target.value)}>
+                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">Mentor Day</label>
+                        <select className="w-full p-2.5 border border-violet-200 rounded-xl focus:ring-2 focus:ring-violet-400 focus:border-violet-400 focus:outline-none shadow-sm bg-white font-medium text-gray-700 cursor-pointer transition-all hover:border-violet-300" value={mentorDay} onChange={e => setMentorDay(e.target.value)}>
                             {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map(d => <option key={d} value={d}>{d}</option>)}
                         </select>
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Mentor Period</label>
-                        <input type="number" className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500" value={mentorPeriod} onChange={e => setMentorPeriod(e.target.value)} min="1" max="8" />
+                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">Mentor Period</label>
+                        <input type="number" className="w-full p-2.5 border border-violet-200 rounded-xl focus:ring-2 focus:ring-violet-400 focus:border-violet-400 focus:outline-none shadow-sm bg-white font-medium text-gray-700" value={mentorPeriod} onChange={e => setMentorPeriod(e.target.value)} min="1" max="8" />
                     </div>
-                    <button onClick={handleGenerate} disabled={loading} className={`w-full py-2 px-4 rounded-lg text-white font-semibold flex items-center justify-center space-x-2 transition-all ${loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-yellow-600 hover:bg-yellow-700 shadow-md'}`}>
+                    <button onClick={handleGenerate} disabled={loading} className={`w-full py-2.5 px-4 rounded-xl text-white font-bold flex items-center justify-center space-x-2 transition-all ${loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-gradient-to-r from-violet-600 to-purple-700 hover:from-violet-700 hover:to-purple-800 shadow-lg shadow-violet-200 hover:shadow-violet-300 hover:-translate-y-0.5 active:scale-95'}`}>
                         {loading ? <RotateCw className="w-5 h-5 animate-spin" /> : <Monitor className="w-5 h-5" />}
                         <span>{loading ? 'Processing...' : 'Generate'}</span>
                     </button>
                 </div>
             </div>
-            <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
-                <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+            <div className="bg-white rounded-2xl shadow-lg shadow-violet-50/50 border border-violet-100 overflow-hidden">
+                <div className="p-4 border-b border-violet-100 flex justify-between items-center bg-gradient-to-r from-violet-50/80 to-purple-50/40">
                     <h3 className="font-bold text-gray-700">{selectedDept && selectedSem ? `${selectedDept} - Semester ${selectedSem}` : 'Timetable Preview'}</h3>
-                    <button onClick={handleDownloadPDF} className="flex items-center space-x-2 text-sm text-gray-600 hover:text-blue-600 border px-3 py-1 rounded bg-white shadow-sm">
+                    <button onClick={handleDownloadPDF} className="flex items-center space-x-2 text-sm text-violet-700 hover:text-violet-900 border border-violet-200 px-4 py-1.5 rounded-xl bg-white shadow-sm hover:shadow-md hover:border-violet-300 font-semibold transition-all">
                         <Download className="w-4 h-4" /><span>Export PDF</span>
                     </button>
                 </div>
@@ -965,62 +965,62 @@ function App() {
     };
 
     return (
-        <div className="flex h-screen bg-gray-50 font-sans text-gray-900 overflow-hidden">
-            <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-slate-900 text-white transform transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:relative lg:translate-x-0 shadow-xl flex flex-col`}>
-                <div className="flex items-center justify-between p-4 border-b border-slate-800">
+        <div className="flex h-screen bg-gradient-to-br from-gray-50 via-violet-50/30 to-purple-50/20 font-sans text-gray-900 overflow-hidden">
+            <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-gradient-to-b from-violet-950 via-purple-900 to-indigo-950 text-white transform transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:relative lg:translate-x-0 shadow-2xl shadow-violet-900/30 flex flex-col`}>
+                <div className="flex items-center justify-between p-4 border-b border-violet-800/50">
                     <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-lg flex items-center justify-center shadow-lg">
-                            <Calendar className="w-6 h-6 text-slate-900" />
+                        <div className="w-10 h-10 bg-gradient-to-br from-violet-400 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-violet-500/30">
+                            <Calendar className="w-6 h-6 text-white" />
                         </div>
-                        <span className="text-xl font-bold tracking-tight text-yellow-500">BIT Scheduler</span>
+                        <span className="text-xl font-bold tracking-tight text-white">BIT Scheduler</span>
                     </div>
-                    <button onClick={() => setIsSidebarOpen(false)} className="lg:hidden p-1 hover:bg-slate-800 rounded"><X className="w-5 h-5" /></button>
+                    <button onClick={() => setIsSidebarOpen(false)} className="lg:hidden p-1 hover:bg-violet-800/50 rounded-lg"><X className="w-5 h-5" /></button>
                 </div>
-                <nav className="mt-6 px-4 space-y-2 flex-grow">
-                    <button onClick={() => switchTab('dashboard')} className={`flex items-center space-x-3 w-full p-3 rounded-lg transition-all duration-200 ${activeTab === 'dashboard' ? 'bg-yellow-500 text-slate-900 font-semibold shadow-md' : 'hover:bg-slate-800 text-slate-300'}`}>
+                <nav className="mt-6 px-4 space-y-1.5 flex-grow">
+                    <button onClick={() => switchTab('dashboard')} className={`flex items-center space-x-3 w-full p-3 rounded-xl transition-all duration-200 ${activeTab === 'dashboard' ? 'bg-violet-600/80 text-white font-semibold shadow-lg shadow-violet-600/30' : 'hover:bg-violet-800/40 text-violet-200'}`}>
                         <LayoutDashboard className="w-5 h-5" /><span>Dashboard</span>
                     </button>
-                    <button onClick={() => switchTab('editor')} className={`flex items-center space-x-3 w-full p-3 rounded-lg transition-all duration-200 ${activeTab === 'editor' ? 'bg-yellow-500 text-slate-900 font-semibold shadow-md' : 'hover:bg-slate-800 text-slate-300'}`}>
+                    <button onClick={() => switchTab('editor')} className={`flex items-center space-x-3 w-full p-3 rounded-xl transition-all duration-200 ${activeTab === 'editor' ? 'bg-violet-600/80 text-white font-semibold shadow-lg shadow-violet-600/30' : 'hover:bg-violet-800/40 text-violet-200'}`}>
                         <Pencil className="w-5 h-5" /><span>Editor</span>
                     </button>
-                    <div className="pt-4 pb-2"><p className="px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Data Explorer</p></div>
-                    <button onClick={() => switchTab('subjects')} className={`flex items-center space-x-3 w-full p-3 rounded-lg transition-all duration-200 ${activeTab === 'subjects' ? 'bg-yellow-500 text-slate-900 font-semibold shadow-md' : 'hover:bg-slate-800 text-slate-300'}`}>
+                    <div className="pt-5 pb-2"><p className="px-3 text-[10px] font-bold text-violet-400/60 uppercase tracking-[0.2em]">Data Explorer</p></div>
+                    <button onClick={() => switchTab('subjects')} className={`flex items-center space-x-3 w-full p-3 rounded-xl transition-all duration-200 ${activeTab === 'subjects' ? 'bg-violet-600/80 text-white font-semibold shadow-lg shadow-violet-600/30' : 'hover:bg-violet-800/40 text-violet-200'}`}>
                         <BookOpen className="w-5 h-5" /><span>Subjects</span>
                     </button>
-                    <button onClick={() => switchTab('faculty')} className={`flex items-center space-x-3 w-full p-3 rounded-lg transition-all duration-200 ${activeTab === 'faculty' ? 'bg-yellow-500 text-slate-900 font-semibold shadow-md' : 'hover:bg-slate-800 text-slate-300'}`}>
+                    <button onClick={() => switchTab('faculty')} className={`flex items-center space-x-3 w-full p-3 rounded-xl transition-all duration-200 ${activeTab === 'faculty' ? 'bg-violet-600/80 text-white font-semibold shadow-lg shadow-violet-600/30' : 'hover:bg-violet-800/40 text-violet-200'}`}>
                         <Users className="w-5 h-5" /><span>Faculty</span>
                     </button>
-                    <button onClick={() => switchTab('mappings')} className={`flex items-center space-x-3 w-full p-3 rounded-lg transition-all duration-200 ${activeTab === 'mappings' ? 'bg-yellow-500 text-slate-900 font-semibold shadow-md' : 'hover:bg-slate-800 text-slate-300'}`}>
+                    <button onClick={() => switchTab('mappings')} className={`flex items-center space-x-3 w-full p-3 rounded-xl transition-all duration-200 ${activeTab === 'mappings' ? 'bg-violet-600/80 text-white font-semibold shadow-lg shadow-violet-600/30' : 'hover:bg-violet-800/40 text-violet-200'}`}>
                         <GraduationCap className="w-5 h-5" /><span>Course-Faculty</span>
                     </button>
-                    <button onClick={() => switchTab('timeslots')} className={`flex items-center space-x-3 w-full p-3 rounded-lg transition-all duration-200 ${activeTab === 'timeslots' ? 'bg-yellow-500 text-slate-900 font-semibold shadow-md' : 'hover:bg-slate-800 text-slate-300'}`}>
+                    <button onClick={() => switchTab('timeslots')} className={`flex items-center space-x-3 w-full p-3 rounded-xl transition-all duration-200 ${activeTab === 'timeslots' ? 'bg-violet-600/80 text-white font-semibold shadow-lg shadow-violet-600/30' : 'hover:bg-violet-800/40 text-violet-200'}`}>
                         <Clock className="w-5 h-5" /><span>Time Slots</span>
                     </button>
                 </nav>
-                <div className="p-4 border-t border-slate-800 bg-slate-900">
-                    <div className="bg-slate-800 rounded-lg p-3">
-                        <p className="text-xs text-slate-400 mb-1">System Status</p>
+                <div className="p-4 border-t border-violet-800/50">
+                    <div className="bg-violet-800/40 rounded-xl p-3">
+                        <p className="text-xs text-violet-300/70 mb-1">System Status</p>
                         <div className="flex items-center space-x-2">
-                            <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
-                            <span className="text-sm font-medium text-emerald-400">Operational</span>
+                            <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span>
+                            <span className="text-sm font-medium text-emerald-300">Operational</span>
                         </div>
-                        <p className="text-[10px] text-slate-500 mt-2">V2.2 - Full CRUD</p>
+                        <p className="text-[10px] text-violet-400/50 mt-2">V2.2 - Full CRUD</p>
                     </div>
                 </div>
             </aside>
 
             <main className="flex-1 flex flex-col h-screen overflow-hidden relative">
-                <header className="bg-white border-b shadow-sm z-10 px-6 py-4 flex items-center justify-between">
+                <header className="bg-white/80 backdrop-blur-md border-b border-violet-100 shadow-sm z-10 px-6 py-4 flex items-center justify-between">
                     <div className="flex items-center space-x-4">
-                        <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 rounded-lg hover:bg-gray-100 lg:hidden text-gray-600"><Menu className="w-6 h-6" /></button>
+                        <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 rounded-xl hover:bg-violet-50 lg:hidden text-gray-600"><Menu className="w-6 h-6" /></button>
                         <h2 className="text-2xl font-bold text-gray-800">{pageTitle[activeTab] || 'Dashboard'}</h2>
                     </div>
                     <div className="flex items-center space-x-6">
-                        <div className="h-10 w-10 bg-yellow-100 rounded-full flex items-center justify-center text-yellow-700 font-bold border-2 border-yellow-200">AD</div>
+                        <div className="h-10 w-10 bg-gradient-to-br from-violet-500 to-purple-700 rounded-xl flex items-center justify-center text-white font-bold shadow-lg shadow-violet-200">AD</div>
                     </div>
                 </header>
 
-                <div className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-6">
+                <div className="flex-1 overflow-x-hidden overflow-y-auto bg-transparent p-6">
                     <div className="max-w-7xl mx-auto">
                         {activeTab === 'dashboard' && renderDashboard()}
                         {activeTab === 'editor' && renderEditorPage()}

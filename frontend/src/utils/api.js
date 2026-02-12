@@ -45,4 +45,5 @@ export const deleteSlot = (slotId) => axios.delete(`${API_URL}/slots/${slotId}`)
 // --- Timetable ---
 export const generateTimetable = (data) => axios.post(`${API_URL}/generate`, data);
 export const getTimetable = (deptCode, sem) => axios.get(`${API_URL}/timetable?department_code=${deptCode}&semester=${sem}`);
+export const getTimetableEntries = getTimetable;
 export const saveTimetable = (data) => axios.post(`${API_URL}/timetable/save`, data);

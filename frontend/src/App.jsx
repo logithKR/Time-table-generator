@@ -1,30 +1,31 @@
 import { useState, useEffect } from 'react';
-import { 
-  LayoutDashboard, 
-  BookOpen, 
-  Users, 
-  GraduationCap, 
-  Clock, 
-  Calendar, 
-  Menu, 
-  X, 
-  Plus, 
-  Trash2, 
-  Edit2, 
-  Check, 
-  ChevronDown, 
-  RotateCw, 
-  Monitor, 
-  Download, 
-  Share2, 
-  Layers, 
-  Filter, 
-  Pencil, 
-  ChevronLeft, 
-  ChevronRight,
-  Search // Added missing import
+import {
+    LayoutDashboard,
+    BookOpen,
+    Users,
+    GraduationCap,
+    Clock,
+    Calendar,
+    Menu,
+    X,
+    Plus,
+    Trash2,
+    Edit2,
+    Check,
+    ChevronDown,
+    RotateCw,
+    Monitor,
+    Download,
+    Share2,
+    Layers,
+    Filter,
+    Pencil,
+    ChevronLeft,
+    ChevronRight,
+    Search // Added missing import
 } from 'lucide-react';
 import TimetableEditor from './components/TimetableEditor';
+import BITTimetable from './components/BITTimetable';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as api from './utils/api';
@@ -80,7 +81,16 @@ function App() {
         if (activeTab === 'subjects') fetchCourses();
         if (activeTab === 'faculty') fetchFaculty();
         if (activeTab === 'mappings') fetchCourseFacultyMappings();
-    }, [activeTab, filterDept, filterSem]);
+        if (activeTab === 'print' && editorDept && editorSem) {
+            const loadPrintData = async () => {
+                try {
+                    const res = await api.getTimetableEntries(editorDept, editorSem);
+                    setTimetableEntries(res.data);
+                } catch (e) { console.error(e); }
+            };
+            loadPrintData();
+        }
+    }, [activeTab, filterDept, filterSem, editorDept, editorSem]);
 
     const fetchMasterData = async () => {
         try {
@@ -133,7 +143,7 @@ function App() {
     };
 
     const handleDeleteCourse = async (code) => {
-        if (!confirm(`Delete course ${ code }? This also removes faculty mappings.`)) return;
+        if (!confirm(`Delete course ${code}? This also removes faculty mappings.`)) return;
         try { await api.deleteCourse(code); fetchCourses(); }
         catch (err) { alert(err.response?.data?.detail || err.message); }
     };
@@ -157,7 +167,7 @@ function App() {
     };
 
     const handleDeleteFaculty = async (fid) => {
-        if (!confirm(`Delete faculty ${ fid }? This also removes their course mappings.`)) return;
+        if (!confirm(`Delete faculty ${fid}? This also removes their course mappings.`)) return;
         try { await api.deleteFaculty(fid); fetchFaculty(); }
         catch (err) { alert(err.response?.data?.detail || err.message); }
     };
@@ -232,14 +242,14 @@ function App() {
             const sem = data[0].semester || selectedSem || 'Unknown';
 
             const doc = new jsPDF('l', 'mm', 'a4');
-            doc.text(`Timetable - ${ dept } - Sem ${ sem } `, 14, 15);
+            doc.text(`Timetable - ${dept} - Sem ${sem} `, 14, 15);
 
             let uniquePeriods = [...new Set(slots.map(s => s.period_number))].sort((a, b) => a - b);
             if (uniquePeriods.length === 0) uniquePeriods = [1, 2, 3, 4, 5, 6, 7, 8];
 
             const periodsHeader = uniquePeriods.map(p => {
                 const s = slots.find(sl => sl.period_number === p);
-                return `P${ p } \n${ s ? s.start_time : '' } `;
+                return `P${p} \n${s ? s.start_time : ''} `;
             });
             const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
             if (slots.some(s => s.day_of_week === 'Saturday') || data.some(t => t.day_of_week === 'Saturday')) days.push('Saturday');
@@ -251,7 +261,7 @@ function App() {
                     if (entry) {
                         if (entry.session_type === 'MENTOR') rowData.push('MENTOR\nINTERACTION');
                         else if (entry.session_type === 'OPEN_ELECTIVE') rowData.push('OPEN\nELECTIVE');
-                        else rowData.push(`${ entry.course_code } \n${ entry.course_name || '' } \n${ entry.faculty_name || '' } `);
+                        else rowData.push(`${entry.course_code} \n${entry.course_name || ''} \n${entry.faculty_name || ''} `);
                     } else rowData.push('-');
                 });
                 return rowData;
@@ -268,7 +278,7 @@ function App() {
                     }
                 }
             });
-            doc.save(`timetable_${ dept }_${ sem }.pdf`);
+            doc.save(`timetable_${dept}_${sem}.pdf`);
         } catch (err) {
             console.error(err);
             alert("Failed to export PDF: " + err.message);
@@ -306,7 +316,7 @@ function App() {
                                 <th className="p-2 border border-gray-300 text-left font-bold w-24 sticky left-0 bg-gray-100 z-10">Day</th>
                                 {periods.map(p => {
                                     const slot = slots.find(s => s.period_number === p && s.day_of_week === 'Monday');
-                                    return (<th key={p} className="p-2 border border-gray-300 text-center font-bold min-w-[110px]"><div>Period {p}</div><div className="text-[10px] text-gray-500 font-normal">{slot ? `${ slot.start_time } - ${ slot.end_time } ` : ''}</div></th>);
+                                    return (<th key={p} className="p-2 border border-gray-300 text-center font-bold min-w-[110px]"><div>Period {p}</div><div className="text-[10px] text-gray-500 font-normal">{slot ? `${slot.start_time} - ${slot.end_time} ` : ''}</div></th>);
                                 })}
                             </tr>
                         </thead>
@@ -447,7 +457,7 @@ function App() {
                         </thead>
                         <tbody>
                             {filtered.map((c, i) => (
-                                <tr key={c.course_code} className={`border-b border-violet-50 hover:bg-violet-50/40 transition-colors duration-200 ${ i % 2 === 0 ? 'bg-white' : 'bg-purple-50/20' }`}>
+                                <tr key={c.course_code} className={`border-b border-violet-50 hover:bg-violet-50/40 transition-colors duration-200 ${i % 2 === 0 ? 'bg-white' : 'bg-purple-50/20'}`}>
                                     <td className="p-3.5 font-mono font-bold text-violet-800">{c.course_code}</td>
                                     <td className="p-3.5 text-gray-800 font-medium">{c.course_name}</td>
                                     <td className="p-3.5 text-center"><span className="bg-violet-50 text-violet-700 px-2.5 py-1 rounded-lg text-xs font-semibold border border-violet-100">{c.department_code}</span></td>
@@ -535,7 +545,7 @@ function App() {
                                     <p className="text-xs text-gray-400 font-mono mt-0.5">{f.faculty_id}</p>
                                     <div className="flex items-center gap-2 mt-2.5">
                                         <span className="bg-violet-50 text-violet-700 px-2.5 py-1 rounded-lg text-xs font-semibold border border-violet-100">{f.department_code}</span>
-                                        <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${ (f.status || '') === 'Active' || (f.status || '') === 'ACTIVE' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-red-50 text-red-700 border border-red-100' }`}>
+                                        <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${(f.status || '') === 'Active' || (f.status || '') === 'ACTIVE' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-red-50 text-red-700 border border-red-100'}`}>
                                             {f.status || 'Active'}
                                         </span>
                                     </div>
@@ -623,7 +633,7 @@ function App() {
                                             const facDepts = new Set(data.faculty.map(f => f.faculty_dept).filter(d => d && d !== '?'));
                                             const offeringDept = facDepts.size === 1 ? Array.from(facDepts)[0] : (facDepts.size > 1 ? 'Mixed' : data.course_dept);
                                             return (
-                                                <span className={`px-2 py-0.5 rounded text-xs font-medium border ${ offeringDept === '?' ? 'bg-gray-100 text-gray-500' : 'bg-slate-100 text-slate-700' }`}>
+                                                <span className={`px-2 py-0.5 rounded text-xs font-medium border ${offeringDept === '?' ? 'bg-gray-100 text-gray-500' : 'bg-slate-100 text-slate-700'}`}>
                                                     {offeringDept}
                                                 </span>
                                             );
@@ -701,15 +711,28 @@ function App() {
             </div>
             <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden min-h-[600px] flex flex-col">
                 <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
-                    <h3 className="font-bold text-gray-700">{editorDept && editorSem ? `${ editorDept } - Semester ${ editorSem } ` : 'Timetable Editor'}</h3>
+                    <h3 className="font-bold text-gray-700">{editorDept && editorSem ? `${editorDept} - Semester ${editorSem} ` : 'Timetable Editor'}</h3>
                 </div>
                 <div className="flex-1 relative">
                     {editorDept && editorSem ? (
                         <TimetableEditor
-                            key={`${ editorDept }-${ editorSem }`}
+                            key={`${editorDept}-${editorSem}`}
                             department={editorDept}
                             semester={editorSem}
-                            onSave={() => { }}
+                            initialData={timetableEntries}
+                            masterData={{ departments, semesters, slots, courses: allCourses, faculty: allFaculty }}
+                            onSave={async (updatedEntries) => {
+                                try {
+                                    await api.saveTimetableEntries(editorDept, editorSem, updatedEntries);
+                                    alert('Timetable saved successfully!');
+                                    // Re-fetch to ensure state is consistent
+                                    const res = await api.getTimetableEntries(editorDept, editorSem);
+                                    setTimetableEntries(res.data);
+                                } catch (error) {
+                                    console.error("Error saving timetable:", error);
+                                    alert('Failed to save timetable: ' + (error.response?.data?.detail || error.message));
+                                }
+                            }}
                             onExportPDF={handleDownloadPDF}
                         />
                     ) : (
@@ -878,7 +901,7 @@ function App() {
                                                         <option value="SPECIAL">Special</option>
                                                     </select>
                                                 ) : (
-                                                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${ slot.slot_type === 'REGULAR' ? 'bg-green-100 text-green-700' : slot.slot_type === 'BREAK' ? 'bg-orange-100 text-orange-700' : slot.slot_type === 'LUNCH' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700' }`}>
+                                                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${slot.slot_type === 'REGULAR' ? 'bg-green-100 text-green-700' : slot.slot_type === 'BREAK' ? 'bg-orange-100 text-orange-700' : slot.slot_type === 'LUNCH' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
                                                         {slot.slot_type}
                                                     </span>
                                                 )}
@@ -890,8 +913,8 @@ function App() {
                                                         <span className="text-xs">{editingSlotData.is_active ? 'Active' : 'Inactive'}</span>
                                                     </label>
                                                 ) : (
-                                                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${ slot.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600' }`}>
-                                                        <span className={`w-1.5 h-1.5 rounded-full ${ slot.is_active ? 'bg-emerald-500' : 'bg-red-400' }`}></span>
+                                                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${slot.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600'}`}>
+                                                        <span className={`w-1.5 h-1.5 rounded-full ${slot.is_active ? 'bg-emerald-500' : 'bg-red-400'}`}></span>
                                                         {slot.is_active ? 'Active' : 'Inactive'}
                                                     </span>
                                                 )}
@@ -956,7 +979,7 @@ function App() {
                         <label className="block text-sm font-semibold text-gray-700 mb-1.5">Mentor Period</label>
                         <input type="number" className="w-full p-2.5 border border-violet-200 rounded-xl focus:ring-2 focus:ring-violet-400 focus:border-violet-400 focus:outline-none shadow-sm bg-white font-medium text-gray-700" value={mentorPeriod} onChange={e => setMentorPeriod(e.target.value)} min="1" max="8" />
                     </div>
-                    <button onClick={handleGenerate} disabled={loading} className={`w-full py-2.5 px-4 rounded-xl text-white font-bold flex items-center justify-center space-x-2 transition-all ${ loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-violet-600 hover:bg-violet-700 shadow-lg shadow-violet-200 hover:shadow-violet-300 hover:-translate-y-0.5 active:scale-95' }`}>
+                    <button onClick={handleGenerate} disabled={loading} className={`w-full py-2.5 px-4 rounded-xl text-white font-bold flex items-center justify-center space-x-2 transition-all ${loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-violet-600 hover:bg-violet-700 shadow-lg shadow-violet-200 hover:shadow-violet-300 hover:-translate-y-0.5 active:scale-95'}`}>
                         {loading ? <RotateCw className="w-5 h-5 animate-spin" /> : <Monitor className="w-5 h-5" />}
                         <span>{loading ? 'Processing...' : 'Generate'}</span>
                     </button>
@@ -964,7 +987,7 @@ function App() {
             </div>
             <div className="bg-white rounded-2xl shadow-lg shadow-violet-50/50 border border-violet-100 overflow-hidden">
                 <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-white">
-                    <h3 className="font-bold text-gray-700">{selectedDept && selectedSem ? `${ selectedDept } - Semester ${ selectedSem } ` : 'Timetable Preview'}</h3>
+                    <h3 className="font-bold text-gray-700">{selectedDept && selectedSem ? `${selectedDept} - Semester ${selectedSem} ` : 'Timetable Preview'}</h3>
                     <button onClick={handleDownloadPDF} className="flex items-center space-x-2 text-sm text-violet-700 hover:text-violet-900 border border-violet-200 px-4 py-1.5 rounded-xl bg-white shadow-sm hover:shadow-md hover:border-violet-300 font-semibold transition-all">
                         <Download className="w-4 h-4" /><span>Export PDF</span>
                     </button>
@@ -974,13 +997,65 @@ function App() {
         </div>
     );
 
-    const pageTitle = { dashboard: 'Timetable Generator', editor: 'Timetable Editor', timeslots: 'Time Slots', subjects: 'Course / Subject Details', faculty: 'Faculty Details', mappings: 'Course-Faculty Mappings' };
+    const renderPrintViewPage = () => (
+        <div className="space-y-6">
+            <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
+                <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                    <Download className="w-5 h-5 text-blue-600" />
+                    <span>Print View Timetable</span>
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Department</label>
+                        <select className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" value={editorDept} onChange={e => setEditorDept(e.target.value)}>
+                            <option value="">Select Dept</option>
+                            {departments.map(d => <option key={d.department_code} value={d.department_code}>{d.department_code}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Semester</label>
+                        <select className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" value={editorSem} onChange={e => setEditorSem(e.target.value)}>
+                            <option value="">Select Sem</option>
+                            {semesters.map(s => <option key={s.semester_number} value={s.semester_number}>Semester {s.semester_number}</option>)}
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden min-h-[600px] flex flex-col">
+                <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+                    <h3 className="font-bold text-gray-700">{editorDept && editorSem ? `${editorDept} - Semester ${editorSem} ` : 'Timetable Print View'}</h3>
+                    <button onClick={handleDownloadPDF} className="flex items-center space-x-2 text-sm text-violet-700 hover:text-violet-900 border border-violet-200 px-4 py-1.5 rounded-xl bg-white shadow-sm hover:shadow-md hover:border-violet-300 font-semibold transition-all">
+                        <Download className="w-4 h-4" /><span>Export PDF</span>
+                    </button>
+                </div>
+                <div className="flex-1 relative">
+                    {editorDept && editorSem ? (
+                        <BITTimetable
+                            timetableData={timetableEntries}
+                            department={departments.find(d => d.department_code === editorDept)?.department_code}
+                            semester={semesters.find(s => s.semester_number === parseInt(editorSem))?.semester_number}
+                            slots={slots}
+                            courses={allCourses}
+                            faculty={allFaculty}
+                        />
+                    ) : (
+                        <div className="flex flex-col items-center justify-center h-full text-gray-400">
+                            <Download className="w-16 h-16 mb-4 opacity-20" />
+                            <p>Select Department and Semester to view timetable for printing</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+
+    const pageTitle = { dashboard: 'Timetable Generator', editor: 'Timetable Editor', print: 'Print View', timeslots: 'Time Slots', subjects: 'Course / Subject Details', faculty: 'Faculty Details', mappings: 'Course-Faculty Mappings' };
 
     const switchTab = (tab) => {
         setActiveTab(tab);
         setIsSidebarOpen(false); // Close mobile sidebar on navigation
-        if (tab === 'editor') {
-            setIsCollapsed(true); // Auto-collapse for editor
+        if (tab === 'editor' || tab === 'print') {
+            setIsCollapsed(true); // Auto-collapse for editor/print
         }
         setSearchQuery('');
         setFilterDept(''); // Clear filter to avoid confusion
@@ -992,13 +1067,13 @@ function App() {
 
     return (
         <div className="flex h-screen bg-slate-50 font-sans text-gray-900 overflow-hidden">
-            <aside className={`fixed inset-y-0 left-0 z-50 ${ isCollapsed ? 'w-20' : 'w-64' } bg-white border-r border-gray-100 transform transition-all duration-300 ease-in-out ${ isSidebarOpen ? 'translate-x-0' : '-translate-x-full' } lg:relative lg:translate-x-0 shadow-xl shadow-gray-200/50 flex flex-col`}>
-                <div className={`flex items-center ${ isCollapsed ? 'justify-center' : 'justify-between' } p-6 border-b border-gray-50 transition-all duration-300`}>
+            <aside className={`fixed inset-y-0 left-0 z-50 ${isCollapsed ? 'w-20' : 'w-64'} bg-white border-r border-gray-100 transform transition-all duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:relative lg:translate-x-0 shadow-xl shadow-gray-200/50 flex flex-col`}>
+                <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'} p-6 border-b border-gray-50 transition-all duration-300`}>
                     <div className="flex items-center space-x-3 overflow-hidden">
                         <div className="w-8 h-8 bg-violet-600 rounded-lg flex items-center justify-center shadow-lg shadow-violet-200 flex-shrink-0">
                             <Calendar className="w-5 h-5 text-white" />
                         </div>
-                        <span className={`text-xl font-bold tracking-tight text-gray-800 whitespace-nowrap transition-opacity duration-300 ${ isCollapsed ? 'opacity-0 w-0 hidden' : 'opacity-100' }`}>
+                        <span className={`text-xl font-bold tracking-tight text-gray-800 whitespace-nowrap transition-opacity duration-300 ${isCollapsed ? 'opacity-0 w-0 hidden' : 'opacity-100'}`}>
                             Time Table
                         </span>
                     </div>
@@ -1013,7 +1088,8 @@ function App() {
                 <nav className="mt-8 px-3 space-y-2 flex-grow">
                     {[
                         { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-                        { id: 'editor', icon: Pencil, label: 'Editor' },
+                        { id: 'editor', icon: Edit2, label: 'Editor' },
+                        { id: 'print', icon: Download, label: 'Print View' },
                         { id: 'subjects', icon: BookOpen, label: 'Subjects' },
                         { id: 'faculty', icon: Users, label: 'Faculty' },
                         { id: 'mappings', icon: GraduationCap, label: 'Course-Faculty' },
@@ -1021,16 +1097,16 @@ function App() {
                     ].map(item => (
                         <button key={item.id} onClick={() => switchTab(item.id)}
                             title={isCollapsed ? item.label : ''}
-                            className={`flex items-center ${ isCollapsed ? 'justify-center px-0' : 'space-x-3 px-3' } w-full py-3 rounded-xl transition-all duration-200 font-medium ${ activeTab === item.id ? 'bg-violet-600 text-white shadow-lg shadow-violet-200' : 'text-gray-500 hover:bg-gray-50 hover:text-violet-600' }`}>
+                            className={`flex items-center ${isCollapsed ? 'justify-center px-0' : 'space-x-3 px-3'} w-full py-3 rounded-xl transition-all duration-200 font-medium ${activeTab === item.id ? 'bg-violet-600 text-white shadow-lg shadow-violet-200' : 'text-gray-500 hover:bg-gray-50 hover:text-violet-600'}`}>
                             <item.icon className="w-5 h-5 flex-shrink-0" />
-                            <span className={`whitespace-nowrap transition-all duration-300 ${ isCollapsed ? 'opacity-0 w-0 hidden' : 'opacity-100' }`}>{item.label}</span>
+                            <span className={`whitespace-nowrap transition-all duration-300 ${isCollapsed ? 'opacity-0 w-0 hidden' : 'opacity-100'}`}>{item.label}</span>
                         </button>
                     ))}
                 </nav>
                 <div className="p-4 border-t border-gray-100">
-                    <div className={`bg-slate-50 rounded-xl p-3 border border-slate-100 flex items-center ${ isCollapsed ? 'justify-center' : 'gap-3' } transition-all duration-300`}>
+                    <div className={`bg-slate-50 rounded-xl p-3 border border-slate-100 flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} transition-all duration-300`}>
                         <div className="h-9 w-9 rounded-full bg-violet-100 flex items-center justify-center text-violet-600 font-bold text-xs flex-shrink-0">LK</div>
-                        <div className={`overflow-hidden transition-all duration-300 ${ isCollapsed ? 'w-0 opacity-0 hidden' : 'w-auto opacity-100' }`}>
+                        <div className={`overflow-hidden transition-all duration-300 ${isCollapsed ? 'w-0 opacity-0 hidden' : 'w-auto opacity-100'}`}>
                             <p className="text-sm font-bold text-gray-800 truncate">LogithKumar</p>
                             <p className="text-xs text-gray-500">Admin</p>
                         </div>

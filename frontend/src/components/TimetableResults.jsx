@@ -5,7 +5,7 @@ import { Calendar as CalendarIcon, Download, Check } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
-const TimetableResults = ({ timetableId }) => {
+const TimetableResults = ({ timetableId, onExport }) => {
     const [entries, setEntries] = useState([]);
     const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
     const hours = Array.from({ length: 8 }, (_, i) => i + 9); // 9 AM to 4 PM
@@ -28,6 +28,10 @@ const TimetableResults = ({ timetableId }) => {
     };
 
     const exportPDF = () => {
+        if (onExport) {
+            onExport();
+            return;
+        }
         try {
             const doc = new jsPDF('l', 'mm', 'a4');
 

@@ -323,7 +323,7 @@ function App() {
     // FILTER BAR (render function, NOT component)
     // ============================================
     const renderFilterBar = (showSem, filteredCount, totalCount) => (
-        <div className="flex flex-wrap gap-3 items-center mb-4 bg-gradient-to-r from-violet-50/80 to-purple-50/60 p-4 rounded-2xl border border-violet-100 shadow-sm">
+        <div className="flex flex-wrap gap-3 items-center mb-4 bg-violet-50 p-4 rounded-2xl border border-violet-100 shadow-sm">
             <div className="flex items-center gap-2">
                 <Layers className="w-4 h-4 text-violet-500" />
                 <span className="text-sm font-semibold text-violet-700">Filter:</span>
@@ -406,7 +406,7 @@ function App() {
                 <div className="overflow-x-auto bg-white rounded-2xl border border-violet-100 shadow-lg shadow-violet-50/50">
                     <table className="min-w-full text-sm">
                         <thead>
-                            <tr className="bg-gradient-to-r from-violet-700 via-purple-700 to-indigo-800 text-white">
+                            <tr className="bg-violet-700 text-white">
                                 <th className="p-3.5 text-left font-semibold text-xs uppercase tracking-wider">Code</th>
                                 <th className="p-3.5 text-left font-semibold text-xs uppercase tracking-wider">Course Name</th>
                                 <th className="p-3.5 text-center font-semibold text-xs uppercase tracking-wider">Dept</th>
@@ -497,7 +497,7 @@ function App() {
                     {filtered.map(f => (
                         <div key={f.faculty_id} className="bg-white rounded-2xl border border-violet-100 shadow-md shadow-violet-50/30 hover:shadow-xl hover:shadow-violet-100/50 hover:border-violet-200 transition-all duration-300 p-5 group">
                             <div className="flex items-start gap-3">
-                                <div className="w-12 h-12 bg-gradient-to-br from-violet-500 to-purple-700 rounded-2xl flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-violet-200 flex-shrink-0">
+                                <div className="w-12 h-12 bg-violet-600 rounded-2xl flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-violet-200 flex-shrink-0">
                                     {(f.faculty_name || '?').charAt(0).toUpperCase()}
                                 </div>
                                 <div className="flex-1 min-w-0">
@@ -592,7 +592,7 @@ function App() {
                 <div className="space-y-4">
                     {Object.entries(grouped).map(([code, data]) => (
                         <div key={code} className="bg-white rounded-2xl border border-violet-100 shadow-md shadow-violet-50/30 overflow-hidden hover:shadow-lg transition-shadow duration-300">
-                            <div className="bg-gradient-to-r from-violet-50/80 to-purple-50/40 p-4 border-b border-violet-100 flex items-center justify-between">
+                            <div className="bg-violet-50 p-4 border-b border-violet-100 flex items-center justify-between">
                                 <div>
                                     <div className="flex items-center gap-2">
                                         <span className="font-mono font-bold text-violet-800 text-sm">{code}</span>
@@ -806,7 +806,7 @@ function App() {
 
                 {sortedDays.map(day => (
                     <div key={day} className="bg-white rounded-2xl border border-violet-100 shadow-md shadow-violet-50/30 overflow-hidden">
-                        <div className="bg-gradient-to-r from-violet-50/80 to-purple-50/40 p-4 border-b border-violet-100">
+                        <div className="bg-violet-50 p-4 border-b border-violet-100">
                             <h3 className="font-bold text-gray-800 flex items-center gap-2">
                                 <Calendar className="w-4 h-4 text-violet-600" />
                                 {day}
@@ -816,7 +816,7 @@ function App() {
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">
                                 <thead>
-                                    <tr className="bg-gradient-to-r from-violet-700 via-purple-700 to-indigo-800 text-white">
+                                    <tr className="bg-violet-700 text-white">
                                         <th className="px-4 py-3 text-left font-semibold text-xs uppercase tracking-wider">Period</th>
                                         <th className="px-4 py-3 text-left font-semibold text-xs uppercase tracking-wider">Start Time</th>
                                         <th className="px-4 py-3 text-left font-semibold text-xs uppercase tracking-wider">End Time</th>
@@ -934,14 +934,14 @@ function App() {
                         <label className="block text-sm font-semibold text-gray-700 mb-1.5">Mentor Period</label>
                         <input type="number" className="w-full p-2.5 border border-violet-200 rounded-xl focus:ring-2 focus:ring-violet-400 focus:border-violet-400 focus:outline-none shadow-sm bg-white font-medium text-gray-700" value={mentorPeriod} onChange={e => setMentorPeriod(e.target.value)} min="1" max="8" />
                     </div>
-                    <button onClick={handleGenerate} disabled={loading} className={`w-full py-2.5 px-4 rounded-xl text-white font-bold flex items-center justify-center space-x-2 transition-all ${loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-gradient-to-r from-violet-600 to-purple-700 hover:from-violet-700 hover:to-purple-800 shadow-lg shadow-violet-200 hover:shadow-violet-300 hover:-translate-y-0.5 active:scale-95'}`}>
+                    <button onClick={handleGenerate} disabled={loading} className={`w-full py-2.5 px-4 rounded-xl text-white font-bold flex items-center justify-center space-x-2 transition-all ${loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-violet-600 hover:bg-violet-700 shadow-lg shadow-violet-200 hover:shadow-violet-300 hover:-translate-y-0.5 active:scale-95'}`}>
                         {loading ? <RotateCw className="w-5 h-5 animate-spin" /> : <Monitor className="w-5 h-5" />}
                         <span>{loading ? 'Processing...' : 'Generate'}</span>
                     </button>
                 </div>
             </div>
             <div className="bg-white rounded-2xl shadow-lg shadow-violet-50/50 border border-violet-100 overflow-hidden">
-                <div className="p-4 border-b border-violet-100 flex justify-between items-center bg-gradient-to-r from-violet-50/80 to-purple-50/40">
+                <div className="p-4 border-b border-violet-100 flex justify-between items-center bg-violet-50">
                     <h3 className="font-bold text-gray-700">{selectedDept && selectedSem ? `${selectedDept} - Semester ${selectedSem}` : 'Timetable Preview'}</h3>
                     <button onClick={handleDownloadPDF} className="flex items-center space-x-2 text-sm text-violet-700 hover:text-violet-900 border border-violet-200 px-4 py-1.5 rounded-xl bg-white shadow-sm hover:shadow-md hover:border-violet-300 font-semibold transition-all">
                         <Download className="w-4 h-4" /><span>Export PDF</span>
@@ -965,11 +965,11 @@ function App() {
     };
 
     return (
-        <div className="flex h-screen bg-gradient-to-br from-gray-50 via-violet-50/30 to-purple-50/20 font-sans text-gray-900 overflow-hidden">
-            <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-gradient-to-b from-violet-950 via-purple-900 to-indigo-950 text-white transform transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:relative lg:translate-x-0 shadow-2xl shadow-violet-900/30 flex flex-col`}>
+        <div className="flex h-screen bg-gray-50 font-sans text-gray-900 overflow-hidden">
+            <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-violet-950 text-white transform transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:relative lg:translate-x-0 shadow-2xl shadow-violet-900/30 flex flex-col`}>
                 <div className="flex items-center justify-between p-4 border-b border-violet-800/50">
                     <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-gradient-to-br from-violet-400 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-violet-500/30">
+                        <div className="w-10 h-10 bg-violet-500 rounded-xl flex items-center justify-center shadow-lg shadow-violet-500/30">
                             <Calendar className="w-6 h-6 text-white" />
                         </div>
                         <span className="text-xl font-bold tracking-tight text-white">BIT Scheduler</span>
@@ -1016,7 +1016,7 @@ function App() {
                         <h2 className="text-2xl font-bold text-gray-800">{pageTitle[activeTab] || 'Dashboard'}</h2>
                     </div>
                     <div className="flex items-center space-x-6">
-                        <div className="h-10 w-10 bg-gradient-to-br from-violet-500 to-purple-700 rounded-xl flex items-center justify-center text-white font-bold shadow-lg shadow-violet-200">AD</div>
+                        <div className="h-10 w-10 bg-violet-600 rounded-xl flex items-center justify-center text-white font-bold shadow-lg shadow-violet-200">AD</div>
                     </div>
                 </header>
 

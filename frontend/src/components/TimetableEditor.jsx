@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { DndContext, useDroppable, useDraggable, DragOverlay, MouseSensor, TouchSensor, useSensor, useSensors, pointerWithin } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import * as api from '../utils/api';
-import { Search, Save, Trash2, Download, Undo2, Coffee, X, BookOpen, FlaskConical, Users2, LayoutTemplate, Palette, ArrowLeftRight } from 'lucide-react';
+import { Search, Save, Trash2, Download, Undo2, Coffee, X, BookOpen, FlaskConical, Users2, LayoutTemplate, Palette } from 'lucide-react';
 
 // ─── Simplified Color Palette (Preserved) ───
 const THEORY_STYLE = {
@@ -163,14 +163,13 @@ const GridCell = ({ id, children, isEmpty, isBreak, isLunch }) => {
 };
 
 // ─── Droppable Grid Cell Span (Preserved Logic) ───
-const DroppableGridCellSpan = ({ id, colSpan, entry, isLabStart, onDelete, onSwapClick, isSwapSelected, swapMode }) => {
+const DroppableGridCellSpan = ({ id, colSpan, entry, isLabStart, onDelete }) => {
     const { setNodeRef, isOver } = useDroppable({ id });
 
     return (
         <td ref={setNodeRef}
             colSpan={colSpan}
-            onClick={onSwapClick}
-            className={`border-r border-b border-gray-100 relative transition-all duration-200 ${swapMode ? 'cursor-pointer' : ''} ${isSwapSelected ? 'ring-2 ring-violet-500 ring-inset bg-violet-50/50 animate-pulse' : ''} ${isOver ? (entry ? 'bg-amber-50/50' : 'bg-emerald-50/50') : (entry ? '' : 'bg-white hover:bg-purple-50/10')}`}
+            className={`border-r border-b border-gray-100 relative transition-colors duration-200 ${isOver ? (entry ? 'bg-amber-50/50' : 'bg-emerald-50/50') : (entry ? '' : 'bg-white hover:bg-purple-50/10')}`}
             style={{ height: 80, padding: 4, minWidth: colSpan > 1 ? 240 : 120 }}>
             {isOver && (
                 <div className={`absolute inset-1 rounded-xl border-2 border-dashed pointer-events-none z-10 ${entry ? 'border-amber-400/50 bg-amber-50/20' : 'border-emerald-400/50 bg-emerald-50/20'}`} />
@@ -178,7 +177,7 @@ const DroppableGridCellSpan = ({ id, colSpan, entry, isLabStart, onDelete, onSwa
             {entry ? (
                 <div className="relative group h-full w-full">
                     <CellContent entry={entry} cellId={`placed-${id}`} isLabStart={isLabStart} />
-                    <button onClick={(e) => { e.stopPropagation(); onDelete(); }}
+                    <button onClick={onDelete}
                         className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-rose-500 hover:bg-rose-600 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shadow-lg z-20 scale-75 group-hover:scale-100 cursor-pointer ring-2 ring-white">
                         <X className="w-3 h-3" />
                     </button>
@@ -199,10 +198,6 @@ export default function TimetableEditor({ department, semester, onSave, onExport
     const [departments, setDepartments] = useState([]);
     const [facultyMap, setFacultyMap] = useState({});
     const [draggedItem, setDraggedItem] = useState(null);
-
-    // Swap Mode
-    const [swapMode, setSwapMode] = useState(false);
-    const [swapSelection, setSwapSelection] = useState(null); // { day, period, entry }
 
     // Filters
     const [paletteDept, setPaletteDept] = useState(department || '');
@@ -407,273 +402,122 @@ export default function TimetableEditor({ department, semester, onSave, onExport
         if (size <= 1) return true;
         const startIdx = periodColumns.findIndex(c => c.type === 'PERIOD' && c.period === parseInt(p));
         if (startIdx === -1) return false;
+
         for (let i = 1; i < size; i++) {
             const nextCol = periodColumns[startIdx + i];
-            if (!nextCol || nextCol.type !== 'PERIOD' || nextCol.period !== parseInt(p) + i) return false;
+            // Must strictly be the next period visually (no break)
+            if (!nextCol || nextCol.type !== 'PERIOD' || nextCol.period !== parseInt(p) + i) {
+                return false;
+            }
         }
         return true;
     };
 
-    // Get ordered period numbers for a day (only PERIOD columns, respecting break boundaries)
-    const getOrderedPeriods = () => {
-        return periodColumns.filter(c => c.type === 'PERIOD').map(c => c.period);
-    };
-
-    // Get break boundaries: periods that are separated by a BREAK/LUNCH
-    const getBreakBoundaries = () => {
-        const boundaries = new Set();
-        for (let i = 0; i < periodColumns.length - 1; i++) {
-            if (periodColumns[i].type === 'PERIOD' && (periodColumns[i + 1].type === 'BREAK' || periodColumns[i + 1].type === 'LUNCH')) {
-                boundaries.add(periodColumns[i].period);
-            }
-            if ((periodColumns[i].type === 'BREAK' || periodColumns[i].type === 'LUNCH') && periodColumns[i + 1].type === 'PERIOD') {
-                boundaries.add(periodColumns[i + 1].period);
-            }
-        }
-        return boundaries;
-    };
-
-    // Get the "segment" of contiguous periods (not broken by BREAK/LUNCH) that contains period p
-    const getPeriodSegment = (p) => {
-        const segments = [];
-        let currentSegment = [];
-        periodColumns.forEach(col => {
-            if (col.type === 'PERIOD') {
-                currentSegment.push(col.period);
-            } else {
-                if (currentSegment.length > 0) {
-                    segments.push([...currentSegment]);
-                    currentSegment = [];
-                }
-            }
-        });
-        if (currentSegment.length > 0) segments.push(currentSegment);
-        return segments.find(seg => seg.includes(parseInt(p))) || [];
-    };
-
-    // Check if a slot is free
-    const isSlotFree = (list, day, startP, size) => {
-        if (!isValidPeriod(day, startP)) return false;
-        if (size === 2 && !isContiguous(day, startP, 2)) return false;
-        return !list.some(e => e.day_of_week === day && e.period_number >= startP && e.period_number < startP + size);
-    };
-
-    // Get the "logical block" for an entry (1 for theory, 2 for lab start)
-    const getEntryBlock = (entry, list, day) => {
-        if (entry.session_type === 'LAB') {
-            const labParts = list.filter(e => e.day_of_week === day && e.course_code === entry.course_code && e.session_type === 'LAB' && Math.abs(e.period_number - entry.period_number) <= 1);
-            const minP = Math.min(...labParts.map(lp => lp.period_number));
-            return { entries: labParts, startPeriod: minP, size: 2 };
-        }
-        return { entries: [entry], startPeriod: entry.period_number, size: 1 };
-    };
-
-    // ─── SHIFT INSERT: The core new logic ───
     const smartInsert = (newEntry, size, currentList = entries) => {
         const day = newEntry.day_of_week;
-        const targetP = newEntry.period_number;
-        const segment = getPeriodSegment(targetP);
+        const p = newEntry.period_number;
 
-        // Check if target cells are free
-        const targetFree = isSlotFree(currentList, day, targetP, size);
-        if (targetFree) {
-            // Simple case: slot is free, just place
-            const finalEntry1 = { ...newEntry };
-            const newList = [...currentList, finalEntry1];
-            if (size === 2) newList.push({ ...newEntry, period_number: targetP + 1 });
-            setEntries(newList);
-            return;
-        }
-
-        // Need to shift existing entries to make room
-        // Collect all entries on this day in this segment
-        const daySegEntries = currentList.filter(e => e.day_of_week === day && segment.includes(e.period_number));
-        const otherEntries = currentList.filter(e => !(e.day_of_week === day && segment.includes(e.period_number)));
-
-        // Try shifting RIGHT first
-        const rightResult = tryShiftDirection(daySegEntries, segment, targetP, size, day, 'right');
-        if (rightResult) {
-            const finalEntry1 = { ...newEntry };
-            const newList = [...otherEntries, ...rightResult, finalEntry1];
-            if (size === 2) newList.push({ ...newEntry, period_number: targetP + 1 });
-            setEntries(newList);
-            return;
-        }
-
-        // Try shifting LEFT
-        const leftResult = tryShiftDirection(daySegEntries, segment, targetP, size, day, 'left');
-        if (leftResult) {
-            const finalEntry1 = { ...newEntry };
-            const newList = [...otherEntries, ...leftResult, finalEntry1];
-            if (size === 2) newList.push({ ...newEntry, period_number: targetP + 1 });
-            setEntries(newList);
-            return;
-        }
-
-        // Cannot shift in either direction - reject
-        console.warn('Cannot insert: no room to shift entries.');
-    };
-
-    // Try to shift entries in a direction to free up `size` cells at `targetP`
-    const tryShiftDirection = (dayEntries, segment, targetP, size, day, direction) => {
-        // Build a map of period -> entry for this day/segment
-        const periodMap = {};
-        dayEntries.forEach(e => { periodMap[e.period_number] = e; });
-
-        // Determine which entries need to shift
-        const entriesToShift = [];
-        if (direction === 'right') {
-            // Collect entries from targetP onward (within segment)
-            for (const p of segment) {
-                if (p >= targetP && periodMap[p]) {
-                    entriesToShift.push(periodMap[p]);
-                }
-            }
-        } else {
-            // Collect entries from targetP backward (within segment)
-            for (let i = segment.length - 1; i >= 0; i--) {
-                const p = segment[i];
-                if (p <= targetP + size - 1 && periodMap[p]) {
-                    entriesToShift.push(periodMap[p]);
-                }
-            }
-        }
-
-        if (entriesToShift.length === 0) return dayEntries; // nothing to shift
-
-        // Check for lab protection: if any entry to shift is a LAB, check if both parts can shift
-        const shiftAmount = direction === 'right' ? size : -size;
-
-        // Identify unique logical blocks among entriesToShift
-        const processedCodes = new Set();
-        const blocks = [];
-        entriesToShift.forEach(e => {
-            const blockKey = `${e.course_code}-${e.session_type}`;
-            if (!processedCodes.has(blockKey)) {
-                processedCodes.add(blockKey);
-                const block = getEntryBlock(e, dayEntries, day);
-                blocks.push(block);
-            }
-        });
-
-        // For each block, verify shifted position is valid
-        const shiftedEntries = new Map(); // period -> entry
-        for (const block of blocks) {
-            for (const entry of block.entries) {
-                const newP = entry.period_number + shiftAmount;
-                if (!segment.includes(newP)) return null; // would go outside segment
-                if (!isValidPeriod(day, newP)) return null;
-                shiftedEntries.set(entry, newP);
-            }
-            // Lab check: if lab, ensure new position is contiguous
-            if (block.size === 2) {
-                const newStart = block.startPeriod + shiftAmount;
-                if (!isContiguous(day, newStart, 2)) return null;
-            }
-        }
-
-        // Check that shifted positions don't collide with non-shifted entries
-        const nonShiftedEntries = dayEntries.filter(e => !shiftedEntries.has(e));
-        for (const [entry, newP] of shiftedEntries) {
-            const collision = nonShiftedEntries.find(e => e.period_number === newP);
-            if (collision) {
-                // Need to cascade: this collision also needs to shift
-                // For simplicity, we handle one level of cascade
-                const cascadeBlock = getEntryBlock(collision, dayEntries, day);
-                for (const ce of cascadeBlock.entries) {
-                    const cascadeP = ce.period_number + shiftAmount;
-                    if (!segment.includes(cascadeP) || !isValidPeriod(day, cascadeP)) return null;
-                    shiftedEntries.set(ce, cascadeP);
-                }
-                if (cascadeBlock.size === 2) {
-                    const cascadeStart = cascadeBlock.startPeriod + shiftAmount;
-                    if (!isContiguous(day, cascadeStart, 2)) return null;
-                }
-            }
-        }
-
-        // Apply shifts
-        const result = dayEntries.map(e => {
-            if (shiftedEntries.has(e)) {
-                return { ...e, period_number: shiftedEntries.get(e) };
-            }
-            return e;
-        });
-
-        // Verify the target slots are now free
+        // 1. Identify Collisions
+        const collisions = [];
         for (let i = 0; i < size; i++) {
-            if (result.some(e => e.period_number === targetP + i)) return null;
+            const targetP = p + i;
+            const existing = currentList.find(e => e.day_of_week === day && e.period_number === targetP);
+            if (existing && !collisions.some(c => c.course_code === existing.course_code && c.day_of_week === existing.day_of_week && c.period_number === existing.period_number)) {
+                if (existing.session_type === 'LAB') {
+                    const labParts = currentList.filter(l => l.day_of_week === day && l.course_code === existing.course_code && l.session_type === 'LAB' && Math.abs(l.period_number - existing.period_number) <= 1);
+                    labParts.forEach(lp => {
+                        if (!collisions.some(c => c === lp)) collisions.push(lp);
+                    });
+                } else {
+                    collisions.push(existing);
+                }
+            }
         }
 
-        return result;
+        // 2. Remove collisions
+        let tempList = currentList.filter(e => !collisions.includes(e));
+
+        // 3. Add Key Entry
+        const finalEntry1 = { ...newEntry };
+        const finalEntry2 = size === 2 ? { ...newEntry, period_number: newEntry.period_number + 1 } : null;
+        tempList = [...tempList, finalEntry1];
+        if (finalEntry2) tempList = [...tempList, finalEntry2];
+
+        // 4. Relocate UNIQUE Collisions
+        if (collisions.length === 0) {
+            setEntries(tempList);
+            return;
+        }
+
+        const logicalCollisions = [];
+        collisions.forEach(c => {
+            if (c.session_type === 'LAB') {
+                const isStart = currentList.find(e => e.day_of_week === day && e.period_number === c.period_number - 1 && e.course_code === c.course_code && e.session_type === 'LAB') === undefined;
+                if (isStart) {
+                    logicalCollisions.push({ entry: c, size: 2 });
+                }
+            } else {
+                logicalCollisions.push({ entry: c, size: 1 });
+            }
+        });
+
+        let finalList = [...tempList];
+
+        logicalCollisions.forEach(item => {
+            const resultList = tryRelocate(item.entry, item.size, finalList, p);
+            if (resultList) {
+                finalList = resultList;
+            } else {
+                console.warn(`Could not relocate ${item.entry.course_code}, dropping it.`);
+            }
+        });
+
+        setEntries(finalList);
     };
 
-    // ─── SWAP Logic ───
-    const handleSwapClick = (day, period) => {
-        if (!swapMode) return;
-        const entry = gridMap[`${day}-${period}`];
-        if (!entry) {
-            setSwapSelection(null);
-            return;
+    const tryRelocate = (entry, size, list, pivotPeriod) => {
+        const day = entry.day_of_week;
+
+        // 1. Left Search
+        let curr = pivotPeriod - 1;
+        while (curr > 0) {
+            if (isSlotFree(list, day, curr, size)) {
+                return placeAt(entry, day, curr, size, list);
+            }
+            curr--;
         }
 
-        if (!swapSelection) {
-            // First selection
-            setSwapSelection({ day, period, entry });
-            return;
-        }
-
-        // Second selection - attempt swap
-        const first = swapSelection;
-        const second = { day, period, entry };
-
-        // Type check: both must be same session_type
-        if (first.entry.session_type !== second.entry.session_type) {
-            alert('Can only swap entries of the same type (Theory↔Theory or Lab↔Lab)');
-            setSwapSelection(null);
-            return;
-        }
-
-        // Don't swap with itself
-        if (first.day === second.day && first.period === second.period) {
-            setSwapSelection(null);
-            return;
-        }
-
-        pushHistory();
-
-        const isLab = first.entry.session_type === 'LAB';
-
-        if (isLab) {
-            // Get both lab blocks
-            const block1 = getEntryBlock(first.entry, entries, first.day);
-            const block2 = getEntryBlock(second.entry, entries, second.day);
-
-            // Remove both blocks
-            let temp = entries.filter(e => !block1.entries.includes(e) && !block2.entries.includes(e));
-
-            // Place block1 at block2's position and vice versa
-            block1.entries.forEach((e, i) => {
-                temp.push({ ...e, day_of_week: second.day, period_number: block2.startPeriod + i });
-            });
-            block2.entries.forEach((e, i) => {
-                temp.push({ ...e, day_of_week: first.day, period_number: block1.startPeriod + i });
-            });
-            setEntries(temp);
-        } else {
-            // Theory swap: simply swap day+period
-            setEntries(prev => prev.map(e => {
-                if (e.day_of_week === first.day && e.period_number === first.period && e.course_code === first.entry.course_code) {
-                    return { ...e, day_of_week: second.day, period_number: second.period };
+        // 2. Right Search
+        curr = pivotPeriod + 1;
+        while (curr < 20) {
+            if (isValidPeriod(day, curr)) {
+                if (isSlotFree(list, day, curr, size)) {
+                    return placeAt(entry, day, curr, size, list);
                 }
-                if (e.day_of_week === second.day && e.period_number === second.period && e.course_code === second.entry.course_code) {
-                    return { ...e, day_of_week: first.day, period_number: first.period };
-                }
-                return e;
-            }));
+            }
+            curr++;
         }
 
-        setSwapSelection(null);
+        return null; // Could not place nearby
+    };
+
+    const isSlotFree = (list, day, startP, size) => {
+        if (!isValidPeriod(day, startP)) return false;
+
+        if (size === 2) {
+            if (!isContiguous(day, startP, 2)) return false;
+        }
+
+        const occupied = list.some(e => e.day_of_week === day && e.period_number >= startP && e.period_number < startP + size);
+        return !occupied;
+    };
+
+    const placeAt = (entry, day, p, size, list) => {
+        const main = { ...entry, day_of_week: day, period_number: p };
+        const secondary = size === 2 ? { ...entry, day_of_week: day, period_number: p + 1 } : null;
+        const res = [...list, main];
+        if (secondary) res.push(secondary);
+        return res;
     };
 
     const handleDeleteEntry = (day, period) => {
@@ -739,10 +583,6 @@ export default function TimetableEditor({ department, semester, onSave, onExport
                         <button onClick={undo} disabled={history.length === 0} title="Undo"
                             className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${history.length ? 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-gray-900 shadow-sm hover:shadow' : 'bg-gray-50 border border-transparent text-gray-300 cursor-not-allowed'}`}>
                             <Undo2 className="w-4 h-4" /> Undo
-                        </button>
-                        <button onClick={() => { setSwapMode(!swapMode); setSwapSelection(null); }}
-                            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all shadow-sm ${swapMode ? 'bg-violet-600 text-white border border-violet-600 shadow-violet-200' : 'bg-white border border-violet-200 text-violet-600 hover:bg-violet-50 hover:border-violet-300'}`}>
-                            <ArrowLeftRight className="w-4 h-4" /> {swapMode ? 'Swap ON' : 'Swap'}
                         </button>
                         <button onClick={() => { pushHistory(); setEntries([]); }}
                             className="flex items-center gap-2 px-4 py-2.5 bg-white border border-rose-100 text-rose-500 rounded-xl hover:bg-rose-50 hover:border-rose-200 text-sm font-semibold transition-all shadow-sm">
@@ -852,7 +692,6 @@ export default function TimetableEditor({ department, semester, onSave, onExport
 
                                         if (spanTwo) skipNext = true;
 
-                                        const isSwapSelected = swapSelection && swapSelection.day === day && swapSelection.period === p;
                                         renderedCols.push(
                                             <DroppableGridCellSpan
                                                 key={key}
@@ -861,9 +700,6 @@ export default function TimetableEditor({ department, semester, onSave, onExport
                                                 entry={entry}
                                                 isLabStart={labStart}
                                                 onDelete={() => handleDeleteEntry(day, p)}
-                                                onSwapClick={() => handleSwapClick(day, p)}
-                                                isSwapSelected={isSwapSelected}
-                                                swapMode={swapMode}
                                             />
                                         );
                                     });

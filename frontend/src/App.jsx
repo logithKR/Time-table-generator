@@ -234,865 +234,877 @@ function App() {
     };
 
     const handleDownloadPDF = (dataToExport) => {
-    } catch (err) {
-        console.error(err);
-        alert("Failed to export PDF: " + err.message);
-    }
-};
-
-// --- Timetable Render ---
-const renderTimetable = () => {
-    if (!timetableEntries.length && !loading) return <div className="text-center p-10 text-gray-500">No timetable generated yet. Select criteria and click Generate.</div>;
-    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
-    if (slots.some(s => s.day_of_week === 'Saturday')) days.push('Saturday');
-    const maxPeriod = Math.max(...slots.map(s => s.period_number), 0);
-    const periods = Array.from({ length: maxPeriod }, (_, i) => i + 1);
-    const isLabStart = (day, p) => {
-        const e1 = timetableEntries.find(t => t.day_of_week === day && t.period_number === p && t.session_type === 'LAB');
-        const e2 = timetableEntries.find(t => t.day_of_week === day && t.period_number === p + 1 && t.session_type === 'LAB');
-        return e1 && e2 && e1.course_code === e2.course_code;
-    };
-    const isLabEnd = (day, p) => {
-        const e1 = timetableEntries.find(t => t.day_of_week === day && t.period_number === p - 1 && t.session_type === 'LAB');
-        const e2 = timetableEntries.find(t => t.day_of_week === day && t.period_number === p && t.session_type === 'LAB');
-        return e1 && e2 && e1.course_code === e2.course_code;
-    };
-    return (
-        <div>
-            <div className="flex gap-4 mb-3 text-xs">
-                <span className="flex items-center gap-1"><span className="w-4 h-4 rounded" style={{ backgroundColor: '#FEF9C3' }}></span> Lab (2 periods)</span>
-                <span className="flex items-center gap-1"><span className="w-4 h-4 rounded" style={{ backgroundColor: '#BFDBFE' }}></span> Mentor Hour</span>
-                <span className="flex items-center gap-1"><span className="w-4 h-4 rounded" style={{ backgroundColor: '#F3F4F6' }}></span> Open Elective</span>
-            </div>
-            <div className="overflow-x-auto">
-                <table className="min-w-full bg-white border-collapse border border-gray-300 text-xs">
-                    <thead>
-                        <tr className="bg-gray-100">
-                            <th className="p-2 border border-gray-300 text-left font-bold w-24 sticky left-0 bg-gray-100 z-10">Day</th>
-                            {periods.map(p => {
-                                const slot = slots.find(s => s.period_number === p && s.day_of_week === 'Monday');
-                                return (<th key={p} className="p-2 border border-gray-300 text-center font-bold min-w-[110px]"><div>Period {p}</div><div className="text-[10px] text-gray-500 font-normal">{slot ? `${slot.start_time} - ${slot.end_time} ` : ''}</div></th>);
-                            })}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {days.map(day => {
-                            const cells = []; let skipNext = false;
-                            periods.forEach(p => {
-                                if (skipNext) { skipNext = false; return; }
-                                const isValidSlot = slots.some(s => s.day_of_week === day && s.period_number === p);
-                                if (!isValidSlot) { cells.push(<td key={p} className="p-2 border border-gray-300 bg-gray-200"></td>); return; }
-                                const entry = timetableEntries.find(t => t.day_of_week === day && t.period_number === p);
-                                if (isLabStart(day, p)) {
-                                    skipNext = true;
-                                    cells.push(<td key={p} colSpan={2} className="p-2 border border-gray-300 text-center align-middle h-20" style={{ backgroundColor: '#FEF9C3' }}><div className="flex flex-col justify-center h-full"><div className="font-bold text-amber-900 text-xs">{entry.course_code}</div><div className="text-[10px] text-amber-800 mt-0.5 font-medium">{entry.course_name || ''}</div><div className="text-[10px] text-amber-700 mt-0.5 italic">{entry.faculty_name || ''}</div><div className="text-[9px] text-amber-600 mt-0.5 font-medium">LAB</div></div></td>);
-                                    return;
-                                }
-                                if (isLabEnd(day, p)) return;
-                                if (!entry) { cells.push(<td key={p} className="p-2 border border-gray-300 text-center text-gray-300">-</td>); return; }
-                                if (entry.session_type === 'MENTOR') {
-                                    cells.push(<td key={p} className="p-2 border border-gray-300 text-center align-middle h-20" style={{ backgroundColor: '#BFDBFE' }}><div className="flex flex-col justify-center h-full"><div className="font-bold text-blue-900 text-sm">MENTOR</div><div className="text-xs text-blue-700 mt-1">INTERACTION</div></div></td>);
-                                    return;
-                                }
-                                if (entry.session_type === 'OPEN_ELECTIVE') {
-                                    cells.push(<td key={p} className="p-2 border border-gray-300 text-center align-middle h-20 bg-gray-100"><div className="flex flex-col justify-center h-full"><div className="font-bold text-gray-600 text-xs">OPEN</div><div className="text-xs text-gray-500">ELECTIVE</div></div></td>);
-                                    return;
-                                }
-                                cells.push(<td key={p} className="p-2 border border-gray-300 text-center align-middle h-20 hover:bg-blue-50 transition-colors"><div className="flex flex-col justify-center h-full"><div className="font-bold text-blue-800 text-xs">{entry.course_code}</div><div className="text-[10px] text-blue-600 mt-0.5 line-clamp-2">{entry.course_name || ''}</div><div className="text-[10px] text-gray-500 mt-0.5 italic">{entry.faculty_name || ''}</div></div></td>);
-                            });
-                            return (<tr key={day}><td className="p-2 border border-gray-300 font-bold text-gray-700 bg-gray-50 sticky left-0 z-10 text-xs">{day.substring(0, 3).toUpperCase()}</td>{cells}</tr>);
-                        })}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    );
-};
-
-// ============================================
-// FILTER BAR (render function, NOT component)
-// ============================================
-const renderFilterBar = (showSem, filteredCount, totalCount) => (
-    <div className="flex flex-wrap gap-3 items-center mb-4 bg-violet-50 p-4 rounded-2xl border border-violet-100 shadow-sm">
-        <div className="flex items-center gap-2">
-            <Layers className="w-4 h-4 text-violet-500" />
-            <span className="text-sm font-semibold text-violet-700">Filter:</span>
-        </div>
-        <select className="p-2.5 border border-violet-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-violet-400 focus:border-violet-400 focus:outline-none shadow-sm font-medium text-gray-700 cursor-pointer transition-all hover:border-violet-300" value={filterDept} onChange={e => setFilterDept(e.target.value)}>
-            <option value="">All Departments</option>
-            {departments.map(d => <option key={d.department_code} value={d.department_code}>{d.department_code}</option>)}
-        </select>
-        {showSem && (
-            <select className="p-2.5 border border-violet-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-violet-400 focus:border-violet-400 focus:outline-none shadow-sm font-medium text-gray-700 cursor-pointer transition-all hover:border-violet-300" value={filterSem} onChange={e => setFilterSem(e.target.value)}>
-                <option value="">All Semesters</option>
-                {semesters.map(s => <option key={s.semester_number} value={s.semester_number}>Semester {s.semester_number}</option>)}
-            </select>
-        )}
-        <div className="flex-1 min-w-[200px]">
-            <div className="relative group">
-                <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-violet-500 transition-colors" />
-                <input type="text" placeholder="Search by name, code..." className="w-full pl-10 p-2.5 border border-violet-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm placeholder:text-gray-400 font-medium text-gray-700 transition-all hover:border-violet-300"
-                    value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
-            </div>
-        </div>
-        <div className="text-xs text-violet-600 font-semibold bg-white px-4 py-2.5 rounded-xl border border-violet-100 shadow-sm">
-            Showing {filteredCount} of {totalCount}
-        </div>
-    </div>
-);
-
-// ============================================
-// SUBJECTS PAGE
-// ============================================
-const renderSubjectsPage = () => {
-    const q = searchQuery.toLowerCase().trim();
-    const filtered = allCourses.filter(c => {
-        if (!q) return true;
-        return (c.course_code || '').toLowerCase().includes(q) || (c.course_name || '').toLowerCase().includes(q) || (c.department_code || '').toLowerCase().includes(q);
-    });
-
-    return (
-        <div className="space-y-4">
-            <div className="flex justify-between items-center">
-                <div className="flex-1">{renderFilterBar(true, filtered.length, allCourses.length)}</div>
-                <button onClick={() => setShowAddCourse(!showAddCourse)} className="ml-3 flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-violet-200 hover:shadow-violet-300 transition-all whitespace-nowrap hover:-translate-y-0.5 active:scale-95">
-                    <Plus className="w-4 h-4" /> Add Course
-                </button>
-            </div>
-
-            {showAddCourse && (
-                <div className="bg-white rounded-2xl border-2 border-violet-200 shadow-xl shadow-violet-100/50 p-6">
-                    <h4 className="font-bold text-gray-800 mb-4 flex items-center gap-2"><Plus className="w-4 h-4 text-violet-600" /> Add New Course</h4>
-                    <form onSubmit={handleAddCourse} className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                        <input name="course_code" placeholder="Course Code *" required className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
-                        <input name="course_name" placeholder="Course Name *" required className="p-2.5 border border-violet-200 rounded-xl text-sm col-span-2 focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
-                        <select name="department_code" required className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm">
-                            <option value="">Department *</option>
-                            {departments.map(d => <option key={d.department_code} value={d.department_code}>{d.department_code}</option>)}
-                        </select>
-                        <select name="semester" required className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm">
-                            <option value="">Semester *</option>
-                            {semesters.map(s => <option key={s.semester_number} value={s.semester_number}>Sem {s.semester_number}</option>)}
-                        </select>
-                        <input name="lecture_hours" type="number" placeholder="L hours" defaultValue="0" min="0" className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
-                        <input name="tutorial_hours" type="number" placeholder="T hours" defaultValue="0" min="0" className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
-                        <input name="practical_hours" type="number" placeholder="P hours" defaultValue="0" min="0" className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
-                        <input name="credits" type="number" placeholder="Credits" defaultValue="0" min="0" className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
-                        <input name="weekly_sessions" type="number" placeholder="Weekly Sessions *" defaultValue="1" min="1" required className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
-                        <div className="flex flex-wrap gap-4 items-center col-span-2">
-                            <label className="flex items-center gap-1.5 text-xs font-medium text-gray-600 cursor-pointer"><input name="is_lab" type="checkbox" className="rounded border-violet-300 text-violet-600 focus:ring-violet-400" /> Lab</label>
-                            <label className="flex items-center gap-1.5 text-xs font-medium text-gray-600 cursor-pointer"><input name="is_honours" type="checkbox" className="rounded border-violet-300 text-violet-600 focus:ring-violet-400" /> Honours</label>
-                            <label className="flex items-center gap-1.5 text-xs font-medium text-gray-600 cursor-pointer"><input name="is_minor" type="checkbox" className="rounded border-violet-300 text-violet-600 focus:ring-violet-400" /> Minor</label>
-                            <label className="flex items-center gap-1.5 text-xs font-medium text-gray-600 cursor-pointer"><input name="is_elective" type="checkbox" className="rounded border-violet-300 text-violet-600 focus:ring-violet-400" /> Elective</label>
-                        </div>
-                        <div className="flex gap-2">
-                            <button type="submit" className="bg-violet-600 hover:bg-violet-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-violet-200 transition-all">Save</button>
-                            <button type="button" onClick={() => setShowAddCourse(false)} className="bg-gray-100 hover:bg-gray-200 text-gray-600 px-4 py-2.5 rounded-xl text-sm font-medium transition-all">Cancel</button>
-                        </div>
-                    </form>
-                </div>
-            )}
-
-            <div className="overflow-x-auto bg-white rounded-2xl border border-violet-100 shadow-lg shadow-violet-50/50">
-                <table className="min-w-full text-sm">
-                    <thead>
-                        <tr className="bg-gray-50 border-b border-gray-100">
-                            <th className="p-3.5 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">Code</th>
-                            <th className="p-3.5 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">Course Name</th>
-                            <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider">Dept</th>
-                            <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider">Sem</th>
-                            <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider">L</th>
-                            <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider">T</th>
-                            <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider">P</th>
-                            <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider">Cr</th>
-                            <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider">Weekly</th>
-                            <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider">Type</th>
-                            <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider w-16">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {filtered.map((c, i) => (
-                            <tr key={c.course_code} className={`border-b border-violet-50 hover:bg-violet-50/40 transition-colors duration-200 ${i % 2 === 0 ? 'bg-white' : 'bg-purple-50/20'}`}>
-                                <td className="p-3.5 font-mono font-bold text-violet-800">{c.course_code}</td>
-                                <td className="p-3.5 text-gray-800 font-medium">{c.course_name}</td>
-                                <td className="p-3.5 text-center"><span className="bg-violet-50 text-violet-700 px-2.5 py-1 rounded-lg text-xs font-semibold border border-violet-100">{c.department_code}</span></td>
-                                <td className="p-3.5 text-center font-semibold text-gray-700">{c.semester}</td>
-                                <td className="p-3.5 text-center text-gray-600">{c.lecture_hours || 0}</td>
-                                <td className="p-3.5 text-center text-gray-600">{c.tutorial_hours || 0}</td>
-                                <td className="p-3.5 text-center text-gray-600">{c.practical_hours || 0}</td>
-                                <td className="p-3.5 text-center font-semibold text-gray-700">{c.credits || '-'}</td>
-                                <td className="p-3.5 text-center"><span className="bg-violet-100 text-violet-800 px-2.5 py-1 rounded-full text-xs font-bold">{c.weekly_sessions}</span></td>
-                                <td className="p-3.5 text-center">
-                                    <div className="flex flex-wrap gap-1 justify-center">
-                                        {c.is_honours && <span className="bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-lg text-[10px] font-semibold">Honours</span>}
-                                        {c.is_minor && <span className="bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded-lg text-[10px] font-semibold">Minor</span>}
-                                        {c.is_lab && <span className="bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-lg text-[10px] font-semibold">Lab</span>}
-                                        {c.is_elective && <span className="bg-green-100 text-green-700 px-1.5 py-0.5 rounded-lg text-[10px] font-semibold">Elective</span>}
-                                        {c.is_open_elective && <span className="bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded-lg text-[10px] font-semibold">Open Elec</span>}
-                                        {!c.is_honours && !c.is_minor && !c.is_lab && !c.is_elective && !c.is_open_elective && <span className="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-lg text-[10px] font-medium">Regular</span>}
-                                    </div>
-                                </td>
-                                <td className="p-3.5 text-center">
-                                    <button onClick={() => handleDeleteCourse(c.course_code)} className="text-red-300 hover:text-red-600 transition-colors p-1 rounded-lg hover:bg-red-50" title="Delete"><Trash2 className="w-4 h-4" /></button>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-                {filtered.length === 0 && <div className="p-10 text-center text-gray-400 text-sm">No courses found.</div>}
-            </div>
-        </div>
-    );
-};
-
-// ============================================
-// FACULTY PAGE
-// ============================================
-const renderFacultyPage = () => {
-    const q = searchQuery.toLowerCase().trim();
-    const filtered = allFaculty.filter(f => {
-        if (!q) return true;
-        return (f.faculty_id || '').toLowerCase().includes(q) || (f.faculty_name || '').toLowerCase().includes(q) || (f.faculty_email || '').toLowerCase().includes(q) || (f.department_code || '').toLowerCase().includes(q);
-    });
-
-    return (
-        <div className="space-y-4">
-            <div className="flex justify-between items-center">
-                <div className="flex-1">{renderFilterBar(false, filtered.length, allFaculty.length)}</div>
-                <button onClick={() => setShowAddFaculty(!showAddFaculty)} className="ml-3 flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-violet-200 hover:shadow-violet-300 transition-all whitespace-nowrap hover:-translate-y-0.5 active:scale-95">
-                    <Plus className="w-4 h-4" /> Add Faculty
-                </button>
-            </div>
-
-            {showAddFaculty && (
-                <div className="bg-white rounded-2xl border-2 border-violet-200 shadow-xl shadow-violet-100/50 p-6">
-                    <h4 className="font-bold text-gray-800 mb-4 flex items-center gap-2"><Plus className="w-4 h-4 text-violet-600" /> Add New Faculty</h4>
-                    <form onSubmit={handleAddFaculty} className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                        <input name="faculty_id" placeholder="Faculty ID *" required className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
-                        <input name="faculty_name" placeholder="Faculty Name *" required className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
-                        <input name="faculty_email" placeholder="Email (optional)" type="email" className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
-                        <select name="department_code" required className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm">
-                            <option value="">Department *</option>
-                            {departments.map(d => <option key={d.department_code} value={d.department_code}>{d.department_code}</option>)}
-                        </select>
-                        <div className="flex gap-2">
-                            <button type="submit" className="bg-violet-600 hover:bg-violet-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-violet-200 transition-all">Save</button>
-                            <button type="button" onClick={() => setShowAddFaculty(false)} className="bg-gray-100 hover:bg-gray-200 text-gray-600 px-4 py-2.5 rounded-xl text-sm font-medium transition-all">Cancel</button>
-                        </div>
-                    </form>
-                </div>
-            )}
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filtered.map(f => (
-                    <div key={f.faculty_id} className="bg-white rounded-2xl border border-violet-100 shadow-md shadow-violet-50/30 hover:shadow-xl hover:shadow-violet-100/50 hover:border-violet-200 transition-all duration-300 p-5 group">
-                        <div className="flex items-start gap-3">
-                            <div className="w-12 h-12 bg-violet-600 rounded-2xl flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-violet-200 flex-shrink-0">
-                                {(f.faculty_name || '?').charAt(0).toUpperCase()}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                                <div className="flex items-center justify-between">
-                                    <h4 className="font-bold text-gray-900 text-sm truncate">{f.faculty_name || 'Unknown'}</h4>
-                                    <button onClick={() => handleDeleteFaculty(f.faculty_id)} className="text-red-300 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-all p-1 rounded-lg hover:bg-red-50" title="Delete">
-                                        <Trash2 className="w-4 h-4" />
-                                    </button>
-                                </div>
-                                <p className="text-xs text-gray-400 font-mono mt-0.5">{f.faculty_id}</p>
-                                <div className="flex items-center gap-2 mt-2.5">
-                                    <span className="bg-violet-50 text-violet-700 px-2.5 py-1 rounded-lg text-xs font-semibold border border-violet-100">{f.department_code}</span>
-                                    <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${(f.status || '') === 'Active' || (f.status || '') === 'ACTIVE' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-red-50 text-red-700 border border-red-100'}`}>
-                                        {f.status || 'Active'}
-                                    </span>
-                                </div>
-                                {f.faculty_email && <p className="text-xs text-violet-500 mt-2 truncate font-medium">{f.faculty_email}</p>}
-                            </div>
-                        </div>
-                    </div>
-                ))}
-            </div>
-            {filtered.length === 0 && <div className="p-10 text-center text-gray-400 bg-white rounded-2xl border border-violet-100 text-sm">No faculty found.</div>}
-        </div>
-    );
-};
-
-// ============================================
-// COURSE-FACULTY MAPPINGS PAGE
-// ============================================
-const renderMappingsPage = () => {
-    const q = searchQuery.toLowerCase().trim();
-    const filtered = courseFacultyMappings.filter(m => {
-        if (!q) return true;
-        return (m.course_code || '').toLowerCase().includes(q) ||
-            (m.course_name || '').toLowerCase().includes(q) ||
-            (m.faculty_name || '').toLowerCase().includes(q) ||
-            (m.course_dept || '').toLowerCase().includes(q) ||     // NEW
-            (m.for_department || '').toLowerCase().includes(q) ||  // NEW
-            (m.faculty_dept || '').toLowerCase().includes(q);      // NEW
-    });
-
-    const grouped = {};
-    filtered.forEach(m => {
-        if (!grouped[m.course_code]) {
-            grouped[m.course_code] = {
-                course_name: m.course_name,
-                course_dept: m.course_dept,
-                target_depts: new Set(), // Track all target departments
-                faculty: []
-            };
+        // If coming from Editor, warn about saving
+        if (activeTab === 'editor') {
+            if (!confirm("Switching to Print View. Make sure you have SAVED your changes. Unsaved changes will not appear. Proceed?")) return;
+            setActiveTab('print');
+            return;
         }
-        grouped[m.course_code].faculty.push(m);
-        if (m.for_department) grouped[m.course_code].target_depts.add(m.for_department);
-    });
 
-    return (
-        <div className="space-y-4">
-            <div className="flex justify-between items-center">
-                <div className="flex-1">{renderFilterBar(false, Object.keys(grouped).length, [...new Set(courseFacultyMappings.map(m => m.course_code))].length)}</div>
-                <button onClick={() => setShowAddMapping(!showAddMapping)} className="ml-3 flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-violet-200 hover:shadow-violet-300 transition-all whitespace-nowrap hover:-translate-y-0.5 active:scale-95">
-                    <Plus className="w-4 h-4" /> Add Mapping
-                </button>
-            </div>
+        // From Dashboard
+        if (!selectedDept || !selectedSem) {
+            alert("Please select Department and Semester to generate the printable timetable.");
+            return;
+        }
 
-            {showAddMapping && (
-                <div className="bg-white rounded-2xl border-2 border-violet-200 shadow-xl shadow-violet-100/50 p-6">
-                    <h4 className="font-bold text-gray-800 mb-4 flex items-center gap-2"><Plus className="w-4 h-4 text-violet-600" /> Add Course-Faculty Mapping</h4>
-                    <form onSubmit={handleAddMapping} className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                        <input name="course_code" placeholder="Course Code *" required className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
-                        <input name="faculty_id" placeholder="Faculty ID *" required className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
-                        <select name="department_code" required className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm">
-                            <option value="">Taught To (Dept) *</option>
-                            {departments.map(d => <option key={d.department_code} value={d.department_code}>{d.department_code}</option>)}
-                        </select>
-                        <select name="delivery_type" className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm">
-                            <option value="Theory">Theory</option>
-                            <option value="Lab">Lab</option>
-                            <option value="Both">Both</option>
-                        </select>
-                        <div className="flex gap-2">
-                            <button type="submit" className="bg-violet-600 hover:bg-violet-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-violet-200 transition-all">Save</button>
-                            <button type="button" onClick={() => setShowAddMapping(false)} className="bg-gray-100 hover:bg-gray-200 text-gray-600 px-4 py-2.5 rounded-xl text-sm font-medium transition-all">Cancel</button>
-                        </div>
-                    </form>
+        setEditorDept(selectedDept);
+        setEditorSem(selectedSem);
+        setActiveTab('print');
+    };
+
+    // --- Timetable Render ---
+    const renderTimetable = () => {
+        if (!timetableEntries.length && !loading) return <div className="text-center p-10 text-gray-500">No timetable generated yet. Select criteria and click Generate.</div>;
+        const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+        if (slots.some(s => s.day_of_week === 'Saturday')) days.push('Saturday');
+        const maxPeriod = Math.max(...slots.map(s => s.period_number), 0);
+        const periods = Array.from({ length: maxPeriod }, (_, i) => i + 1);
+        const isLabStart = (day, p) => {
+            const e1 = timetableEntries.find(t => t.day_of_week === day && t.period_number === p && t.session_type === 'LAB');
+            const e2 = timetableEntries.find(t => t.day_of_week === day && t.period_number === p + 1 && t.session_type === 'LAB');
+            return e1 && e2 && e1.course_code === e2.course_code;
+        };
+        const isLabEnd = (day, p) => {
+            const e1 = timetableEntries.find(t => t.day_of_week === day && t.period_number === p - 1 && t.session_type === 'LAB');
+            const e2 = timetableEntries.find(t => t.day_of_week === day && t.period_number === p && t.session_type === 'LAB');
+            return e1 && e2 && e1.course_code === e2.course_code;
+        };
+        return (
+            <div>
+                <div className="flex gap-4 mb-3 text-xs">
+                    <span className="flex items-center gap-1"><span className="w-4 h-4 rounded" style={{ backgroundColor: '#FEF9C3' }}></span> Lab (2 periods)</span>
+                    <span className="flex items-center gap-1"><span className="w-4 h-4 rounded" style={{ backgroundColor: '#BFDBFE' }}></span> Mentor Hour</span>
+                    <span className="flex items-center gap-1"><span className="w-4 h-4 rounded" style={{ backgroundColor: '#F3F4F6' }}></span> Open Elective</span>
                 </div>
-            )}
+                <div className="overflow-x-auto">
+                    <table className="min-w-full bg-white border-collapse border border-gray-300 text-xs">
+                        <thead>
+                            <tr className="bg-gray-100">
+                                <th className="p-2 border border-gray-300 text-left font-bold w-24 sticky left-0 bg-gray-100 z-10">Day</th>
+                                {periods.map(p => {
+                                    const slot = slots.find(s => s.period_number === p && s.day_of_week === 'Monday');
+                                    return (<th key={p} className="p-2 border border-gray-300 text-center font-bold min-w-[110px]"><div>Period {p}</div><div className="text-[10px] text-gray-500 font-normal">{slot ? `${slot.start_time} - ${slot.end_time} ` : ''}</div></th>);
+                                })}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {days.map(day => {
+                                const cells = []; let skipNext = false;
+                                periods.forEach(p => {
+                                    if (skipNext) { skipNext = false; return; }
+                                    const isValidSlot = slots.some(s => s.day_of_week === day && s.period_number === p);
+                                    if (!isValidSlot) { cells.push(<td key={p} className="p-2 border border-gray-300 bg-gray-200"></td>); return; }
+                                    const entry = timetableEntries.find(t => t.day_of_week === day && t.period_number === p);
+                                    if (isLabStart(day, p)) {
+                                        skipNext = true;
+                                        cells.push(<td key={p} colSpan={2} className="p-2 border border-gray-300 text-center align-middle h-20" style={{ backgroundColor: '#FEF9C3' }}><div className="flex flex-col justify-center h-full"><div className="font-bold text-amber-900 text-xs">{entry.course_code}</div><div className="text-[10px] text-amber-800 mt-0.5 font-medium">{entry.course_name || ''}</div><div className="text-[10px] text-amber-700 mt-0.5 italic">{entry.faculty_name || ''}</div><div className="text-[9px] text-amber-600 mt-0.5 font-medium">LAB</div></div></td>);
+                                        return;
+                                    }
+                                    if (isLabEnd(day, p)) return;
+                                    if (!entry) { cells.push(<td key={p} className="p-2 border border-gray-300 text-center text-gray-300">-</td>); return; }
+                                    if (entry.session_type === 'MENTOR') {
+                                        cells.push(<td key={p} className="p-2 border border-gray-300 text-center align-middle h-20" style={{ backgroundColor: '#BFDBFE' }}><div className="flex flex-col justify-center h-full"><div className="font-bold text-blue-900 text-sm">MENTOR</div><div className="text-xs text-blue-700 mt-1">INTERACTION</div></div></td>);
+                                        return;
+                                    }
+                                    if (entry.session_type === 'OPEN_ELECTIVE') {
+                                        cells.push(<td key={p} className="p-2 border border-gray-300 text-center align-middle h-20 bg-gray-100"><div className="flex flex-col justify-center h-full"><div className="font-bold text-gray-600 text-xs">OPEN</div><div className="text-xs text-gray-500">ELECTIVE</div></div></td>);
+                                        return;
+                                    }
+                                    cells.push(<td key={p} className="p-2 border border-gray-300 text-center align-middle h-20 hover:bg-blue-50 transition-colors"><div className="flex flex-col justify-center h-full"><div className="font-bold text-blue-800 text-xs">{entry.course_code}</div><div className="text-[10px] text-blue-600 mt-0.5 line-clamp-2">{entry.course_name || ''}</div><div className="text-[10px] text-gray-500 mt-0.5 italic">{entry.faculty_name || ''}</div></div></td>);
+                                });
+                                return (<tr key={day}><td className="p-2 border border-gray-300 font-bold text-gray-700 bg-gray-50 sticky left-0 z-10 text-xs">{day.substring(0, 3).toUpperCase()}</td>{cells}</tr>);
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        );
+    };
 
+    // ============================================
+    // FILTER BAR (render function, NOT component)
+    // ============================================
+    const renderFilterBar = (showSem, filteredCount, totalCount) => (
+        <div className="flex flex-wrap gap-3 items-center mb-4 bg-violet-50 p-4 rounded-2xl border border-violet-100 shadow-sm">
+            <div className="flex items-center gap-2">
+                <Layers className="w-4 h-4 text-violet-500" />
+                <span className="text-sm font-semibold text-violet-700">Filter:</span>
+            </div>
+            <select className="p-2.5 border border-violet-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-violet-400 focus:border-violet-400 focus:outline-none shadow-sm font-medium text-gray-700 cursor-pointer transition-all hover:border-violet-300" value={filterDept} onChange={e => setFilterDept(e.target.value)}>
+                <option value="">All Departments</option>
+                {departments.map(d => <option key={d.department_code} value={d.department_code}>{d.department_code}</option>)}
+            </select>
+            {showSem && (
+                <select className="p-2.5 border border-violet-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-violet-400 focus:border-violet-400 focus:outline-none shadow-sm font-medium text-gray-700 cursor-pointer transition-all hover:border-violet-300" value={filterSem} onChange={e => setFilterSem(e.target.value)}>
+                    <option value="">All Semesters</option>
+                    {semesters.map(s => <option key={s.semester_number} value={s.semester_number}>Semester {s.semester_number}</option>)}
+                </select>
+            )}
+            <div className="flex-1 min-w-[200px]">
+                <div className="relative group">
+                    <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-violet-500 transition-colors" />
+                    <input type="text" placeholder="Search by name, code..." className="w-full pl-10 p-2.5 border border-violet-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm placeholder:text-gray-400 font-medium text-gray-700 transition-all hover:border-violet-300"
+                        value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+                </div>
+            </div>
+            <div className="text-xs text-violet-600 font-semibold bg-white px-4 py-2.5 rounded-xl border border-violet-100 shadow-sm">
+                Showing {filteredCount} of {totalCount}
+            </div>
+        </div>
+    );
+
+    // ============================================
+    // SUBJECTS PAGE
+    // ============================================
+    const renderSubjectsPage = () => {
+        const q = searchQuery.toLowerCase().trim();
+        const filtered = allCourses.filter(c => {
+            if (!q) return true;
+            return (c.course_code || '').toLowerCase().includes(q) || (c.course_name || '').toLowerCase().includes(q) || (c.department_code || '').toLowerCase().includes(q);
+        });
+
+        return (
             <div className="space-y-4">
-                {Object.entries(grouped).map(([code, data]) => (
-                    <div key={code} className="bg-white rounded-2xl border border-violet-100 shadow-md shadow-violet-50/30 overflow-hidden hover:shadow-lg transition-shadow duration-300">
-                        <div className="bg-white p-4 border-b border-gray-100 flex items-center justify-between">
-                            <div>
-                                <div className="flex items-center gap-2">
-                                    <span className="font-mono font-bold text-violet-800 text-sm">{code}</span>
-                                    {/* Logic to determine offering department from faculty */}
-                                    {(() => {
-                                        const facDepts = new Set(data.faculty.map(f => f.faculty_dept).filter(d => d && d !== '?'));
-                                        const offeringDept = facDepts.size === 1 ? Array.from(facDepts)[0] : (facDepts.size > 1 ? 'Mixed' : data.course_dept);
-                                        return (
-                                            <span className={`px-2 py-0.5 rounded text-xs font-medium border ${offeringDept === '?' ? 'bg-gray-100 text-gray-500' : 'bg-slate-100 text-slate-700'}`}>
-                                                {offeringDept}
-                                            </span>
-                                        );
-                                    })()}
-                                    {/* Show Target Depts */}
-                                    {data.target_depts.size > 0 && (
-                                        <span className="flex items-center gap-1 text-[10px] text-gray-500 font-medium ml-2 bg-yellow-50 px-2 py-0.5 rounded border border-yellow-100">
-                                            For {Array.from(data.target_depts).join(', ')}
-                                        </span>
-                                    )}
+                <div className="flex justify-between items-center">
+                    <div className="flex-1">{renderFilterBar(true, filtered.length, allCourses.length)}</div>
+                    <button onClick={() => setShowAddCourse(!showAddCourse)} className="ml-3 flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-violet-200 hover:shadow-violet-300 transition-all whitespace-nowrap hover:-translate-y-0.5 active:scale-95">
+                        <Plus className="w-4 h-4" /> Add Course
+                    </button>
+                </div>
+
+                {showAddCourse && (
+                    <div className="bg-white rounded-2xl border-2 border-violet-200 shadow-xl shadow-violet-100/50 p-6">
+                        <h4 className="font-bold text-gray-800 mb-4 flex items-center gap-2"><Plus className="w-4 h-4 text-violet-600" /> Add New Course</h4>
+                        <form onSubmit={handleAddCourse} className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            <input name="course_code" placeholder="Course Code *" required className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
+                            <input name="course_name" placeholder="Course Name *" required className="p-2.5 border border-violet-200 rounded-xl text-sm col-span-2 focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
+                            <select name="department_code" required className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm">
+                                <option value="">Department *</option>
+                                {departments.map(d => <option key={d.department_code} value={d.department_code}>{d.department_code}</option>)}
+                            </select>
+                            <select name="semester" required className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm">
+                                <option value="">Semester *</option>
+                                {semesters.map(s => <option key={s.semester_number} value={s.semester_number}>Sem {s.semester_number}</option>)}
+                            </select>
+                            <input name="lecture_hours" type="number" placeholder="L hours" defaultValue="0" min="0" className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
+                            <input name="tutorial_hours" type="number" placeholder="T hours" defaultValue="0" min="0" className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
+                            <input name="practical_hours" type="number" placeholder="P hours" defaultValue="0" min="0" className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
+                            <input name="credits" type="number" placeholder="Credits" defaultValue="0" min="0" className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
+                            <input name="weekly_sessions" type="number" placeholder="Weekly Sessions *" defaultValue="1" min="1" required className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
+                            <div className="flex flex-wrap gap-4 items-center col-span-2">
+                                <label className="flex items-center gap-1.5 text-xs font-medium text-gray-600 cursor-pointer"><input name="is_lab" type="checkbox" className="rounded border-violet-300 text-violet-600 focus:ring-violet-400" /> Lab</label>
+                                <label className="flex items-center gap-1.5 text-xs font-medium text-gray-600 cursor-pointer"><input name="is_honours" type="checkbox" className="rounded border-violet-300 text-violet-600 focus:ring-violet-400" /> Honours</label>
+                                <label className="flex items-center gap-1.5 text-xs font-medium text-gray-600 cursor-pointer"><input name="is_minor" type="checkbox" className="rounded border-violet-300 text-violet-600 focus:ring-violet-400" /> Minor</label>
+                                <label className="flex items-center gap-1.5 text-xs font-medium text-gray-600 cursor-pointer"><input name="is_elective" type="checkbox" className="rounded border-violet-300 text-violet-600 focus:ring-violet-400" /> Elective</label>
+                            </div>
+                            <div className="flex gap-2">
+                                <button type="submit" className="bg-violet-600 hover:bg-violet-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-violet-200 transition-all">Save</button>
+                                <button type="button" onClick={() => setShowAddCourse(false)} className="bg-gray-100 hover:bg-gray-200 text-gray-600 px-4 py-2.5 rounded-xl text-sm font-medium transition-all">Cancel</button>
+                            </div>
+                        </form>
+                    </div>
+                )}
+
+                <div className="overflow-x-auto bg-white rounded-2xl border border-violet-100 shadow-lg shadow-violet-50/50">
+                    <table className="min-w-full text-sm">
+                        <thead>
+                            <tr className="bg-gray-50 border-b border-gray-100">
+                                <th className="p-3.5 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">Code</th>
+                                <th className="p-3.5 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">Course Name</th>
+                                <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider">Dept</th>
+                                <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider">Sem</th>
+                                <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider">L</th>
+                                <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider">T</th>
+                                <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider">P</th>
+                                <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider">Cr</th>
+                                <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider">Weekly</th>
+                                <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider">Type</th>
+                                <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider w-16">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {filtered.map((c, i) => (
+                                <tr key={c.course_code} className={`border-b border-violet-50 hover:bg-violet-50/40 transition-colors duration-200 ${i % 2 === 0 ? 'bg-white' : 'bg-purple-50/20'}`}>
+                                    <td className="p-3.5 font-mono font-bold text-violet-800">{c.course_code}</td>
+                                    <td className="p-3.5 text-gray-800 font-medium">{c.course_name}</td>
+                                    <td className="p-3.5 text-center"><span className="bg-violet-50 text-violet-700 px-2.5 py-1 rounded-lg text-xs font-semibold border border-violet-100">{c.department_code}</span></td>
+                                    <td className="p-3.5 text-center font-semibold text-gray-700">{c.semester}</td>
+                                    <td className="p-3.5 text-center text-gray-600">{c.lecture_hours || 0}</td>
+                                    <td className="p-3.5 text-center text-gray-600">{c.tutorial_hours || 0}</td>
+                                    <td className="p-3.5 text-center text-gray-600">{c.practical_hours || 0}</td>
+                                    <td className="p-3.5 text-center font-semibold text-gray-700">{c.credits || '-'}</td>
+                                    <td className="p-3.5 text-center"><span className="bg-violet-100 text-violet-800 px-2.5 py-1 rounded-full text-xs font-bold">{c.weekly_sessions}</span></td>
+                                    <td className="p-3.5 text-center">
+                                        <div className="flex flex-wrap gap-1 justify-center">
+                                            {c.is_honours && <span className="bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-lg text-[10px] font-semibold">Honours</span>}
+                                            {c.is_minor && <span className="bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded-lg text-[10px] font-semibold">Minor</span>}
+                                            {c.is_lab && <span className="bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-lg text-[10px] font-semibold">Lab</span>}
+                                            {c.is_elective && <span className="bg-green-100 text-green-700 px-1.5 py-0.5 rounded-lg text-[10px] font-semibold">Elective</span>}
+                                            {c.is_open_elective && <span className="bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded-lg text-[10px] font-semibold">Open Elec</span>}
+                                            {!c.is_honours && !c.is_minor && !c.is_lab && !c.is_elective && !c.is_open_elective && <span className="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-lg text-[10px] font-medium">Regular</span>}
+                                        </div>
+                                    </td>
+                                    <td className="p-3.5 text-center">
+                                        <button onClick={() => handleDeleteCourse(c.course_code)} className="text-red-300 hover:text-red-600 transition-colors p-1 rounded-lg hover:bg-red-50" title="Delete"><Trash2 className="w-4 h-4" /></button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                    {filtered.length === 0 && <div className="p-10 text-center text-gray-400 text-sm">No courses found.</div>}
+                </div>
+            </div>
+        );
+    };
+
+    // ============================================
+    // FACULTY PAGE
+    // ============================================
+    const renderFacultyPage = () => {
+        const q = searchQuery.toLowerCase().trim();
+        const filtered = allFaculty.filter(f => {
+            if (!q) return true;
+            return (f.faculty_id || '').toLowerCase().includes(q) || (f.faculty_name || '').toLowerCase().includes(q) || (f.faculty_email || '').toLowerCase().includes(q) || (f.department_code || '').toLowerCase().includes(q);
+        });
+
+        return (
+            <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                    <div className="flex-1">{renderFilterBar(false, filtered.length, allFaculty.length)}</div>
+                    <button onClick={() => setShowAddFaculty(!showAddFaculty)} className="ml-3 flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-violet-200 hover:shadow-violet-300 transition-all whitespace-nowrap hover:-translate-y-0.5 active:scale-95">
+                        <Plus className="w-4 h-4" /> Add Faculty
+                    </button>
+                </div>
+
+                {showAddFaculty && (
+                    <div className="bg-white rounded-2xl border-2 border-violet-200 shadow-xl shadow-violet-100/50 p-6">
+                        <h4 className="font-bold text-gray-800 mb-4 flex items-center gap-2"><Plus className="w-4 h-4 text-violet-600" /> Add New Faculty</h4>
+                        <form onSubmit={handleAddFaculty} className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            <input name="faculty_id" placeholder="Faculty ID *" required className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
+                            <input name="faculty_name" placeholder="Faculty Name *" required className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
+                            <input name="faculty_email" placeholder="Email (optional)" type="email" className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
+                            <select name="department_code" required className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm">
+                                <option value="">Department *</option>
+                                {departments.map(d => <option key={d.department_code} value={d.department_code}>{d.department_code}</option>)}
+                            </select>
+                            <div className="flex gap-2">
+                                <button type="submit" className="bg-violet-600 hover:bg-violet-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-violet-200 transition-all">Save</button>
+                                <button type="button" onClick={() => setShowAddFaculty(false)} className="bg-gray-100 hover:bg-gray-200 text-gray-600 px-4 py-2.5 rounded-xl text-sm font-medium transition-all">Cancel</button>
+                            </div>
+                        </form>
+                    </div>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {filtered.map(f => (
+                        <div key={f.faculty_id} className="bg-white rounded-2xl border border-violet-100 shadow-md shadow-violet-50/30 hover:shadow-xl hover:shadow-violet-100/50 hover:border-violet-200 transition-all duration-300 p-5 group">
+                            <div className="flex items-start gap-3">
+                                <div className="w-12 h-12 bg-violet-600 rounded-2xl flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-violet-200 flex-shrink-0">
+                                    {(f.faculty_name || '?').charAt(0).toUpperCase()}
                                 </div>
-                                <p className="text-sm text-gray-700 mt-0.5 font-medium">{data.course_name}</p>
-                            </div>
-                            <div className="bg-violet-100 text-violet-700 px-3.5 py-1.5 rounded-full text-xs font-bold border border-violet-200">
-                                {data.faculty.length} faculty
-                            </div>
-                        </div>
-                        <div className="p-3">
-                            <div className="flex flex-wrap gap-2">
-                                {data.faculty.map((f, i) => (
-                                    <div key={i} className="flex items-center gap-2 bg-purple-50/50 rounded-xl px-3.5 py-2.5 border border-violet-100 group hover:border-violet-300 hover:bg-violet-50 transition-all duration-200">
-                                        <div className="w-8 h-8 bg-violet-600 rounded-xl flex items-center justify-center text-white text-xs font-bold shadow-sm">
-                                            {(f.faculty_name || '?').charAt(0)}
-                                        </div>
-                                        <div>
-                                            <p className="text-xs font-medium text-gray-800">{f.faculty_name || 'Unknown'}</p>
-                                            <div className="flex items-center gap-1.5">
-                                                <span className="text-[10px] text-gray-500">{f.delivery_type || 'Theory'}</span>
-                                                {f.faculty_dept && f.faculty_dept !== '?' && f.faculty_dept !== data.course_dept && (
-                                                    <span className="text-[9px] px-1 rounded bg-gray-200 text-gray-600">{f.faculty_dept}</span>
-                                                )}
-                                            </div>
-                                        </div>
-                                        <button onClick={() => handleDeleteMapping(f.id)} className="text-red-300 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-all ml-1" title="Remove Mapping">
-                                            <Trash2 className="w-3 h-3" />
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex items-center justify-between">
+                                        <h4 className="font-bold text-gray-900 text-sm truncate">{f.faculty_name || 'Unknown'}</h4>
+                                        <button onClick={() => handleDeleteFaculty(f.faculty_id)} className="text-red-300 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-all p-1 rounded-lg hover:bg-red-50" title="Delete">
+                                            <Trash2 className="w-4 h-4" />
                                         </button>
                                     </div>
-                                ))}
+                                    <p className="text-xs text-gray-400 font-mono mt-0.5">{f.faculty_id}</p>
+                                    <div className="flex items-center gap-2 mt-2.5">
+                                        <span className="bg-violet-50 text-violet-700 px-2.5 py-1 rounded-lg text-xs font-semibold border border-violet-100">{f.department_code}</span>
+                                        <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${(f.status || '') === 'Active' || (f.status || '') === 'ACTIVE' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-red-50 text-red-700 border border-red-100'}`}>
+                                            {f.status || 'Active'}
+                                        </span>
+                                    </div>
+                                    {f.faculty_email && <p className="text-xs text-violet-500 mt-2 truncate font-medium">{f.faculty_email}</p>}
+                                </div>
                             </div>
                         </div>
+                    ))}
+                </div>
+                {filtered.length === 0 && <div className="p-10 text-center text-gray-400 bg-white rounded-2xl border border-violet-100 text-sm">No faculty found.</div>}
+            </div>
+        );
+    };
+
+    // ============================================
+    // COURSE-FACULTY MAPPINGS PAGE
+    // ============================================
+    const renderMappingsPage = () => {
+        const q = searchQuery.toLowerCase().trim();
+        const filtered = courseFacultyMappings.filter(m => {
+            if (!q) return true;
+            return (m.course_code || '').toLowerCase().includes(q) ||
+                (m.course_name || '').toLowerCase().includes(q) ||
+                (m.faculty_name || '').toLowerCase().includes(q) ||
+                (m.course_dept || '').toLowerCase().includes(q) ||     // NEW
+                (m.for_department || '').toLowerCase().includes(q) ||  // NEW
+                (m.faculty_dept || '').toLowerCase().includes(q);      // NEW
+        });
+
+        const grouped = {};
+        filtered.forEach(m => {
+            if (!grouped[m.course_code]) {
+                grouped[m.course_code] = {
+                    course_name: m.course_name,
+                    course_dept: m.course_dept,
+                    target_depts: new Set(), // Track all target departments
+                    faculty: []
+                };
+            }
+            grouped[m.course_code].faculty.push(m);
+            if (m.for_department) grouped[m.course_code].target_depts.add(m.for_department);
+        });
+
+        return (
+            <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                    <div className="flex-1">{renderFilterBar(false, Object.keys(grouped).length, [...new Set(courseFacultyMappings.map(m => m.course_code))].length)}</div>
+                    <button onClick={() => setShowAddMapping(!showAddMapping)} className="ml-3 flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-violet-200 hover:shadow-violet-300 transition-all whitespace-nowrap hover:-translate-y-0.5 active:scale-95">
+                        <Plus className="w-4 h-4" /> Add Mapping
+                    </button>
+                </div>
+
+                {showAddMapping && (
+                    <div className="bg-white rounded-2xl border-2 border-violet-200 shadow-xl shadow-violet-100/50 p-6">
+                        <h4 className="font-bold text-gray-800 mb-4 flex items-center gap-2"><Plus className="w-4 h-4 text-violet-600" /> Add Course-Faculty Mapping</h4>
+                        <form onSubmit={handleAddMapping} className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                            <input name="course_code" placeholder="Course Code *" required className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
+                            <input name="faculty_id" placeholder="Faculty ID *" required className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
+                            <select name="department_code" required className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm">
+                                <option value="">Taught To (Dept) *</option>
+                                {departments.map(d => <option key={d.department_code} value={d.department_code}>{d.department_code}</option>)}
+                            </select>
+                            <select name="delivery_type" className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm">
+                                <option value="Theory">Theory</option>
+                                <option value="Lab">Lab</option>
+                                <option value="Both">Both</option>
+                            </select>
+                            <div className="flex gap-2">
+                                <button type="submit" className="bg-violet-600 hover:bg-violet-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-violet-200 transition-all">Save</button>
+                                <button type="button" onClick={() => setShowAddMapping(false)} className="bg-gray-100 hover:bg-gray-200 text-gray-600 px-4 py-2.5 rounded-xl text-sm font-medium transition-all">Cancel</button>
+                            </div>
+                        </form>
                     </div>
-                ))}
-                {Object.keys(grouped).length === 0 && <div className="p-10 text-center text-gray-400 bg-white rounded-2xl border border-violet-100 text-sm">No mappings found.</div>}
+                )}
+
+                <div className="space-y-4">
+                    {Object.entries(grouped).map(([code, data]) => (
+                        <div key={code} className="bg-white rounded-2xl border border-violet-100 shadow-md shadow-violet-50/30 overflow-hidden hover:shadow-lg transition-shadow duration-300">
+                            <div className="bg-white p-4 border-b border-gray-100 flex items-center justify-between">
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="font-mono font-bold text-violet-800 text-sm">{code}</span>
+                                        {/* Logic to determine offering department from faculty */}
+                                        {(() => {
+                                            const facDepts = new Set(data.faculty.map(f => f.faculty_dept).filter(d => d && d !== '?'));
+                                            const offeringDept = facDepts.size === 1 ? Array.from(facDepts)[0] : (facDepts.size > 1 ? 'Mixed' : data.course_dept);
+                                            return (
+                                                <span className={`px-2 py-0.5 rounded text-xs font-medium border ${offeringDept === '?' ? 'bg-gray-100 text-gray-500' : 'bg-slate-100 text-slate-700'}`}>
+                                                    {offeringDept}
+                                                </span>
+                                            );
+                                        })()}
+                                        {/* Show Target Depts */}
+                                        {data.target_depts.size > 0 && (
+                                            <span className="flex items-center gap-1 text-[10px] text-gray-500 font-medium ml-2 bg-yellow-50 px-2 py-0.5 rounded border border-yellow-100">
+                                                For {Array.from(data.target_depts).join(', ')}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <p className="text-sm text-gray-700 mt-0.5 font-medium">{data.course_name}</p>
+                                </div>
+                                <div className="bg-violet-100 text-violet-700 px-3.5 py-1.5 rounded-full text-xs font-bold border border-violet-200">
+                                    {data.faculty.length} faculty
+                                </div>
+                            </div>
+                            <div className="p-3">
+                                <div className="flex flex-wrap gap-2">
+                                    {data.faculty.map((f, i) => (
+                                        <div key={i} className="flex items-center gap-2 bg-purple-50/50 rounded-xl px-3.5 py-2.5 border border-violet-100 group hover:border-violet-300 hover:bg-violet-50 transition-all duration-200">
+                                            <div className="w-8 h-8 bg-violet-600 rounded-xl flex items-center justify-center text-white text-xs font-bold shadow-sm">
+                                                {(f.faculty_name || '?').charAt(0)}
+                                            </div>
+                                            <div>
+                                                <p className="text-xs font-medium text-gray-800">{f.faculty_name || 'Unknown'}</p>
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className="text-[10px] text-gray-500">{f.delivery_type || 'Theory'}</span>
+                                                    {f.faculty_dept && f.faculty_dept !== '?' && f.faculty_dept !== data.course_dept && (
+                                                        <span className="text-[9px] px-1 rounded bg-gray-200 text-gray-600">{f.faculty_dept}</span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <button onClick={() => handleDeleteMapping(f.id)} className="text-red-300 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-all ml-1" title="Remove Mapping">
+                                                <Trash2 className="w-3 h-3" />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                    {Object.keys(grouped).length === 0 && <div className="p-10 text-center text-gray-400 bg-white rounded-2xl border border-violet-100 text-sm">No mappings found.</div>}
+                </div>
+            </div>
+        );
+    };
+
+    // ============================================
+    // EDITOR PAGE
+    // ============================================
+    const renderEditorPage = () => (
+        <div className="space-y-6">
+            <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
+                <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                    <Pencil className="w-5 h-5 text-yellow-600" />
+                    <span>Edit Saved Timetable</span>
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Department</label>
+                        <select className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500" value={editorDept} onChange={e => setEditorDept(e.target.value)}>
+                            <option value="">Select Dept</option>
+                            {departments.map(d => <option key={d.department_code} value={d.department_code}>{d.department_code}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Semester</label>
+                        <select className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500" value={editorSem} onChange={e => setEditorSem(e.target.value)}>
+                            <option value="">Select Sem</option>
+                            {semesters.map(s => <option key={s.semester_number} value={s.semester_number}>Semester {s.semester_number}</option>)}
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden min-h-[600px] flex flex-col">
+                <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+                    <h3 className="font-bold text-gray-700">{editorDept && editorSem ? `${editorDept} - Semester ${editorSem} ` : 'Timetable Editor'}</h3>
+                </div>
+                <div className="flex-1 relative">
+                    {editorDept && editorSem ? (
+                        <TimetableEditor
+                            key={`${editorDept}-${editorSem}`}
+                            department={editorDept}
+                            semester={editorSem}
+                            initialData={timetableEntries}
+                            masterData={{ departments, semesters, slots, courses: allCourses, faculty: allFaculty }}
+                            onSave={async (updatedEntries) => {
+                                try {
+                                    await api.saveTimetableEntries(editorDept, editorSem, updatedEntries);
+                                    alert('Timetable saved successfully!');
+                                    // Re-fetch to ensure state is consistent
+                                    const res = await api.getTimetableEntries(editorDept, editorSem);
+                                    setTimetableEntries(res.data);
+                                } catch (error) {
+                                    console.error("Error saving timetable:", error);
+                                    alert('Failed to save timetable: ' + (error.response?.data?.detail || error.message));
+                                }
+                            }}
+                            onExportPDF={handleDownloadPDF}
+                        />
+                    ) : (
+                        <div className="flex flex-col items-center justify-center h-full text-gray-400">
+                            <Pencil className="w-16 h-16 mb-4 opacity-20" />
+                            <p>Select Department and Semester to edit saved timetable</p>
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     );
-};
 
-// ============================================
-// EDITOR PAGE
-// ============================================
-const renderEditorPage = () => (
-    <div className="space-y-6">
-        <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
-            <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-                <Pencil className="w-5 h-5 text-yellow-600" />
-                <span>Edit Saved Timetable</span>
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Department</label>
-                    <select className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500" value={editorDept} onChange={e => setEditorDept(e.target.value)}>
-                        <option value="">Select Dept</option>
-                        {departments.map(d => <option key={d.department_code} value={d.department_code}>{d.department_code}</option>)}
-                    </select>
+    // ============================================
+    // TIME SLOTS PAGE
+    // ============================================
+    const handleDeleteSlot = async (slotId) => {
+        if (!confirm('Delete this time slot?')) return;
+        try {
+            await api.deleteSlot(slotId);
+            const res = await api.getSlots();
+            setSlots(res.data);
+        } catch (err) {
+            alert('Failed to delete slot: ' + (err.response?.data?.detail || err.message));
+        }
+    };
+
+    const handleUpdateSlot = async (slotId) => {
+        try {
+            await api.updateSlot(slotId, editingSlotData);
+            setEditingSlotId(null);
+            setEditingSlotData({});
+            const res = await api.getSlots();
+            setSlots(res.data);
+        } catch (err) {
+            alert('Failed to update slot: ' + (err.response?.data?.detail || err.message));
+        }
+    };
+
+    const handleAddSlot = async (e) => {
+        e.preventDefault();
+        const form = e.target;
+        try {
+            await api.createSlot({
+                day_of_week: form.day_of_week.value,
+                period_number: parseInt(form.period_number.value),
+                start_time: form.start_time.value,
+                end_time: form.end_time.value,
+                slot_type: form.slot_type.value,
+                is_active: true
+            });
+            form.reset();
+            setShowAddSlot(false);
+            const res = await api.getSlots();
+            setSlots(res.data);
+        } catch (err) {
+            alert('Failed to add slot: ' + (err.response?.data?.detail || err.message));
+        }
+    };
+
+    const startEditSlot = (slot) => {
+        setEditingSlotId(slot.slot_id);
+        setEditingSlotData({
+            start_time: slot.start_time,
+            end_time: slot.end_time,
+            slot_type: slot.slot_type,
+            is_active: slot.is_active
+        });
+    };
+
+    const renderSlotsPage = () => {
+        const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        const grouped = {};
+        slots.forEach(s => {
+            if (!grouped[s.day_of_week]) grouped[s.day_of_week] = [];
+            grouped[s.day_of_week].push(s);
+        });
+        Object.values(grouped).forEach(arr => arr.sort((a, b) => a.period_number - b.period_number));
+        const sortedDays = dayOrder.filter(d => grouped[d]);
+
+        return (
+            <div className="space-y-6">
+                <div className="flex justify-between items-center">
+                    <div>
+                        <p className="text-sm text-gray-500 mt-1">Manage period timings, types, and active status for each day of the week.</p>
+                    </div>
+                    <button onClick={() => setShowAddSlot(!showAddSlot)} className="flex items-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-bold shadow-lg shadow-violet-200 hover:shadow-violet-300 transition-all hover:-translate-y-0.5 active:scale-95">
+                        <Plus className="w-4 h-4" /> Add Slot
+                    </button>
                 </div>
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Semester</label>
-                    <select className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500" value={editorSem} onChange={e => setEditorSem(e.target.value)}>
-                        <option value="">Select Sem</option>
-                        {semesters.map(s => <option key={s.semester_number} value={s.semester_number}>Semester {s.semester_number}</option>)}
-                    </select>
-                </div>
-            </div>
-        </div>
-        <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden min-h-[600px] flex flex-col">
-            <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
-                <h3 className="font-bold text-gray-700">{editorDept && editorSem ? `${editorDept} - Semester ${editorSem} ` : 'Timetable Editor'}</h3>
-            </div>
-            <div className="flex-1 relative">
-                {editorDept && editorSem ? (
-                    <TimetableEditor
-                        key={`${editorDept}-${editorSem}`}
-                        department={editorDept}
-                        semester={editorSem}
-                        initialData={timetableEntries}
-                        masterData={{ departments, semesters, slots, courses: allCourses, faculty: allFaculty }}
-                        onSave={async (updatedEntries) => {
-                            try {
-                                await api.saveTimetableEntries(editorDept, editorSem, updatedEntries);
-                                alert('Timetable saved successfully!');
-                                // Re-fetch to ensure state is consistent
-                                const res = await api.getTimetableEntries(editorDept, editorSem);
-                                setTimetableEntries(res.data);
-                            } catch (error) {
-                                console.error("Error saving timetable:", error);
-                                alert('Failed to save timetable: ' + (error.response?.data?.detail || error.message));
-                            }
-                        }}
-                        onExportPDF={handleDownloadPDF}
-                    />
-                ) : (
-                    <div className="flex flex-col items-center justify-center h-full text-gray-400">
-                        <Pencil className="w-16 h-16 mb-4 opacity-20" />
-                        <p>Select Department and Semester to edit saved timetable</p>
+
+                {showAddSlot && (
+                    <div className="bg-white rounded-2xl border-2 border-violet-200 shadow-xl shadow-violet-100/50 p-6">
+                        <h4 className="font-bold text-gray-800 mb-4 flex items-center gap-2"><Plus className="w-4 h-4 text-violet-600" /> Add New Time Slot</h4>
+                        <form onSubmit={handleAddSlot} className="grid grid-cols-2 md:grid-cols-6 gap-3">
+                            <select name="day_of_week" required className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm">
+                                <option value="">Day *</option>
+                                {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map(d => <option key={d} value={d}>{d}</option>)}
+                            </select>
+                            <input name="period_number" type="number" placeholder="Period # *" required min="1" className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
+                            <input name="start_time" type="time" required className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
+                            <input name="end_time" type="time" required className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
+                            <select name="slot_type" className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm">
+                                <option value="REGULAR">Regular</option>
+                                <option value="BREAK">Break</option>
+                                <option value="LUNCH">Lunch</option>
+                                <option value="SPECIAL">Special</option>
+                            </select>
+                            <div className="flex gap-2">
+                                <button type="submit" className="bg-violet-600 hover:bg-violet-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-violet-200 transition-all">Save</button>
+                                <button type="button" onClick={() => setShowAddSlot(false)} className="bg-gray-100 hover:bg-gray-200 text-gray-600 px-4 py-2.5 rounded-xl text-sm font-medium transition-all">Cancel</button>
+                            </div>
+                        </form>
                     </div>
                 )}
+
+                {sortedDays.map(day => (
+                    <div key={day} className="bg-white rounded-2xl border border-violet-100 shadow-md shadow-violet-50/30 overflow-hidden">
+                        <div className="bg-white p-4 border-b border-gray-100">
+                            <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                                <Calendar className="w-4 h-4 text-violet-600" />
+                                {day}
+                                <span className="ml-2 text-xs font-semibold bg-violet-100 text-violet-700 px-2.5 py-1 rounded-full border border-violet-200">{grouped[day].length} periods</span>
+                            </h3>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                                <thead>
+                                    <tr className="bg-gray-50 border-b border-gray-100">
+                                        <th className="px-4 py-3 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">Period</th>
+                                        <th className="px-4 py-3 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">Start Time</th>
+                                        <th className="px-4 py-3 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">End Time</th>
+                                        <th className="px-4 py-3 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">Type</th>
+                                        <th className="px-4 py-3 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">Status</th>
+                                        <th className="px-4 py-3 text-right font-semibold text-gray-500 text-xs uppercase tracking-wider">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {grouped[day].map(slot => (
+                                        <tr key={slot.slot_id} className="border-b border-violet-50 hover:bg-violet-50/40 transition-colors duration-200">
+                                            <td className="px-4 py-3">
+                                                <span className="inline-flex items-center justify-center w-8 h-8 bg-violet-100 text-violet-800 rounded-xl font-bold text-sm border border-violet-200">
+                                                    P{slot.period_number}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                {editingSlotId === slot.slot_id ? (
+                                                    <input type="time" value={editingSlotData.start_time || ''} onChange={e => setEditingSlotData(prev => ({ ...prev, start_time: e.target.value }))} className="p-1 border rounded text-sm w-28" />
+                                                ) : (
+                                                    <span className="font-mono text-gray-800">{slot.start_time}</span>
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                {editingSlotId === slot.slot_id ? (
+                                                    <input type="time" value={editingSlotData.end_time || ''} onChange={e => setEditingSlotData(prev => ({ ...prev, end_time: e.target.value }))} className="p-1 border rounded text-sm w-28" />
+                                                ) : (
+                                                    <span className="font-mono text-gray-800">{slot.end_time}</span>
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                {editingSlotId === slot.slot_id ? (
+                                                    <select value={editingSlotData.slot_type || 'REGULAR'} onChange={e => setEditingSlotData(prev => ({ ...prev, slot_type: e.target.value }))} className="p-1 border rounded text-sm">
+                                                        <option value="REGULAR">Regular</option>
+                                                        <option value="BREAK">Break</option>
+                                                        <option value="LUNCH">Lunch</option>
+                                                        <option value="SPECIAL">Special</option>
+                                                    </select>
+                                                ) : (
+                                                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${slot.slot_type === 'REGULAR' ? 'bg-green-100 text-green-700' : slot.slot_type === 'BREAK' ? 'bg-orange-100 text-orange-700' : slot.slot_type === 'LUNCH' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
+                                                        {slot.slot_type}
+                                                    </span>
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                {editingSlotId === slot.slot_id ? (
+                                                    <label className="flex items-center gap-2 cursor-pointer">
+                                                        <input type="checkbox" checked={editingSlotData.is_active ?? true} onChange={e => setEditingSlotData(prev => ({ ...prev, is_active: e.target.checked }))} className="w-4 h-4 rounded" />
+                                                        <span className="text-xs">{editingSlotData.is_active ? 'Active' : 'Inactive'}</span>
+                                                    </label>
+                                                ) : (
+                                                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${slot.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600'}`}>
+                                                        <span className={`w-1.5 h-1.5 rounded-full ${slot.is_active ? 'bg-emerald-500' : 'bg-red-400'}`}></span>
+                                                        {slot.is_active ? 'Active' : 'Inactive'}
+                                                    </span>
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-3 text-right">
+                                                {editingSlotId === slot.slot_id ? (
+                                                    <div className="flex gap-2 justify-end">
+                                                        <button onClick={() => handleUpdateSlot(slot.slot_id)} className="text-green-600 hover:text-green-800 p-1" title="Save"><Check className="w-4 h-4" /></button>
+                                                        <button onClick={() => { setEditingSlotId(null); setEditingSlotData({}); }} className="text-gray-400 hover:text-gray-600 p-1" title="Cancel"><X className="w-4 h-4" /></button>
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex gap-2 justify-end">
+                                                        <button onClick={() => startEditSlot(slot)} className="text-blue-500 hover:text-blue-700 p-1" title="Edit"><Pencil className="w-3.5 h-3.5" /></button>
+                                                        <button onClick={() => handleDeleteSlot(slot.slot_id)} className="text-red-400 hover:text-red-600 p-1" title="Delete"><Trash2 className="w-3.5 h-3.5" /></button>
+                                                    </div>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                ))}
+                {sortedDays.length === 0 && <div className="p-10 text-center text-gray-400 bg-white rounded-2xl border border-violet-100 text-sm">No time slots configured. Click "Add Slot" to create one.</div>}
             </div>
-        </div>
-    </div>
-);
+        );
+    };
 
-// ============================================
-// TIME SLOTS PAGE
-// ============================================
-const handleDeleteSlot = async (slotId) => {
-    if (!confirm('Delete this time slot?')) return;
-    try {
-        await api.deleteSlot(slotId);
-        const res = await api.getSlots();
-        setSlots(res.data);
-    } catch (err) {
-        alert('Failed to delete slot: ' + (err.response?.data?.detail || err.message));
-    }
-};
-
-const handleUpdateSlot = async (slotId) => {
-    try {
-        await api.updateSlot(slotId, editingSlotData);
-        setEditingSlotId(null);
-        setEditingSlotData({});
-        const res = await api.getSlots();
-        setSlots(res.data);
-    } catch (err) {
-        alert('Failed to update slot: ' + (err.response?.data?.detail || err.message));
-    }
-};
-
-const handleAddSlot = async (e) => {
-    e.preventDefault();
-    const form = e.target;
-    try {
-        await api.createSlot({
-            day_of_week: form.day_of_week.value,
-            period_number: parseInt(form.period_number.value),
-            start_time: form.start_time.value,
-            end_time: form.end_time.value,
-            slot_type: form.slot_type.value,
-            is_active: true
-        });
-        form.reset();
-        setShowAddSlot(false);
-        const res = await api.getSlots();
-        setSlots(res.data);
-    } catch (err) {
-        alert('Failed to add slot: ' + (err.response?.data?.detail || err.message));
-    }
-};
-
-const startEditSlot = (slot) => {
-    setEditingSlotId(slot.slot_id);
-    setEditingSlotData({
-        start_time: slot.start_time,
-        end_time: slot.end_time,
-        slot_type: slot.slot_type,
-        is_active: slot.is_active
-    });
-};
-
-const renderSlotsPage = () => {
-    const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    const grouped = {};
-    slots.forEach(s => {
-        if (!grouped[s.day_of_week]) grouped[s.day_of_week] = [];
-        grouped[s.day_of_week].push(s);
-    });
-    Object.values(grouped).forEach(arr => arr.sort((a, b) => a.period_number - b.period_number));
-    const sortedDays = dayOrder.filter(d => grouped[d]);
-
-    return (
+    // ============================================
+    // DASHBOARD
+    // ============================================
+    const renderDashboard = () => (
         <div className="space-y-6">
-            <div className="flex justify-between items-center">
-                <div>
-                    <p className="text-sm text-gray-500 mt-1">Manage period timings, types, and active status for each day of the week.</p>
-                </div>
-                <button onClick={() => setShowAddSlot(!showAddSlot)} className="flex items-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-bold shadow-lg shadow-violet-200 hover:shadow-violet-300 transition-all hover:-translate-y-0.5 active:scale-95">
-                    <Plus className="w-4 h-4" /> Add Slot
-                </button>
-            </div>
-
-            {showAddSlot && (
-                <div className="bg-white rounded-2xl border-2 border-violet-200 shadow-xl shadow-violet-100/50 p-6">
-                    <h4 className="font-bold text-gray-800 mb-4 flex items-center gap-2"><Plus className="w-4 h-4 text-violet-600" /> Add New Time Slot</h4>
-                    <form onSubmit={handleAddSlot} className="grid grid-cols-2 md:grid-cols-6 gap-3">
-                        <select name="day_of_week" required className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm">
-                            <option value="">Day *</option>
+            <div className="bg-white p-6 rounded-2xl shadow-lg shadow-violet-50/50 border border-violet-100">
+                <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                    <Monitor className="w-5 h-5 text-violet-600" />
+                    <span>Generate Timetable</span>
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                    <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">Department</label>
+                        <select className="w-full p-2.5 border border-violet-200 rounded-xl focus:ring-2 focus:ring-violet-400 focus:border-violet-400 focus:outline-none shadow-sm bg-white font-medium text-gray-700 cursor-pointer transition-all hover:border-violet-300" value={selectedDept} onChange={e => setSelectedDept(e.target.value)}>
+                            <option value="">Select Dept</option>
+                            {departments.map(d => <option key={d.department_code} value={d.department_code}>{d.department_code}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">Semester</label>
+                        <select className="w-full p-2.5 border border-violet-200 rounded-xl focus:ring-2 focus:ring-violet-400 focus:border-violet-400 focus:outline-none shadow-sm bg-white font-medium text-gray-700 cursor-pointer transition-all hover:border-violet-300" value={selectedSem} onChange={e => setSelectedSem(e.target.value)}>
+                            <option value="">Select Sem</option>
+                            {semesters.map(s => <option key={s.semester_number} value={s.semester_number}>Semester {s.semester_number}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">Mentor Day</label>
+                        <select className="w-full p-2.5 border border-violet-200 rounded-xl focus:ring-2 focus:ring-violet-400 focus:border-violet-400 focus:outline-none shadow-sm bg-white font-medium text-gray-700 cursor-pointer transition-all hover:border-violet-300" value={mentorDay} onChange={e => setMentorDay(e.target.value)}>
                             {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map(d => <option key={d} value={d}>{d}</option>)}
                         </select>
-                        <input name="period_number" type="number" placeholder="Period # *" required min="1" className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
-                        <input name="start_time" type="time" required className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
-                        <input name="end_time" type="time" required className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
-                        <select name="slot_type" className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm">
-                            <option value="REGULAR">Regular</option>
-                            <option value="BREAK">Break</option>
-                            <option value="LUNCH">Lunch</option>
-                            <option value="SPECIAL">Special</option>
-                        </select>
-                        <div className="flex gap-2">
-                            <button type="submit" className="bg-violet-600 hover:bg-violet-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-violet-200 transition-all">Save</button>
-                            <button type="button" onClick={() => setShowAddSlot(false)} className="bg-gray-100 hover:bg-gray-200 text-gray-600 px-4 py-2.5 rounded-xl text-sm font-medium transition-all">Cancel</button>
-                        </div>
-                    </form>
-                </div>
-            )}
-
-            {sortedDays.map(day => (
-                <div key={day} className="bg-white rounded-2xl border border-violet-100 shadow-md shadow-violet-50/30 overflow-hidden">
-                    <div className="bg-white p-4 border-b border-gray-100">
-                        <h3 className="font-bold text-gray-800 flex items-center gap-2">
-                            <Calendar className="w-4 h-4 text-violet-600" />
-                            {day}
-                            <span className="ml-2 text-xs font-semibold bg-violet-100 text-violet-700 px-2.5 py-1 rounded-full border border-violet-200">{grouped[day].length} periods</span>
-                        </h3>
                     </div>
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="bg-gray-50 border-b border-gray-100">
-                                    <th className="px-4 py-3 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">Period</th>
-                                    <th className="px-4 py-3 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">Start Time</th>
-                                    <th className="px-4 py-3 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">End Time</th>
-                                    <th className="px-4 py-3 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">Type</th>
-                                    <th className="px-4 py-3 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">Status</th>
-                                    <th className="px-4 py-3 text-right font-semibold text-gray-500 text-xs uppercase tracking-wider">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {grouped[day].map(slot => (
-                                    <tr key={slot.slot_id} className="border-b border-violet-50 hover:bg-violet-50/40 transition-colors duration-200">
-                                        <td className="px-4 py-3">
-                                            <span className="inline-flex items-center justify-center w-8 h-8 bg-violet-100 text-violet-800 rounded-xl font-bold text-sm border border-violet-200">
-                                                P{slot.period_number}
-                                            </span>
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            {editingSlotId === slot.slot_id ? (
-                                                <input type="time" value={editingSlotData.start_time || ''} onChange={e => setEditingSlotData(prev => ({ ...prev, start_time: e.target.value }))} className="p-1 border rounded text-sm w-28" />
-                                            ) : (
-                                                <span className="font-mono text-gray-800">{slot.start_time}</span>
-                                            )}
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            {editingSlotId === slot.slot_id ? (
-                                                <input type="time" value={editingSlotData.end_time || ''} onChange={e => setEditingSlotData(prev => ({ ...prev, end_time: e.target.value }))} className="p-1 border rounded text-sm w-28" />
-                                            ) : (
-                                                <span className="font-mono text-gray-800">{slot.end_time}</span>
-                                            )}
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            {editingSlotId === slot.slot_id ? (
-                                                <select value={editingSlotData.slot_type || 'REGULAR'} onChange={e => setEditingSlotData(prev => ({ ...prev, slot_type: e.target.value }))} className="p-1 border rounded text-sm">
-                                                    <option value="REGULAR">Regular</option>
-                                                    <option value="BREAK">Break</option>
-                                                    <option value="LUNCH">Lunch</option>
-                                                    <option value="SPECIAL">Special</option>
-                                                </select>
-                                            ) : (
-                                                <span className={`px-2 py-0.5 rounded text-xs font-medium ${slot.slot_type === 'REGULAR' ? 'bg-green-100 text-green-700' : slot.slot_type === 'BREAK' ? 'bg-orange-100 text-orange-700' : slot.slot_type === 'LUNCH' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
-                                                    {slot.slot_type}
-                                                </span>
-                                            )}
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            {editingSlotId === slot.slot_id ? (
-                                                <label className="flex items-center gap-2 cursor-pointer">
-                                                    <input type="checkbox" checked={editingSlotData.is_active ?? true} onChange={e => setEditingSlotData(prev => ({ ...prev, is_active: e.target.checked }))} className="w-4 h-4 rounded" />
-                                                    <span className="text-xs">{editingSlotData.is_active ? 'Active' : 'Inactive'}</span>
-                                                </label>
-                                            ) : (
-                                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${slot.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600'}`}>
-                                                    <span className={`w-1.5 h-1.5 rounded-full ${slot.is_active ? 'bg-emerald-500' : 'bg-red-400'}`}></span>
-                                                    {slot.is_active ? 'Active' : 'Inactive'}
-                                                </span>
-                                            )}
-                                        </td>
-                                        <td className="px-4 py-3 text-right">
-                                            {editingSlotId === slot.slot_id ? (
-                                                <div className="flex gap-2 justify-end">
-                                                    <button onClick={() => handleUpdateSlot(slot.slot_id)} className="text-green-600 hover:text-green-800 p-1" title="Save"><Check className="w-4 h-4" /></button>
-                                                    <button onClick={() => { setEditingSlotId(null); setEditingSlotData({}); }} className="text-gray-400 hover:text-gray-600 p-1" title="Cancel"><X className="w-4 h-4" /></button>
-                                                </div>
-                                            ) : (
-                                                <div className="flex gap-2 justify-end">
-                                                    <button onClick={() => startEditSlot(slot)} className="text-blue-500 hover:text-blue-700 p-1" title="Edit"><Pencil className="w-3.5 h-3.5" /></button>
-                                                    <button onClick={() => handleDeleteSlot(slot.slot_id)} className="text-red-400 hover:text-red-600 p-1" title="Delete"><Trash2 className="w-3.5 h-3.5" /></button>
-                                                </div>
-                                            )}
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                    <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">Mentor Period</label>
+                        <input type="number" className="w-full p-2.5 border border-violet-200 rounded-xl focus:ring-2 focus:ring-violet-400 focus:border-violet-400 focus:outline-none shadow-sm bg-white font-medium text-gray-700" value={mentorPeriod} onChange={e => setMentorPeriod(e.target.value)} min="1" max="8" />
                     </div>
+                    <button onClick={handleGenerate} disabled={loading} className={`w-full py-2.5 px-4 rounded-xl text-white font-bold flex items-center justify-center space-x-2 transition-all ${loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-violet-600 hover:bg-violet-700 shadow-lg shadow-violet-200 hover:shadow-violet-300 hover:-translate-y-0.5 active:scale-95'}`}>
+                        {loading ? <RotateCw className="w-5 h-5 animate-spin" /> : <Monitor className="w-5 h-5" />}
+                        <span>{loading ? 'Processing...' : 'Generate'}</span>
+                    </button>
                 </div>
-            ))}
-            {sortedDays.length === 0 && <div className="p-10 text-center text-gray-400 bg-white rounded-2xl border border-violet-100 text-sm">No time slots configured. Click "Add Slot" to create one.</div>}
+            </div>
+            <div className="bg-white rounded-2xl shadow-lg shadow-violet-50/50 border border-violet-100 overflow-hidden">
+                <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-white">
+                    <h3 className="font-bold text-gray-700">{selectedDept && selectedSem ? `${selectedDept} - Semester ${selectedSem} ` : 'Timetable Preview'}</h3>
+                    <button onClick={handleDownloadPDF} className="flex items-center space-x-2 text-sm text-violet-700 hover:text-violet-900 border border-violet-200 px-4 py-1.5 rounded-xl bg-white shadow-sm hover:shadow-md hover:border-violet-300 font-semibold transition-all">
+                        <Download className="w-4 h-4" /><span>Export PDF</span>
+                    </button>
+                </div>
+                <div className="p-4">{renderTimetable()}</div>
+            </div>
         </div>
     );
-};
 
-// ============================================
-// DASHBOARD
-// ============================================
-const renderDashboard = () => (
-    <div className="space-y-6">
-        <div className="bg-white p-6 rounded-2xl shadow-lg shadow-violet-50/50 border border-violet-100">
-            <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-                <Monitor className="w-5 h-5 text-violet-600" />
-                <span>Generate Timetable</span>
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-                <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">Department</label>
-                    <select className="w-full p-2.5 border border-violet-200 rounded-xl focus:ring-2 focus:ring-violet-400 focus:border-violet-400 focus:outline-none shadow-sm bg-white font-medium text-gray-700 cursor-pointer transition-all hover:border-violet-300" value={selectedDept} onChange={e => setSelectedDept(e.target.value)}>
-                        <option value="">Select Dept</option>
-                        {departments.map(d => <option key={d.department_code} value={d.department_code}>{d.department_code}</option>)}
-                    </select>
-                </div>
-                <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">Semester</label>
-                    <select className="w-full p-2.5 border border-violet-200 rounded-xl focus:ring-2 focus:ring-violet-400 focus:border-violet-400 focus:outline-none shadow-sm bg-white font-medium text-gray-700 cursor-pointer transition-all hover:border-violet-300" value={selectedSem} onChange={e => setSelectedSem(e.target.value)}>
-                        <option value="">Select Sem</option>
-                        {semesters.map(s => <option key={s.semester_number} value={s.semester_number}>Semester {s.semester_number}</option>)}
-                    </select>
-                </div>
-                <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">Mentor Day</label>
-                    <select className="w-full p-2.5 border border-violet-200 rounded-xl focus:ring-2 focus:ring-violet-400 focus:border-violet-400 focus:outline-none shadow-sm bg-white font-medium text-gray-700 cursor-pointer transition-all hover:border-violet-300" value={mentorDay} onChange={e => setMentorDay(e.target.value)}>
-                        {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map(d => <option key={d} value={d}>{d}</option>)}
-                    </select>
-                </div>
-                <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">Mentor Period</label>
-                    <input type="number" className="w-full p-2.5 border border-violet-200 rounded-xl focus:ring-2 focus:ring-violet-400 focus:border-violet-400 focus:outline-none shadow-sm bg-white font-medium text-gray-700" value={mentorPeriod} onChange={e => setMentorPeriod(e.target.value)} min="1" max="8" />
-                </div>
-                <button onClick={handleGenerate} disabled={loading} className={`w-full py-2.5 px-4 rounded-xl text-white font-bold flex items-center justify-center space-x-2 transition-all ${loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-violet-600 hover:bg-violet-700 shadow-lg shadow-violet-200 hover:shadow-violet-300 hover:-translate-y-0.5 active:scale-95'}`}>
-                    {loading ? <RotateCw className="w-5 h-5 animate-spin" /> : <Monitor className="w-5 h-5" />}
-                    <span>{loading ? 'Processing...' : 'Generate'}</span>
-                </button>
-            </div>
-        </div>
-        <div className="bg-white rounded-2xl shadow-lg shadow-violet-50/50 border border-violet-100 overflow-hidden">
-            <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-white">
-                <h3 className="font-bold text-gray-700">{selectedDept && selectedSem ? `${selectedDept} - Semester ${selectedSem} ` : 'Timetable Preview'}</h3>
-                <button onClick={handleDownloadPDF} className="flex items-center space-x-2 text-sm text-violet-700 hover:text-violet-900 border border-violet-200 px-4 py-1.5 rounded-xl bg-white shadow-sm hover:shadow-md hover:border-violet-300 font-semibold transition-all">
-                    <Download className="w-4 h-4" /><span>Export PDF</span>
-                </button>
-            </div>
-            <div className="p-4">{renderTimetable()}</div>
-        </div>
-    </div>
-);
-
-const renderPrintViewPage = () => (
-    <div className="space-y-6">
-        <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
-            <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-                <Download className="w-5 h-5 text-blue-600" />
-                <span>Print View Timetable</span>
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Department</label>
-                    <select className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" value={editorDept} onChange={e => setEditorDept(e.target.value)}>
-                        <option value="">Select Dept</option>
-                        {departments.map(d => <option key={d.department_code} value={d.department_code}>{d.department_code}</option>)}
-                    </select>
-                </div>
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Semester</label>
-                    <select className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" value={editorSem} onChange={e => setEditorSem(e.target.value)}>
-                        <option value="">Select Sem</option>
-                        {semesters.map(s => <option key={s.semester_number} value={s.semester_number}>Semester {s.semester_number}</option>)}
-                    </select>
-                </div>
-            </div>
-        </div>
-        <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden min-h-[600px] flex flex-col">
-            <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
-                <h3 className="font-bold text-gray-700">{editorDept && editorSem ? `${editorDept} - Semester ${editorSem} ` : 'Timetable Print View'}</h3>
-                <button onClick={handleDownloadPDF} className="flex items-center space-x-2 text-sm text-violet-700 hover:text-violet-900 border border-violet-200 px-4 py-1.5 rounded-xl bg-white shadow-sm hover:shadow-md hover:border-violet-300 font-semibold transition-all">
-                    <Download className="w-4 h-4" /><span>Export PDF</span>
-                </button>
-            </div>
-            <div className="flex-1 relative">
-                {editorDept && editorSem ? (
-                    <BITTimetable
-                        timetableData={timetableEntries}
-                        department={departments.find(d => d.department_code === editorDept)?.department_code}
-                        semester={semesters.find(s => s.semester_number === parseInt(editorSem))?.semester_number}
-                        slots={slots}
-                        courses={allCourses}
-                        faculty={allFaculty}
-                    />
-                ) : (
-                    <div className="flex flex-col items-center justify-center h-full text-gray-400">
-                        <Download className="w-16 h-16 mb-4 opacity-20" />
-                        <p>Select Department and Semester to view timetable for printing</p>
+    const renderPrintViewPage = () => (
+        <div className="space-y-6">
+            <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
+                <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                    <Download className="w-5 h-5 text-blue-600" />
+                    <span>Print View Timetable</span>
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Department</label>
+                        <select className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" value={editorDept} onChange={e => setEditorDept(e.target.value)}>
+                            <option value="">Select Dept</option>
+                            {departments.map(d => <option key={d.department_code} value={d.department_code}>{d.department_code}</option>)}
+                        </select>
                     </div>
-                )}
-            </div>
-        </div>
-    </div>
-);
-
-const pageTitle = { dashboard: 'Timetable Generator', editor: 'Timetable Editor', print: 'Print View', timeslots: 'Time Slots', subjects: 'Course / Subject Details', faculty: 'Faculty Details', mappings: 'Course-Faculty Mappings' };
-
-const switchTab = (tab) => {
-    setActiveTab(tab);
-    setIsSidebarOpen(false); // Close mobile sidebar on navigation
-    if (tab === 'editor' || tab === 'print') {
-        setIsCollapsed(true); // Auto-collapse for editor/print
-    }
-    setSearchQuery('');
-    setFilterDept(''); // Clear filter to avoid confusion
-    setFilterSem('');
-    setShowAddCourse(false);
-    setShowAddFaculty(false);
-    setShowAddMapping(false);
-};
-
-return (
-    <div className="flex h-screen bg-slate-50 font-sans text-gray-900 overflow-hidden">
-        <aside className={`fixed inset-y-0 left-0 z-50 ${isCollapsed ? 'w-20' : 'w-64'} bg-white border-r border-gray-100 transform transition-all duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:relative lg:translate-x-0 shadow-xl shadow-gray-200/50 flex flex-col print:hidden`}>
-            <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'} p-6 border-b border-gray-50 transition-all duration-300`}>
-                <div className="flex items-center space-x-3 overflow-hidden">
-                    <div className="w-8 h-8 bg-violet-600 rounded-lg flex items-center justify-center shadow-lg shadow-violet-200 flex-shrink-0">
-                        <Calendar className="w-5 h-5 text-white" />
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Semester</label>
+                        <select className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" value={editorSem} onChange={e => setEditorSem(e.target.value)}>
+                            <option value="">Select Sem</option>
+                            {semesters.map(s => <option key={s.semester_number} value={s.semester_number}>Semester {s.semester_number}</option>)}
+                        </select>
                     </div>
-                    <span className={`text-xl font-bold tracking-tight text-gray-800 whitespace-nowrap transition-opacity duration-300 ${isCollapsed ? 'opacity-0 w-0 hidden' : 'opacity-100'}`}>
-                        Time Table
-                    </span>
                 </div>
             </div>
-
-            {/* Collapse Toggle Button - Desktop Only */}
-            <button onClick={() => setIsCollapsed(!isCollapsed)}
-                className="hidden lg:flex absolute -right-3 top-20 bg-white border border-gray-200 text-gray-500 rounded-full p-1 shadow-md hover:bg-gray-50 hover:text-violet-600 transition-colors z-50">
-                {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
-            </button>
-
-            <nav className="mt-8 px-3 space-y-2 flex-grow">
-                {[
-                    { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-                    { id: 'editor', icon: Edit2, label: 'Editor' },
-                    { id: 'print', icon: Download, label: 'Print View' },
-                    { id: 'subjects', icon: BookOpen, label: 'Subjects' },
-                    { id: 'faculty', icon: Users, label: 'Faculty' },
-                    { id: 'mappings', icon: GraduationCap, label: 'Course-Faculty' },
-                    { id: 'timeslots', icon: Clock, label: 'Time Slots' }
-                ].map(item => (
-                    <button key={item.id} onClick={() => switchTab(item.id)}
-                        title={isCollapsed ? item.label : ''}
-                        className={`flex items-center ${isCollapsed ? 'justify-center px-0' : 'space-x-3 px-3'} w-full py-3 rounded-xl transition-all duration-200 font-medium ${activeTab === item.id ? 'bg-violet-600 text-white shadow-lg shadow-violet-200' : 'text-gray-500 hover:bg-gray-50 hover:text-violet-600'}`}>
-                        <item.icon className="w-5 h-5 flex-shrink-0" />
-                        <span className={`whitespace-nowrap transition-all duration-300 ${isCollapsed ? 'opacity-0 w-0 hidden' : 'opacity-100'}`}>{item.label}</span>
+            <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden min-h-[600px] flex flex-col">
+                <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+                    <h3 className="font-bold text-gray-700">{editorDept && editorSem ? `${editorDept} - Semester ${editorSem} ` : 'Timetable Print View'}</h3>
+                    <button onClick={handleDownloadPDF} className="flex items-center space-x-2 text-sm text-violet-700 hover:text-violet-900 border border-violet-200 px-4 py-1.5 rounded-xl bg-white shadow-sm hover:shadow-md hover:border-violet-300 font-semibold transition-all">
+                        <Download className="w-4 h-4" /><span>Export PDF</span>
                     </button>
-                ))}
-            </nav>
-            <div className="p-4 border-t border-gray-100">
-                <div className={`bg-slate-50 rounded-xl p-3 border border-slate-100 flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} transition-all duration-300`}>
-                    <div className="h-9 w-9 rounded-full bg-violet-100 flex items-center justify-center text-violet-600 font-bold text-xs flex-shrink-0">LK</div>
-                    <div className={`overflow-hidden transition-all duration-300 ${isCollapsed ? 'w-0 opacity-0 hidden' : 'w-auto opacity-100'}`}>
-                        <p className="text-sm font-bold text-gray-800 truncate">LogithKumar</p>
-                        <p className="text-xs text-gray-500">Admin</p>
+                </div>
+                <div className="flex-1 relative">
+                    {editorDept && editorSem ? (
+                        <BITTimetable
+                            timetableData={timetableEntries}
+                            department={departments.find(d => d.department_code === editorDept)?.department_code}
+                            semester={semesters.find(s => s.semester_number === parseInt(editorSem))?.semester_number}
+                            slots={slots}
+                            courses={allCourses}
+                            faculty={allFaculty}
+                        />
+                    ) : (
+                        <div className="flex flex-col items-center justify-center h-full text-gray-400">
+                            <Download className="w-16 h-16 mb-4 opacity-20" />
+                            <p>Select Department and Semester to view timetable for printing</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+
+    const pageTitle = { dashboard: 'Timetable Generator', editor: 'Timetable Editor', print: 'Print View', timeslots: 'Time Slots', subjects: 'Course / Subject Details', faculty: 'Faculty Details', mappings: 'Course-Faculty Mappings' };
+
+    const switchTab = (tab) => {
+        setActiveTab(tab);
+        setIsSidebarOpen(false); // Close mobile sidebar on navigation
+        if (tab === 'editor' || tab === 'print') {
+            setIsCollapsed(true); // Auto-collapse for editor/print
+        }
+        setSearchQuery('');
+        setFilterDept(''); // Clear filter to avoid confusion
+        setFilterSem('');
+        setShowAddCourse(false);
+        setShowAddFaculty(false);
+        setShowAddMapping(false);
+    };
+
+    return (
+        <div className="flex h-screen bg-slate-50 font-sans text-gray-900 overflow-hidden">
+            <aside className={`fixed inset-y-0 left-0 z-50 ${isCollapsed ? 'w-20' : 'w-64'} bg-white border-r border-gray-100 transform transition-all duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:relative lg:translate-x-0 shadow-xl shadow-gray-200/50 flex flex-col print:hidden`}>
+                <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'} p-6 border-b border-gray-50 transition-all duration-300`}>
+                    <div className="flex items-center space-x-3 overflow-hidden">
+                        <div className="w-8 h-8 bg-violet-600 rounded-lg flex items-center justify-center shadow-lg shadow-violet-200 flex-shrink-0">
+                            <Calendar className="w-5 h-5 text-white" />
+                        </div>
+                        <span className={`text-xl font-bold tracking-tight text-gray-800 whitespace-nowrap transition-opacity duration-300 ${isCollapsed ? 'opacity-0 w-0 hidden' : 'opacity-100'}`}>
+                            Time Table
+                        </span>
                     </div>
                 </div>
-            </div>
-        </aside>
 
-        <main className="flex-1 flex flex-col h-screen overflow-hidden relative print:overflow-visible print:h-auto print:block">
-            <header className="bg-white border-b border-gray-100 shadow-sm z-10 px-8 py-4 flex items-center justify-between print:hidden">
-                <div className="flex items-center space-x-4">
-                    <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 rounded-xl hover:bg-violet-50 lg:hidden text-gray-600"><Menu className="w-6 h-6" /></button>
-                    <h2 className="text-2xl font-bold text-gray-800">{pageTitle[activeTab] || 'Dashboard'}</h2>
-                </div>
-                <div className="flex items-center space-x-6">
-                    <div className="h-10 w-10 bg-violet-100 rounded-full flex items-center justify-center text-violet-700 font-bold border-2 border-white shadow-sm">LK</div>
-                </div>
-            </header>
+                {/* Collapse Toggle Button - Desktop Only */}
+                <button onClick={() => setIsCollapsed(!isCollapsed)}
+                    className="hidden lg:flex absolute -right-3 top-20 bg-white border border-gray-200 text-gray-500 rounded-full p-1 shadow-md hover:bg-gray-50 hover:text-violet-600 transition-colors z-50">
+                    {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+                </button>
 
-            <div className="flex-1 overflow-x-hidden overflow-y-auto bg-transparent p-6">
-                <div className="max-w-7xl mx-auto">
-                    {activeTab === 'dashboard' && renderDashboard()}
-                    {activeTab === 'editor' && renderEditorPage()}
-                    {activeTab === 'subjects' && renderSubjectsPage()}
-                    {activeTab === 'faculty' && renderFacultyPage()}
-                    {activeTab === 'mappings' && renderMappingsPage()}
-                    {activeTab === 'timeslots' && renderSlotsPage()}
+                <nav className="mt-8 px-3 space-y-2 flex-grow">
+                    {[
+                        { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+                        { id: 'editor', icon: Edit2, label: 'Editor' },
+                        { id: 'print', icon: Download, label: 'Print View' },
+                        { id: 'subjects', icon: BookOpen, label: 'Subjects' },
+                        { id: 'faculty', icon: Users, label: 'Faculty' },
+                        { id: 'mappings', icon: GraduationCap, label: 'Course-Faculty' },
+                        { id: 'timeslots', icon: Clock, label: 'Time Slots' }
+                    ].map(item => (
+                        <button key={item.id} onClick={() => switchTab(item.id)}
+                            title={isCollapsed ? item.label : ''}
+                            className={`flex items-center ${isCollapsed ? 'justify-center px-0' : 'space-x-3 px-3'} w-full py-3 rounded-xl transition-all duration-200 font-medium ${activeTab === item.id ? 'bg-violet-600 text-white shadow-lg shadow-violet-200' : 'text-gray-500 hover:bg-gray-50 hover:text-violet-600'}`}>
+                            <item.icon className="w-5 h-5 flex-shrink-0" />
+                            <span className={`whitespace-nowrap transition-all duration-300 ${isCollapsed ? 'opacity-0 w-0 hidden' : 'opacity-100'}`}>{item.label}</span>
+                        </button>
+                    ))}
+                </nav>
+                <div className="p-4 border-t border-gray-100">
+                    <div className={`bg-slate-50 rounded-xl p-3 border border-slate-100 flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} transition-all duration-300`}>
+                        <div className="h-9 w-9 rounded-full bg-violet-100 flex items-center justify-center text-violet-600 font-bold text-xs flex-shrink-0">LK</div>
+                        <div className={`overflow-hidden transition-all duration-300 ${isCollapsed ? 'w-0 opacity-0 hidden' : 'w-auto opacity-100'}`}>
+                            <p className="text-sm font-bold text-gray-800 truncate">LogithKumar</p>
+                            <p className="text-xs text-gray-500">Admin</p>
+                        </div>
+                    </div>
                 </div>
-            </div>
-        </main>
-    </div>
-);
+            </aside>
+
+            <main className="flex-1 flex flex-col h-screen overflow-hidden relative print:overflow-visible print:h-auto print:block">
+                <header className="bg-white border-b border-gray-100 shadow-sm z-10 px-8 py-4 flex items-center justify-between print:hidden">
+                    <div className="flex items-center space-x-4">
+                        <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 rounded-xl hover:bg-violet-50 lg:hidden text-gray-600"><Menu className="w-6 h-6" /></button>
+                        <h2 className="text-2xl font-bold text-gray-800">{pageTitle[activeTab] || 'Dashboard'}</h2>
+                    </div>
+                    <div className="flex items-center space-x-6">
+                        <div className="h-10 w-10 bg-violet-100 rounded-full flex items-center justify-center text-violet-700 font-bold border-2 border-white shadow-sm">LK</div>
+                    </div>
+                </header>
+
+                <div className="flex-1 overflow-x-hidden overflow-y-auto bg-transparent p-6">
+                    <div className="max-w-7xl mx-auto">
+                        {activeTab === 'dashboard' && renderDashboard()}
+                        {activeTab === 'editor' && renderEditorPage()}
+                        {activeTab === 'subjects' && renderSubjectsPage()}
+                        {activeTab === 'faculty' && renderFacultyPage()}
+                        {activeTab === 'mappings' && renderMappingsPage()}
+                        {activeTab === 'timeslots' && renderSlotsPage()}
+                    </div>
+                </div>
+            </main>
+        </div>
+    );
 }
 
 export default App;

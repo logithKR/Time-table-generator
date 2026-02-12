@@ -567,7 +567,7 @@ export default function TimetableEditor({ department, semester, onSave, onExport
             <div className="flex flex-col h-full bg-white font-sans text-gray-800" style={{ minHeight: '80vh' }}>
 
                 {/* ─── TOOLBAR ─── */}
-                <div className="flex items-center justify-between px-8 py-4 bg-white border-b border-violet-100 shadow-sm flex-shrink-0 z-20">
+                <div className="flex items-center justify-between px-8 py-4 bg-white border-b border-gray-100 shadow-sm flex-shrink-0 z-20">
                     <div className="flex items-center gap-5">
                         <div className="flex items-center gap-3 bg-white rounded-xl px-5 py-2.5 border border-violet-100 shadow-sm ring-1 ring-violet-50">
                             <span className="text-lg font-bold text-gray-800 tracking-tight">{department}</span>
@@ -602,7 +602,7 @@ export default function TimetableEditor({ department, semester, onSave, onExport
                 </div>
 
                 {/* ─── COURSE PALETTE (ELEGANT) ─── */}
-                <div className="bg-white border-b border-violet-100 px-8 py-5 flex-shrink-0 z-10 sticky top-0 shadow-sm">
+                <div className="bg-white border-b border-gray-100 px-8 py-5 flex-shrink-0 z-10 sticky top-0 shadow-sm">
                     <div className="flex items-center gap-6 mb-4">
                         <div className="flex items-center gap-2.5 text-xs font-extra-bold text-gray-400 uppercase tracking-widest">
                             <Palette className="w-4 h-4 text-violet-400" /> Palette
@@ -644,21 +644,21 @@ export default function TimetableEditor({ department, semester, onSave, onExport
 
                 {/* ─── TIMETABLE GRID (SMOOTH) ─── */}
                 <div className="flex-1 overflow-auto p-10 bg-gray-50/50">
-                    <div className="bg-white rounded-2xl shadow-xl shadow-violet-100/30 border border-violet-100 overflow-hidden ring-1 ring-violet-50 mx-auto max-w-[1400px]">
+                    <div className="bg-white rounded-2xl shadow-xl shadow-gray-200/50 border border-gray-100 overflow-hidden ring-1 ring-gray-50 mx-auto max-w-[1400px]">
                         <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
                             <thead>
-                                <tr className="bg-violet-800 text-white">
-                                    <th className="py-5 px-6 text-left text-xs font-bold uppercase tracking-widest border-r border-white/10 w-32">Day</th>
+                                <tr className="bg-white border-b border-gray-200 text-gray-900">
+                                    <th className="py-5 px-6 text-left text-xs font-bold uppercase tracking-widest border-r border-gray-100 w-32">Day</th>
                                     {periodColumns.map((col, i) => (
                                         col.type === 'PERIOD' ? (
-                                            <th key={`h-${col.period}`} className="py-4 px-3 text-center border-r border-white/5 last:border-r-0 min-w-[120px]">
-                                                <div className="text-[10px] font-black text-violet-200 tracking-widest mb-1 uppercase">Period {col.period}</div>
-                                                <div className="text-[11px] font-medium text-white/90 font-mono tracking-tight bg-white/10 rounded-full px-2 py-0.5 inline-block border border-white/10">{col.start} – {col.end}</div>
+                                            <th key={`h-${col.period}`} className="py-4 px-3 text-center border-r border-gray-100 last:border-r-0 min-w-[120px]">
+                                                <div className="text-[10px] font-black text-gray-400 tracking-widest mb-1 uppercase">Period {col.period}</div>
+                                                <div className="text-[11px] font-medium text-gray-600 font-mono tracking-tight bg-gray-50 rounded-full px-2 py-0.5 inline-block border border-gray-200">{col.start} – {col.end}</div>
                                             </th>
                                         ) : (
-                                            <th key={`break-${i}`} className={`py-3 px-1 text-center border-r border-white/5 w-16 ${col.type === 'LUNCH' ? 'bg-orange-500/10' : 'bg-white/5'}`}>
+                                            <th key={`break-${i}`} className={`py-3 px-1 text-center border-r border-gray-100 w-16 ${col.type === 'LUNCH' ? 'bg-orange-50' : 'bg-gray-50'}`}>
                                                 <div className="flex flex-col items-center justify-center h-full opacity-60">
-                                                    <Coffee className="w-4 h-4 mb-1 text-white/40" />
+                                                    <Coffee className="w-4 h-4 mb-1 text-gray-400" />
                                                 </div>
                                             </th>
                                         )
@@ -705,7 +705,7 @@ export default function TimetableEditor({ department, semester, onSave, onExport
                                     });
 
                                     return (
-                                        <tr key={day} className={`border-b border-gray-100 last:border-b-0 hover:bg-purple-50/5 transition-colors duration-300 ${dayIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}>
+                                        <tr key={day} className={`border-b border-gray-50 last:border-b-0 hover:bg-slate-50/50 transition-colors duration-300 ${dayIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'}`}>
                                             <td className="py-6 px-6 font-bold text-xs text-gray-500 border-r border-gray-100 bg-gray-50/50 uppercase tracking-widest">{day.slice(0, 3)}</td>
                                             {renderedCols}
                                         </tr>

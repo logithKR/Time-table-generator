@@ -406,18 +406,18 @@ function App() {
                 <div className="overflow-x-auto bg-white rounded-2xl border border-violet-100 shadow-lg shadow-violet-50/50">
                     <table className="min-w-full text-sm">
                         <thead>
-                            <tr className="bg-violet-700 text-white">
-                                <th className="p-3.5 text-left font-semibold text-xs uppercase tracking-wider">Code</th>
-                                <th className="p-3.5 text-left font-semibold text-xs uppercase tracking-wider">Course Name</th>
-                                <th className="p-3.5 text-center font-semibold text-xs uppercase tracking-wider">Dept</th>
-                                <th className="p-3.5 text-center font-semibold text-xs uppercase tracking-wider">Sem</th>
-                                <th className="p-3.5 text-center font-semibold text-xs uppercase tracking-wider">L</th>
-                                <th className="p-3.5 text-center font-semibold text-xs uppercase tracking-wider">T</th>
-                                <th className="p-3.5 text-center font-semibold text-xs uppercase tracking-wider">P</th>
-                                <th className="p-3.5 text-center font-semibold text-xs uppercase tracking-wider">Cr</th>
-                                <th className="p-3.5 text-center font-semibold text-xs uppercase tracking-wider">Weekly</th>
-                                <th className="p-3.5 text-center font-semibold text-xs uppercase tracking-wider">Type</th>
-                                <th className="p-3.5 text-center font-semibold text-xs uppercase tracking-wider w-16">Actions</th>
+                            <tr className="bg-gray-50 border-b border-gray-100">
+                                <th className="p-3.5 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">Code</th>
+                                <th className="p-3.5 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">Course Name</th>
+                                <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider">Dept</th>
+                                <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider">Sem</th>
+                                <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider">L</th>
+                                <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider">T</th>
+                                <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider">P</th>
+                                <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider">Cr</th>
+                                <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider">Weekly</th>
+                                <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider">Type</th>
+                                <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider w-16">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -592,7 +592,7 @@ function App() {
                 <div className="space-y-4">
                     {Object.entries(grouped).map(([code, data]) => (
                         <div key={code} className="bg-white rounded-2xl border border-violet-100 shadow-md shadow-violet-50/30 overflow-hidden hover:shadow-lg transition-shadow duration-300">
-                            <div className="bg-violet-50 p-4 border-b border-violet-100 flex items-center justify-between">
+                            <div className="bg-white p-4 border-b border-gray-100 flex items-center justify-between">
                                 <div>
                                     <div className="flex items-center gap-2">
                                         <span className="font-mono font-bold text-violet-800 text-sm">{code}</span>
@@ -806,7 +806,7 @@ function App() {
 
                 {sortedDays.map(day => (
                     <div key={day} className="bg-white rounded-2xl border border-violet-100 shadow-md shadow-violet-50/30 overflow-hidden">
-                        <div className="bg-violet-50 p-4 border-b border-violet-100">
+                        <div className="bg-white p-4 border-b border-gray-100">
                             <h3 className="font-bold text-gray-800 flex items-center gap-2">
                                 <Calendar className="w-4 h-4 text-violet-600" />
                                 {day}
@@ -816,13 +816,13 @@ function App() {
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">
                                 <thead>
-                                    <tr className="bg-violet-700 text-white">
-                                        <th className="px-4 py-3 text-left font-semibold text-xs uppercase tracking-wider">Period</th>
-                                        <th className="px-4 py-3 text-left font-semibold text-xs uppercase tracking-wider">Start Time</th>
-                                        <th className="px-4 py-3 text-left font-semibold text-xs uppercase tracking-wider">End Time</th>
-                                        <th className="px-4 py-3 text-left font-semibold text-xs uppercase tracking-wider">Type</th>
-                                        <th className="px-4 py-3 text-left font-semibold text-xs uppercase tracking-wider">Status</th>
-                                        <th className="px-4 py-3 text-right font-semibold text-xs uppercase tracking-wider">Actions</th>
+                                    <tr className="bg-gray-50 border-b border-gray-100">
+                                        <th className="px-4 py-3 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">Period</th>
+                                        <th className="px-4 py-3 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">Start Time</th>
+                                        <th className="px-4 py-3 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">End Time</th>
+                                        <th className="px-4 py-3 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">Type</th>
+                                        <th className="px-4 py-3 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">Status</th>
+                                        <th className="px-4 py-3 text-right font-semibold text-gray-500 text-xs uppercase tracking-wider">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -941,7 +941,7 @@ function App() {
                 </div>
             </div>
             <div className="bg-white rounded-2xl shadow-lg shadow-violet-50/50 border border-violet-100 overflow-hidden">
-                <div className="p-4 border-b border-violet-100 flex justify-between items-center bg-violet-50">
+                <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-white">
                     <h3 className="font-bold text-gray-700">{selectedDept && selectedSem ? `${selectedDept} - Semester ${selectedSem}` : 'Timetable Preview'}</h3>
                     <button onClick={handleDownloadPDF} className="flex items-center space-x-2 text-sm text-violet-700 hover:text-violet-900 border border-violet-200 px-4 py-1.5 rounded-xl bg-white shadow-sm hover:shadow-md hover:border-violet-300 font-semibold transition-all">
                         <Download className="w-4 h-4" /><span>Export PDF</span>
@@ -965,58 +965,53 @@ function App() {
     };
 
     return (
-        <div className="flex h-screen bg-gray-50 font-sans text-gray-900 overflow-hidden">
-            <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-violet-950 text-white transform transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:relative lg:translate-x-0 shadow-2xl shadow-violet-900/30 flex flex-col`}>
-                <div className="flex items-center justify-between p-4 border-b border-violet-800/50">
+        <div className="flex h-screen bg-slate-50 font-sans text-gray-900 overflow-hidden">
+            <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-100 transform transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:relative lg:translate-x-0 shadow-xl shadow-gray-200/50 flex flex-col`}>
+                <div className="flex items-center justify-between p-6 border-b border-gray-50">
                     <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-violet-500 rounded-xl flex items-center justify-center shadow-lg shadow-violet-500/30">
-                            <Calendar className="w-6 h-6 text-white" />
+                        <div className="w-8 h-8 bg-violet-600 rounded-lg flex items-center justify-center shadow-lg shadow-violet-200">
+                            <Calendar className="w-5 h-5 text-white" />
                         </div>
-                        <span className="text-xl font-bold tracking-tight text-white">BIT Scheduler</span>
+                        <span className="text-xl font-bold tracking-tight text-gray-800">PCDP Portal</span>
                     </div>
-                    <button onClick={() => setIsSidebarOpen(false)} className="lg:hidden p-1 hover:bg-violet-800/50 rounded-lg"><X className="w-5 h-5" /></button>
+                    <button onClick={() => setIsSidebarOpen(false)} className="lg:hidden p-2 hover:bg-gray-50 rounded-lg text-gray-500"><X className="w-5 h-5" /></button>
                 </div>
-                <nav className="mt-6 px-4 space-y-1.5 flex-grow">
-                    <button onClick={() => switchTab('dashboard')} className={`flex items-center space-x-3 w-full p-3 rounded-xl transition-all duration-200 ${activeTab === 'dashboard' ? 'bg-violet-600/80 text-white font-semibold shadow-lg shadow-violet-600/30' : 'hover:bg-violet-800/40 text-violet-200'}`}>
-                        <LayoutDashboard className="w-5 h-5" /><span>Dashboard</span>
-                    </button>
-                    <button onClick={() => switchTab('editor')} className={`flex items-center space-x-3 w-full p-3 rounded-xl transition-all duration-200 ${activeTab === 'editor' ? 'bg-violet-600/80 text-white font-semibold shadow-lg shadow-violet-600/30' : 'hover:bg-violet-800/40 text-violet-200'}`}>
-                        <Pencil className="w-5 h-5" /><span>Editor</span>
-                    </button>
-                    <div className="pt-5 pb-2"><p className="px-3 text-[10px] font-bold text-violet-400/60 uppercase tracking-[0.2em]">Data Explorer</p></div>
-                    <button onClick={() => switchTab('subjects')} className={`flex items-center space-x-3 w-full p-3 rounded-xl transition-all duration-200 ${activeTab === 'subjects' ? 'bg-violet-600/80 text-white font-semibold shadow-lg shadow-violet-600/30' : 'hover:bg-violet-800/40 text-violet-200'}`}>
-                        <BookOpen className="w-5 h-5" /><span>Subjects</span>
-                    </button>
-                    <button onClick={() => switchTab('faculty')} className={`flex items-center space-x-3 w-full p-3 rounded-xl transition-all duration-200 ${activeTab === 'faculty' ? 'bg-violet-600/80 text-white font-semibold shadow-lg shadow-violet-600/30' : 'hover:bg-violet-800/40 text-violet-200'}`}>
-                        <Users className="w-5 h-5" /><span>Faculty</span>
-                    </button>
-                    <button onClick={() => switchTab('mappings')} className={`flex items-center space-x-3 w-full p-3 rounded-xl transition-all duration-200 ${activeTab === 'mappings' ? 'bg-violet-600/80 text-white font-semibold shadow-lg shadow-violet-600/30' : 'hover:bg-violet-800/40 text-violet-200'}`}>
-                        <GraduationCap className="w-5 h-5" /><span>Course-Faculty</span>
-                    </button>
-                    <button onClick={() => switchTab('timeslots')} className={`flex items-center space-x-3 w-full p-3 rounded-xl transition-all duration-200 ${activeTab === 'timeslots' ? 'bg-violet-600/80 text-white font-semibold shadow-lg shadow-violet-600/30' : 'hover:bg-violet-800/40 text-violet-200'}`}>
-                        <Clock className="w-5 h-5" /><span>Time Slots</span>
-                    </button>
+                <nav className="mt-8 px-4 space-y-2 flex-grow">
+                    {[
+                        { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+                        { id: 'editor', icon: Pencil, label: 'Editor' },
+                        { id: 'subjects', icon: BookOpen, label: 'Subjects' },
+                        { id: 'faculty', icon: Users, label: 'Faculty' },
+                        { id: 'mappings', icon: GraduationCap, label: 'Course-Faculty' },
+                        { id: 'timeslots', icon: Clock, label: 'Time Slots' }
+                    ].map(item => (
+                        <button key={item.id} onClick={() => switchTab(item.id)}
+                            className={`flex items-center space-x-3 w-full p-3 rounded-xl transition-all duration-200 font-medium ${activeTab === item.id ? 'bg-violet-600 text-white shadow-lg shadow-violet-200' : 'text-gray-500 hover:bg-gray-50 hover:text-violet-600'}`}>
+                            <item.icon className="w-5 h-5" /><span>{item.label}</span>
+                        </button>
+                    ))}
                 </nav>
-                <div className="p-4 border-t border-violet-800/50">
-                    <div className="bg-violet-800/40 rounded-xl p-3">
-                        <p className="text-xs text-violet-300/70 mb-1">System Status</p>
-                        <div className="flex items-center space-x-2">
-                            <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span>
-                            <span className="text-sm font-medium text-emerald-300">Operational</span>
+                <div className="p-4 border-t border-gray-100">
+                    <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                        <div className="flex items-center gap-3">
+                            <div className="h-10 w-10 rounded-full bg-violet-100 flex items-center justify-center text-violet-600 font-bold">LK</div>
+                            <div>
+                                <p className="text-sm font-bold text-gray-800">LogithKumar</p>
+                                <p className="text-xs text-gray-500">Admin</p>
+                            </div>
                         </div>
-                        <p className="text-[10px] text-violet-400/50 mt-2">V2.2 - Full CRUD</p>
                     </div>
                 </div>
             </aside>
 
             <main className="flex-1 flex flex-col h-screen overflow-hidden relative">
-                <header className="bg-white/80 backdrop-blur-md border-b border-violet-100 shadow-sm z-10 px-6 py-4 flex items-center justify-between">
+                <header className="bg-white border-b border-gray-100 shadow-sm z-10 px-8 py-4 flex items-center justify-between">
                     <div className="flex items-center space-x-4">
                         <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 rounded-xl hover:bg-violet-50 lg:hidden text-gray-600"><Menu className="w-6 h-6" /></button>
                         <h2 className="text-2xl font-bold text-gray-800">{pageTitle[activeTab] || 'Dashboard'}</h2>
                     </div>
                     <div className="flex items-center space-x-6">
-                        <div className="h-10 w-10 bg-violet-600 rounded-xl flex items-center justify-center text-white font-bold shadow-lg shadow-violet-200">AD</div>
+                        <div className="h-10 w-10 bg-violet-100 rounded-full flex items-center justify-center text-violet-700 font-bold border-2 border-white shadow-sm">LK</div>
                     </div>
                 </header>
 

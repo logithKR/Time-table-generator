@@ -202,4 +202,4 @@ const BITTimetable = ({ timetableData, department = "Department", semester = "Se
 
 export default BITTimetable;
 
-export default BITTimetable;
+

@@ -15,7 +15,7 @@ __pycache__/
 !RUN_GUIDE.md
 
 # Excel/Data files (User requested exclusion of excel/checks)
-*.xlsx
+# *.xlsx
 *.csv
 backend/data/
 

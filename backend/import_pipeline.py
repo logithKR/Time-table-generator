@@ -7,9 +7,13 @@ from database import engine, Base
 import models # Ensure models are registered
 
 # Files
-COURSE_FILE = r"D:\timetable adhi\timetable-generator\Coursewise Allocation - 2025-26 EVEN.xlsx"
-VENUE_FILE = r"D:\timetable adhi\timetable-generator\Academic Mode Class Venues.xlsx"
-DB_FILE = r"c:\Users\kalai\Downloads\Sih 6\backend\college_scheduler.db"
+# Files
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(BASE_DIR)
+
+COURSE_FILE = os.path.join(PROJECT_ROOT, "data", "Coursewise Allocation - 2025-26 EVEN.xlsx")
+VENUE_FILE = os.path.join(PROJECT_ROOT, "data", "Academic Mode Class Venues.xlsx")
+DB_FILE = os.path.join(BASE_DIR, "college_scheduler.db")
 
 # Depts to process (heuristics didn't work well, so we use strict list or extract)
 # User wants 'Departments' table. We can extract from Sheet Names of Course File.

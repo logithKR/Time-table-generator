@@ -1,4 +1,4 @@
-import pandas as pd
+﻿import pandas as pd
 import json
 
 # Your data
@@ -19,7 +19,7 @@ data_json = """
     {"id": "sf-block", "name": "SF Block", "match": "Department of Information Technology", "floor": "Ground Floor", "floor_no": 1},
     {"id": "sf-block", "name": "SF Block", "match": "Artificial Intelligence Lab (AI Lab)", "floor": "Ground Floor", "floor_no": 1},
     {"id": "sf-block", "name": "SF Block", "match": "CS 201", "floor": "First Floor", "floor_no": 2},
-    {"id": "sf-block", "name": "SF Block", "match": "CS 202", "floor": "First Floor", "floor_no": 2},
+    {"id": "sf-block", "name": "SF Block", "match": "CS 202 ≡ƒÆ₧", "floor": "First Floor", "floor_no": 2},
     {"id": "sf-block", "name": "SF Block", "match": "CS 203", "floor": "First Floor", "floor_no": 2},
     {"id": "sf-block", "name": "SF Block", "match": "Department of Computer Science and Engineering", "floor": "First Floor", "floor_no": 2},
     {"id": "sf-block", "name": "SF Block", "match": "CSE Lab 1", "floor": "First Floor", "floor_no": 2},
@@ -231,7 +231,7 @@ data_json = """
     {"id": "as-rib-5", "name": "AS rib 5", "match": "Dept of ECE", "floor": "tagged", "floor_no": 0},
     {"id": "as-rib-5", "name": "AS rib 5", "match": "Faculty Hall 2", "floor": "Ground Floor", "floor_no": 0},
     {"id": "as-rib-5", "name": "AS rib 5", "match": "EW 107", "floor": "First Floor", "floor_no": 1},
-    {"id": "as-rib-5", "name": "AS rib 5", "match": "EW 108 ❤️‍🩹", "floor": "First Floor", "floor_no": 1},
+    {"id": "as-rib-5", "name": "AS rib 5", "match": "EW 108 Γ¥ñ∩╕ÅΓÇì≡ƒ⌐╣", "floor": "First Floor", "floor_no": 1},
     {"id": "as-rib-5", "name": "AS rib 5", "match": "EW 109", "floor": "First Floor", "floor_no": 1},
     {"id": "as-rib-5", "name": "AS rib 5", "match": "EW 207", "floor": "Second Floor", "floor_no": 2},
     {"id": "as-rib-5", "name": "AS rib 5", "match": "EW 208", "floor": "Second Floor", "floor_no": 2},
@@ -370,7 +370,7 @@ data_json = """
     {"id": "ib-rib-1", "name": "IB rib 1", "match": "WW 212", "floor": "Second Floor", "floor_no": 2},
     {"id": "ib-rib-1", "name": "IB rib 1", "match": "WW 211", "floor": "Second Floor", "floor_no": 2},
     {"id": "ib-rib-2", "name": "IB rib 2", "match": "Technology Business Incubator - BIT TBI", "floor": "Ground Floor", "floor_no": 0},
-    {"id": "ib-rib-2", "name": "IB rib 2", "match": "ß,α cave", "floor": "Ground Floor", "floor_no": 0},
+    {"id": "ib-rib-2", "name": "IB rib 2", "match": "├ƒ,╬▒ cave", "floor": "Ground Floor", "floor_no": 0},
     {"id": "ib-rib-2", "name": "IB rib 2", "match": "Repository", "floor": "Ground Floor", "floor_no": 0},
     {"id": "ib-rib-2", "name": "IB rib 2", "match": "Idea Pad", "floor": "First Floor", "floor_no": 1},
     {"id": "ib-rib-2", "name": "IB rib 2", "match": "Mission Control", "floor": "First Floor", "floor_no": 1},
@@ -445,7 +445,7 @@ data_json = """
     {"id": "ib-rib-10", "name": "IB rib 10", "match": "EEE Tutorial Hall", "floor": "Second Floor", "floor_no": 2},
     {"id": "ib-rib-11", "name": "IB rib 11", "match": "Department of Humanities", "floor": "Ground Floor", "floor_no": 0},
     {"id": "ib-rib-11", "name": "IB rib 11", "match": "Chairman Cabin", "floor": "Ground Floor", "floor_no": 0},
-    {"id": "ib-rib-11", "name": "IB rib 11", "match": "WW 104 💝", "floor": "First Floor", "floor_no": 1},
+    {"id": "ib-rib-11", "name": "IB rib 11", "match": "WW 104 ≡ƒÆ¥", "floor": "First Floor", "floor_no": 1},
     {"id": "ib-rib-11", "name": "IB rib 11", "match": "WW 105", "floor": "First Floor", "floor_no": 1},
     {"id": "ib-rib-11", "name": "IB rib 11", "match": "WW 106", "floor": "First Floor", "floor_no": 1},
     {"id": "ib-rib-11", "name": "IB rib 11", "match": "WW 203", "floor": "Second Floor", "floor_no": 2},

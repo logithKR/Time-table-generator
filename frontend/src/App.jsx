@@ -81,9 +81,7 @@ function App() {
         if (activeTab === 'subjects') fetchCourses();
         if (activeTab === 'faculty') fetchFaculty();
         if (activeTab === 'mappings') fetchCourseFacultyMappings();
-        // Removed the activeTab === 'print' check here to prevent double fetching
-        // We now handle print data loading explicitly in handleDownloadPDF
-    }, [activeTab, filterDept, filterSem]); // Removed editorDept/Sem from dep array to avoid loops
+    }, [activeTab, filterDept, filterSem]);
 
     const fetchMasterData = async () => {
         try {
@@ -226,42 +224,31 @@ function App() {
         }
     };
 
-    // --- FIX: Updated Handle PDF Download ---
-    const handleDownloadPDF = async () => {
-        // If coming from Editor, warn about saving
-        if (activeTab === 'editor') {
-            if (!confirm("Switching to Print View. Make sure you have SAVED your changes. Unsaved changes will not appear. Proceed?")) return;
-            setActiveTab('print');
-            return;
-        }
-
-        // From Dashboard
-        if (!selectedDept || !selectedSem) {
-            alert("Please select Department and Semester to generate the printable timetable.");
-            return;
-        }
-
-        // --- NEW LOGIC: Fetch data explicitly BEFORE switching tabs ---
+    // --- NEW HELPER: Fetch Data for Print View (Supports Master View) ---
+    const fetchPrintData = async (dept, sem) => {
         setLoading(true);
         try {
-             // 1. Fetch the data
-             const res = await api.getTimetableEntries(selectedDept, selectedSem);
-             
-             // 2. Set the data state
-             setTimetableEntries(res.data);
-             
-             // 3. Set the context states
-             setEditorDept(selectedDept);
-             setEditorSem(selectedSem);
-             
-             // 4. Finally switch the tab (now data is ready)
-             setActiveTab('print');
+            const d = dept || '';
+            const s = sem || '';
+            const res = await api.getTimetableEntries(d, s);
+            setTimetableEntries(res.data);
+            setEditorDept(d);
+            setEditorSem(s);
+            setActiveTab('print');
         } catch (e) {
-            console.error("Error loading print data:", e);
-            alert("Could not load data for print view. Please ensure timetable is generated.");
+            console.error("Print Load Error:", e);
+            alert("Failed to load data. If viewing 'All Departments', ensure Backend supports empty parameters.");
         } finally {
             setLoading(false);
         }
+    };
+
+    // --- UPDATED: Handle PDF Download (Entry Point) ---
+    const handleDownloadPDF = () => {
+        if (activeTab === 'editor') {
+            if (!confirm("Switching to Print View. Unsaved changes in Editor will be lost. Proceed?")) return;
+        }
+        fetchPrintData(selectedDept, selectedSem);
     };
 
     // --- Timetable Render ---
@@ -334,7 +321,7 @@ function App() {
     };
 
     // ============================================
-    // FILTER BAR (render function, NOT component)
+    // FILTER BAR
     // ============================================
     const renderFilterBar = (showSem, filteredCount, totalCount) => (
         <div className="flex flex-wrap gap-3 items-center mb-4 bg-violet-50 p-4 rounded-2xl border border-violet-100 shadow-sm">
@@ -434,7 +421,6 @@ function App() {
                                     <tr className="bg-gray-50 border-b border-gray-100">
                                         <th className="p-3.5 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">Code</th>
                                         <th className="p-3.5 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">Course Name</th>
-                                        {/* Dept column removed as it's now the header */}
                                         <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider">Sem</th>
                                         <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider">L</th>
                                         <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider">T</th>
@@ -450,7 +436,6 @@ function App() {
                                         <tr key={c.course_code} className={`border-b border-violet-50 hover:bg-violet-50/40 transition-colors duration-200 ${i % 2 === 0 ? 'bg-white' : 'bg-purple-50/20'}`}>
                                             <td className="p-3.5 font-mono font-bold text-violet-800">{c.course_code}</td>
                                             <td className="p-3.5 text-gray-800 font-medium">{c.course_name}</td>
-                                            {/* Dept cell removed */}
                                             <td className="p-3.5 text-center font-semibold text-gray-700">{c.semester}</td>
                                             <td className="p-3.5 text-center text-gray-600">{c.lecture_hours || 0}</td>
                                             <td className="p-3.5 text-center text-gray-600">{c.tutorial_hours || 0}</td>
@@ -1003,53 +988,69 @@ function App() {
         </div>
     );
 
+    // --- UPDATED: Print View Page Render ---
     const renderPrintViewPage = () => (
         <div className="space-y-6">
             <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
                 <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
                     <Download className="w-5 h-5 text-blue-600" />
-                    <span>Print View Timetable</span>
+                    <span>Print View Manager</span>
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Department</label>
-                        <select className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" value={editorDept} onChange={e => setEditorDept(e.target.value)}>
-                            <option value="">Select Dept</option>
+                        <select
+                            className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                            value={editorDept}
+                            onChange={e => setEditorDept(e.target.value)}
+                        >
+                            <option value="">-- All Departments (Master View) --</option>
                             {departments.map(d => <option key={d.department_code} value={d.department_code}>{d.department_code}</option>)}
                         </select>
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Semester</label>
-                        <select className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" value={editorSem} onChange={e => setEditorSem(e.target.value)}>
-                            <option value="">Select Sem</option>
+                        <select
+                            className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                            value={editorSem}
+                            onChange={e => setEditorSem(e.target.value)}
+                        >
+                            <option value="">-- All Semesters --</option>
                             {semesters.map(s => <option key={s.semester_number} value={s.semester_number}>Semester {s.semester_number}</option>)}
                         </select>
                     </div>
+                    <div className="pb-0.5">
+                        <button
+                            // Calls fetchPrintData with the *current* dropdown values
+                            onClick={() => fetchPrintData(editorDept, editorSem)}
+                            disabled={loading}
+                            className="flex items-center gap-2 bg-blue-600 text-white px-6 py-2.5 rounded-lg text-sm font-bold shadow hover:bg-blue-700 transition-all disabled:bg-gray-400"
+                        >
+                            {loading ? <RotateCw className="w-4 h-4 animate-spin" /> : <RotateCw className="w-4 h-4" />}
+                            Load / Refresh Data
+                        </button>
+                    </div>
                 </div>
             </div>
+
             <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden min-h-[600px] flex flex-col">
                 <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
-                    <h3 className="font-bold text-gray-700">{editorDept && editorSem ? `${editorDept} - Semester ${editorSem} ` : 'Timetable Print View'}</h3>
-                    <button onClick={handleDownloadPDF} className="flex items-center space-x-2 text-sm text-violet-700 hover:text-violet-900 border border-violet-200 px-4 py-1.5 rounded-xl bg-white shadow-sm hover:shadow-md hover:border-violet-300 font-semibold transition-all">
-                        <Download className="w-4 h-4" /><span>Export PDF</span>
-                    </button>
+                    <h3 className="font-bold text-gray-700">
+                        {!editorDept && !editorSem ? 'MASTER TIMETABLE (All Data)' :
+                            `${editorDept || 'All Depts'} - ${editorSem ? 'Sem ' + editorSem : 'All Sems'}`}
+                    </h3>
                 </div>
                 <div className="flex-1 relative">
-                    {editorDept && editorSem ? (
-                        <BITTimetable
-                            timetableData={timetableEntries}
-                            department={departments.find(d => d.department_code === editorDept)?.department_code}
-                            semester={semesters.find(s => s.semester_number === parseInt(editorSem))?.semester_number}
-                            slots={slots}
-                            courses={allCourses}
-                            faculty={allFaculty}
-                        />
-                    ) : (
-                        <div className="flex flex-col items-center justify-center h-full text-gray-400">
-                            <Download className="w-16 h-16 mb-4 opacity-20" />
-                            <p>Select Department and Semester to view timetable for printing</p>
-                        </div>
-                    )}
+                    <BITTimetable
+                        timetableData={timetableEntries}
+                        department={departments.find(d => d.department_code === editorDept)?.department_code}
+                        semester={semesters.find(s => s.semester_number === parseInt(editorSem))?.semester_number}
+                        slots={slots}
+                        courses={allCourses}
+                        faculty={allFaculty}
+                        // Pass the refresh handler to the component
+                        onRefresh={() => fetchPrintData(editorDept, editorSem)}
+                    />
                 </div>
             </div>
         </div>

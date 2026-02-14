@@ -322,3 +322,4 @@ def save_timetable(request: schemas.TimetableSaveRequest, db: Session = Depends(
         raise HTTPException(status_code=400, detail=f"Save failed: {str(e)}")
         
     return {"status": "success", "count": len(new_entries)}
+

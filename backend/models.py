@@ -99,5 +99,15 @@ class TimetableEntry(Base):
     
     created_at = Column(String)
 
+
+class VenueMaster(Base):
+    __tablename__ = "venue_master"
+    
+    venue_id = Column(Integer, primary_key=True, autoincrement=True)
+    venue_name = Column(String, unique=True, index=True, nullable=False)
+    block = Column(String, nullable=True)
+    is_lab = Column(Boolean, default=False)
+    capacity = Column(Integer, default=60)
+
 # Index for fast retrieval by dept/sem
 Index('idx_timetable_dept_sem', TimetableEntry.department_code, TimetableEntry.semester)

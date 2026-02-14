@@ -180,6 +180,110 @@ def get_course_faculty(department_code: str = None, db: Session = Depends(get_db
         })
     return result
 
+# ============================================
+# VENUES
+# ============================================
+
+@app.get("/venues", response_model=List[schemas.Venue])
+def get_venues(db: Session = Depends(get_db)):
+    return db.query(models.VenueMaster).all()
+
+@app.post("/venues")
+def create_venue(req: schemas.VenueCreate, db: Session = Depends(get_db)):
+    existing = db.query(models.VenueMaster).filter_by(venue_name=req.venue_name).first()
+    if existing:
+        raise HTTPException(status_code=400, detail=f"Venue {req.venue_name} already exists")
+    venue = models.VenueMaster(
+        venue_name=req.venue_name,
+        block=req.block,
+        is_lab=req.is_lab,
+        capacity=req.capacity
+    )
+    db.add(venue)
+    db.commit()
+    return {"status": "success", "venue_name": req.venue_name}
+
+@app.delete("/venues/{venue_id}")
+def delete_venue(venue_id: int, db: Session = Depends(get_db)):
+    venue = db.query(models.VenueMaster).filter_by(venue_id=venue_id).first()
+    if not venue:
+        raise HTTPException(status_code=404, detail="Venue not found")
+    db.delete(venue)
+    db.commit()
+    return {"status": "deleted"}
+
+@app.post("/venues/import")
+def import_venues(db: Session = Depends(get_db)):
+    import pandas as pd
+    import os
+    
+    file_path = "C:/Users/kalai/Downloads/time table/data/campus_classrooms_labs_simplified.xlsx"
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Venues Excel file not found")
+        
+    try:
+        count = 0
+        processed_names = set()
+        
+        # Helper to avoid duplicates within this transaction
+        def process_row(row, name_col, block_col, force_lab=False):
+            nonlocal count
+            v_name = str(row.get(name_col, '')).strip()
+            if not v_name or v_name.lower() == 'nan': return
+            
+            # Normalize for deduplication check
+            norm_name = v_name.lower()
+            
+            block = str(row.get(block_col, '')).strip()
+            is_lab = force_lab or ('LAB' in v_name.upper())
+
+            if norm_name in processed_names:
+                # Already processed in this batch, maybe update details?
+                # For now just skip to avoid UNIQUE constraint error
+                return
+            
+            # Check DB
+            existing = db.query(models.VenueMaster).filter_by(venue_name=v_name).first()
+            if existing:
+                existing.block = block
+                existing.is_lab = is_lab
+            else:
+                new_venue = models.VenueMaster(
+                    venue_name=v_name,
+                    block=block,
+                    is_lab=is_lab,
+                    capacity=60
+                )
+                db.add(new_venue)
+                # Important: Flush to ensure subsequent queries might find it if we were relying on that,
+                # but 'processed_names' handles the in-memory duplication within this request.
+                # db.flush() 
+                count += 1
+            
+            processed_names.add(norm_name)
+
+        # 1. Process Classrooms
+        try:
+            df_class = pd.read_excel(file_path, sheet_name='All Classrooms')
+            for _, row in df_class.iterrows():
+                process_row(row, 'Room Name', 'Block ID', force_lab=False)
+        except Exception as e:
+            print(f"Error reading All Classrooms: {e}")
+
+        # 2. Process Labs
+        try:
+            df_labs = pd.read_excel(file_path, sheet_name='All Labs')
+            for _, row in df_labs.iterrows():
+                process_row(row, 'Lab Name', 'Block ID', force_lab=True)
+        except Exception as e:
+            print(f"Error reading All Labs: {e}")
+
+        db.commit()
+        return {"status": "success", "imported_count": count}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Import failed: {str(e)}")
+
 @app.post("/course-faculty")
 def create_course_faculty(req: schemas.CourseFacultyCreate, db: Session = Depends(get_db)):
     # Validate

@@ -22,10 +22,12 @@ import {
     Pencil,
     ChevronLeft,
     ChevronRight,
-    Search // Added missing import
+    Search,
+    MapPin // Added for Venues
 } from 'lucide-react';
 import TimetableEditor from './components/TimetableEditor';
 import BITTimetable from './components/BITTimetable';
+import Venues from './components/Venues';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as api from './utils/api';
@@ -1043,7 +1045,7 @@ function App() {
         </div>
     );
 
-    const pageTitle = { dashboard: 'Timetable Generator', editor: 'Timetable Editor', print: 'Print View', timeslots: 'Time Slots', subjects: 'Course / Subject Details', faculty: 'Faculty Details', mappings: 'Course-Faculty Mappings' };
+    const pageTitle = { dashboard: 'Timetable Generator', editor: 'Timetable Editor', print: 'Print View', timeslots: 'Time Slots', subjects: 'Course / Subject Details', faculty: 'Faculty Details', mappings: 'Course-Faculty Mappings', venues: 'Venue Management' };
 
     const switchTab = (tab) => {
         setActiveTab(tab);
@@ -1087,7 +1089,8 @@ function App() {
                         { id: 'subjects', icon: BookOpen, label: 'Subjects' },
                         { id: 'faculty', icon: Users, label: 'Faculty' },
                         { id: 'mappings', icon: GraduationCap, label: 'Course-Faculty' },
-                        { id: 'timeslots', icon: Clock, label: 'Time Slots' }
+                        { id: 'timeslots', icon: Clock, label: 'Time Slots' },
+                        { id: 'venues', icon: MapPin, label: 'Venues' }
                     ].map(item => (
                         <button key={item.id} onClick={() => switchTab(item.id)}
                             title={isCollapsed ? item.label : ''}
@@ -1127,6 +1130,7 @@ function App() {
                         {activeTab === 'faculty' && renderFacultyPage()}
                         {activeTab === 'mappings' && renderMappingsPage()}
                         {activeTab === 'timeslots' && renderSlotsPage()}
+                        {activeTab === 'venues' && <Venues />}
                     </div>
                 </div>
             </main>

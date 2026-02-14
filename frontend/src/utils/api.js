@@ -47,3 +47,9 @@ export const generateTimetable = (data) => axios.post(`${API_URL}/generate`, dat
 export const getTimetable = (deptCode, sem) => axios.get(`${API_URL}/timetable?department_code=${deptCode}&semester=${sem}`);
 export const getTimetableEntries = getTimetable;
 export const saveTimetable = (data) => axios.post(`${API_URL}/timetable/save`, data);
+
+// --- Venues ---
+export const getVenues = () => axios.get(`${API_URL}/venues`);
+export const createVenue = (data) => axios.post(`${API_URL}/venues`, data);
+export const deleteVenue = (id) => axios.delete(`${API_URL}/venues/${id}`);
+export const importVenues = () => axios.post(`${API_URL}/venues/import`);

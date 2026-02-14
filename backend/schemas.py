@@ -99,6 +99,17 @@ class Slot(BaseModel):
     class Config:
         orm_mode = True
 
+class VenueCreate(BaseModel):
+    venue_name: str
+    block: Optional[str] = None
+    is_lab: bool = False
+    capacity: int = 60
+
+class Venue(VenueCreate):
+    venue_id: int
+    class Config:
+        orm_mode = True
+
 class TimetableEntry(BaseModel):
     id: int
     department_code: str

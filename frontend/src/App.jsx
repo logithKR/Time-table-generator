@@ -22,12 +22,10 @@ import {
     Pencil,
     ChevronLeft,
     ChevronRight,
-    Search,
-    MapPin // Added for Venues
+    Search 
 } from 'lucide-react';
 import TimetableEditor from './components/TimetableEditor';
 import BITTimetable from './components/BITTimetable';
-import Venues from './components/Venues';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as api from './utils/api';
@@ -83,16 +81,9 @@ function App() {
         if (activeTab === 'subjects') fetchCourses();
         if (activeTab === 'faculty') fetchFaculty();
         if (activeTab === 'mappings') fetchCourseFacultyMappings();
-        if (activeTab === 'print' && editorDept && editorSem) {
-            const loadPrintData = async () => {
-                try {
-                    const res = await api.getTimetableEntries(editorDept, editorSem);
-                    setTimetableEntries(res.data);
-                } catch (e) { console.error(e); }
-            };
-            loadPrintData();
-        }
-    }, [activeTab, filterDept, filterSem, editorDept, editorSem]);
+        // Removed the activeTab === 'print' check here to prevent double fetching
+        // We now handle print data loading explicitly in handleDownloadPDF
+    }, [activeTab, filterDept, filterSem]); // Removed editorDept/Sem from dep array to avoid loops
 
     const fetchMasterData = async () => {
         try {
@@ -235,7 +226,8 @@ function App() {
         }
     };
 
-    const handleDownloadPDF = (dataToExport) => {
+    // --- FIX: Updated Handle PDF Download ---
+    const handleDownloadPDF = async () => {
         // If coming from Editor, warn about saving
         if (activeTab === 'editor') {
             if (!confirm("Switching to Print View. Make sure you have SAVED your changes. Unsaved changes will not appear. Proceed?")) return;
@@ -249,9 +241,27 @@ function App() {
             return;
         }
 
-        setEditorDept(selectedDept);
-        setEditorSem(selectedSem);
-        setActiveTab('print');
+        // --- NEW LOGIC: Fetch data explicitly BEFORE switching tabs ---
+        setLoading(true);
+        try {
+             // 1. Fetch the data
+             const res = await api.getTimetableEntries(selectedDept, selectedSem);
+             
+             // 2. Set the data state
+             setTimetableEntries(res.data);
+             
+             // 3. Set the context states
+             setEditorDept(selectedDept);
+             setEditorSem(selectedSem);
+             
+             // 4. Finally switch the tab (now data is ready)
+             setActiveTab('print');
+        } catch (e) {
+            console.error("Error loading print data:", e);
+            alert("Could not load data for print view. Please ensure timetable is generated.");
+        } finally {
+            setLoading(false);
+        }
     };
 
     // --- Timetable Render ---
@@ -1045,7 +1055,7 @@ function App() {
         </div>
     );
 
-    const pageTitle = { dashboard: 'Timetable Generator', editor: 'Timetable Editor', print: 'Print View', timeslots: 'Time Slots', subjects: 'Course / Subject Details', faculty: 'Faculty Details', mappings: 'Course-Faculty Mappings', venues: 'Venue Management' };
+    const pageTitle = { dashboard: 'Timetable Generator', editor: 'Timetable Editor', print: 'Print View', timeslots: 'Time Slots', subjects: 'Course / Subject Details', faculty: 'Faculty Details', mappings: 'Course-Faculty Mappings' };
 
     const switchTab = (tab) => {
         setActiveTab(tab);
@@ -1089,8 +1099,7 @@ function App() {
                         { id: 'subjects', icon: BookOpen, label: 'Subjects' },
                         { id: 'faculty', icon: Users, label: 'Faculty' },
                         { id: 'mappings', icon: GraduationCap, label: 'Course-Faculty' },
-                        { id: 'timeslots', icon: Clock, label: 'Time Slots' },
-                        { id: 'venues', icon: MapPin, label: 'Venues' }
+                        { id: 'timeslots', icon: Clock, label: 'Time Slots' }
                     ].map(item => (
                         <button key={item.id} onClick={() => switchTab(item.id)}
                             title={isCollapsed ? item.label : ''}
@@ -1130,7 +1139,8 @@ function App() {
                         {activeTab === 'faculty' && renderFacultyPage()}
                         {activeTab === 'mappings' && renderMappingsPage()}
                         {activeTab === 'timeslots' && renderSlotsPage()}
-                        {activeTab === 'venues' && <Venues />}
+                        {/* New Print View Render */}
+                        {activeTab === 'print' && renderPrintViewPage()}
                     </div>
                 </div>
             </main>

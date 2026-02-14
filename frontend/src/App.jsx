@@ -405,54 +405,68 @@ function App() {
                     </div>
                 )}
 
-                <div className="overflow-x-auto bg-white rounded-2xl border border-violet-100 shadow-lg shadow-violet-50/50">
-                    <table className="min-w-full text-sm">
-                        <thead>
-                            <tr className="bg-gray-50 border-b border-gray-100">
-                                <th className="p-3.5 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">Code</th>
-                                <th className="p-3.5 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">Course Name</th>
-                                <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider">Dept</th>
-                                <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider">Sem</th>
-                                <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider">L</th>
-                                <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider">T</th>
-                                <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider">P</th>
-                                <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider">Cr</th>
-                                <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider">Weekly</th>
-                                <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider">Type</th>
-                                <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider w-16">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {filtered.map((c, i) => (
-                                <tr key={c.course_code} className={`border-b border-violet-50 hover:bg-violet-50/40 transition-colors duration-200 ${i % 2 === 0 ? 'bg-white' : 'bg-purple-50/20'}`}>
-                                    <td className="p-3.5 font-mono font-bold text-violet-800">{c.course_code}</td>
-                                    <td className="p-3.5 text-gray-800 font-medium">{c.course_name}</td>
-                                    <td className="p-3.5 text-center"><span className="bg-violet-50 text-violet-700 px-2.5 py-1 rounded-lg text-xs font-semibold border border-violet-100">{c.department_code}</span></td>
-                                    <td className="p-3.5 text-center font-semibold text-gray-700">{c.semester}</td>
-                                    <td className="p-3.5 text-center text-gray-600">{c.lecture_hours || 0}</td>
-                                    <td className="p-3.5 text-center text-gray-600">{c.tutorial_hours || 0}</td>
-                                    <td className="p-3.5 text-center text-gray-600">{c.practical_hours || 0}</td>
-                                    <td className="p-3.5 text-center font-semibold text-gray-700">{c.credits || '-'}</td>
-                                    <td className="p-3.5 text-center"><span className="bg-violet-100 text-violet-800 px-2.5 py-1 rounded-full text-xs font-bold">{c.weekly_sessions}</span></td>
-                                    <td className="p-3.5 text-center">
-                                        <div className="flex flex-wrap gap-1 justify-center">
-                                            {c.is_honours && <span className="bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-lg text-[10px] font-semibold">Honours</span>}
-                                            {c.is_minor && <span className="bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded-lg text-[10px] font-semibold">Minor</span>}
-                                            {c.is_lab && <span className="bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-lg text-[10px] font-semibold">Lab</span>}
-                                            {c.is_elective && <span className="bg-green-100 text-green-700 px-1.5 py-0.5 rounded-lg text-[10px] font-semibold">Elective</span>}
-                                            {c.is_open_elective && <span className="bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded-lg text-[10px] font-semibold">Open Elec</span>}
-                                            {!c.is_honours && !c.is_minor && !c.is_lab && !c.is_elective && !c.is_open_elective && <span className="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-lg text-[10px] font-medium">Regular</span>}
-                                        </div>
-                                    </td>
-                                    <td className="p-3.5 text-center">
-                                        <button onClick={() => handleDeleteCourse(c.course_code)} className="text-red-300 hover:text-red-600 transition-colors p-1 rounded-lg hover:bg-red-50" title="Delete"><Trash2 className="w-4 h-4" /></button>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                    {filtered.length === 0 && <div className="p-10 text-center text-gray-400 text-sm">No courses found.</div>}
-                </div>
+                {Object.entries(filtered.reduce((acc, c) => {
+                    const dept = c.department_code || 'Other';
+                    if (!acc[dept]) acc[dept] = [];
+                    acc[dept].push(c);
+                    return acc;
+                }, {})).sort().map(([dept, courses]) => (
+                    <div key={dept} className="mb-8">
+                        <h3 className="text-lg font-bold text-violet-800 mb-3 flex items-center gap-2 px-1">
+                            <span className="bg-violet-100/50 px-3 py-1 rounded-lg border border-violet-100">{dept}</span>
+                            <span className="bg-fuchsia-100 text-fuchsia-700 px-2.5 py-0.5 rounded-full text-xs font-bold border border-fuchsia-200 shadow-sm">{courses.length} Courses</span>
+                        </h3>
+                        <div className="overflow-x-auto bg-white rounded-2xl border border-violet-100 shadow-lg shadow-violet-50/50">
+                            <table className="min-w-full text-sm">
+                                <thead>
+                                    <tr className="bg-gray-50 border-b border-gray-100">
+                                        <th className="p-3.5 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">Code</th>
+                                        <th className="p-3.5 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">Course Name</th>
+                                        {/* Dept column removed as it's now the header */}
+                                        <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider">Sem</th>
+                                        <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider">L</th>
+                                        <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider">T</th>
+                                        <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider">P</th>
+                                        <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider">Cr</th>
+                                        <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider">Weekly</th>
+                                        <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider">Type</th>
+                                        <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider w-16">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {courses.map((c, i) => (
+                                        <tr key={c.course_code} className={`border-b border-violet-50 hover:bg-violet-50/40 transition-colors duration-200 ${i % 2 === 0 ? 'bg-white' : 'bg-purple-50/20'}`}>
+                                            <td className="p-3.5 font-mono font-bold text-violet-800">{c.course_code}</td>
+                                            <td className="p-3.5 text-gray-800 font-medium">{c.course_name}</td>
+                                            {/* Dept cell removed */}
+                                            <td className="p-3.5 text-center font-semibold text-gray-700">{c.semester}</td>
+                                            <td className="p-3.5 text-center text-gray-600">{c.lecture_hours || 0}</td>
+                                            <td className="p-3.5 text-center text-gray-600">{c.tutorial_hours || 0}</td>
+                                            <td className="p-3.5 text-center text-gray-600">{c.practical_hours || 0}</td>
+                                            <td className="p-3.5 text-center font-semibold text-gray-700">{c.credits || '-'}</td>
+                                            <td className="p-3.5 text-center"><span className="bg-violet-100 text-violet-800 px-2.5 py-1 rounded-full text-xs font-bold">{c.weekly_sessions}</span></td>
+                                            <td className="p-3.5 text-center">
+                                                <div className="flex flex-wrap gap-1 justify-center">
+                                                    {c.is_honours && <span className="bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-lg text-[10px] font-semibold">Honours</span>}
+                                                    {c.is_minor && <span className="bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded-lg text-[10px] font-semibold">Minor</span>}
+                                                    {c.is_lab && <span className="bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-lg text-[10px] font-semibold">Lab</span>}
+                                                    {c.is_elective && <span className="bg-green-100 text-green-700 px-1.5 py-0.5 rounded-lg text-[10px] font-semibold">Elective</span>}
+                                                    {c.is_open_elective && <span className="bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded-lg text-[10px] font-semibold">Open Elec</span>}
+                                                    {!c.is_honours && !c.is_minor && !c.is_lab && !c.is_elective && !c.is_open_elective && <span className="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-lg text-[10px] font-medium">Regular</span>}
+                                                </div>
+                                            </td>
+                                            <td className="p-3.5 text-center">
+                                                <button onClick={() => handleDeleteCourse(c.course_code)} className="text-red-300 hover:text-red-600 transition-colors p-1 rounded-lg hover:bg-red-50" title="Delete"><Trash2 className="w-4 h-4" /></button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                ))}
+
+                {filtered.length === 0 && <div className="p-10 text-center text-gray-400 text-sm">No courses found.</div>}
             </div>
         );
     };
@@ -495,33 +509,46 @@ function App() {
                     </div>
                 )}
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {filtered.map(f => (
-                        <div key={f.faculty_id} className="bg-white rounded-2xl border border-violet-100 shadow-md shadow-violet-50/30 hover:shadow-xl hover:shadow-violet-100/50 hover:border-violet-200 transition-all duration-300 p-5 group">
-                            <div className="flex items-start gap-3">
-                                <div className="w-12 h-12 bg-violet-600 rounded-2xl flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-violet-200 flex-shrink-0">
-                                    {(f.faculty_name || '?').charAt(0).toUpperCase()}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex items-center justify-between">
-                                        <h4 className="font-bold text-gray-900 text-sm truncate">{f.faculty_name || 'Unknown'}</h4>
-                                        <button onClick={() => handleDeleteFaculty(f.faculty_id)} className="text-red-300 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-all p-1 rounded-lg hover:bg-red-50" title="Delete">
-                                            <Trash2 className="w-4 h-4" />
-                                        </button>
+                {Object.entries(filtered.reduce((acc, f) => {
+                    const dept = f.department_code || 'Other';
+                    if (!acc[dept]) acc[dept] = [];
+                    acc[dept].push(f);
+                    return acc;
+                }, {})).sort().map(([dept, faculty]) => (
+                    <div key={dept} className="mb-8">
+                        <h3 className="text-lg font-bold text-violet-800 mb-3 flex items-center gap-2 px-1">
+                            <span className="bg-violet-100/50 px-3 py-1 rounded-lg border border-violet-100">{dept}</span>
+                            <span className="bg-fuchsia-100 text-fuchsia-700 px-2.5 py-0.5 rounded-full text-xs font-bold border border-fuchsia-200 shadow-sm">{faculty.length} Faculty</span>
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {faculty.map(f => (
+                                <div key={f.faculty_id} className="bg-white rounded-2xl border border-violet-100 shadow-md shadow-violet-50/30 hover:shadow-xl hover:shadow-violet-100/50 hover:border-violet-200 transition-all duration-300 p-5 group">
+                                    <div className="flex items-start gap-3">
+                                        <div className="w-12 h-12 bg-violet-600 rounded-2xl flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-violet-200 flex-shrink-0">
+                                            {(f.faculty_name || '?').charAt(0).toUpperCase()}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center justify-between">
+                                                <h4 className="font-bold text-gray-900 text-sm truncate">{f.faculty_name || 'Unknown'}</h4>
+                                                <button onClick={() => handleDeleteFaculty(f.faculty_id)} className="text-red-300 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-all p-1 rounded-lg hover:bg-red-50" title="Delete">
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                            <p className="text-xs text-gray-400 font-mono mt-0.5">{f.faculty_id}</p>
+                                            <div className="flex items-center gap-2 mt-2.5">
+                                                <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${(f.status || '') === 'Active' || (f.status || '') === 'ACTIVE' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-red-50 text-red-700 border border-red-100'}`}>
+                                                    {f.status || 'Active'}
+                                                </span>
+                                            </div>
+                                            {f.faculty_email && <p className="text-xs text-violet-500 mt-2 truncate font-medium">{f.faculty_email}</p>}
+                                        </div>
                                     </div>
-                                    <p className="text-xs text-gray-400 font-mono mt-0.5">{f.faculty_id}</p>
-                                    <div className="flex items-center gap-2 mt-2.5">
-                                        <span className="bg-violet-50 text-violet-700 px-2.5 py-1 rounded-lg text-xs font-semibold border border-violet-100">{f.department_code}</span>
-                                        <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${(f.status || '') === 'Active' || (f.status || '') === 'ACTIVE' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-red-50 text-red-700 border border-red-100'}`}>
-                                            {f.status || 'Active'}
-                                        </span>
-                                    </div>
-                                    {f.faculty_email && <p className="text-xs text-violet-500 mt-2 truncate font-medium">{f.faculty_email}</p>}
                                 </div>
-                            </div>
+                            ))}
                         </div>
-                    ))}
-                </div>
+                    </div>
+                ))}
+
                 {filtered.length === 0 && <div className="p-10 text-center text-gray-400 bg-white rounded-2xl border border-violet-100 text-sm">No faculty found.</div>}
             </div>
         );

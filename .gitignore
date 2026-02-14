@@ -33,3 +33,4 @@ debug_db.py
 # Build artifacts
 dist/
 build/
+backend/college_scheduler.db

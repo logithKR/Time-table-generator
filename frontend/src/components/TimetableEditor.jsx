@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { DndContext, useDroppable, useDraggable, DragOverlay, MouseSensor, TouchSensor, useSensor, useSensors, pointerWithin } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import * as api from '../utils/api';
-import { Search, Save, Trash2, Download, Undo2, Coffee, X, BookOpen, FlaskConical, Users2, LayoutTemplate, Palette } from 'lucide-react';
+import { Search, Save, Trash2, Download, Undo2, Coffee, X, BookOpen, FlaskConical, Users2, LayoutTemplate, Palette, ArrowLeftRight } from 'lucide-react';
 
 // ─── Simplified Color Palette (Preserved) ───
 const THEORY_STYLE = {
@@ -74,10 +74,11 @@ const CourseChip = ({ course, colorStyle, facultyName }) => {
 };
 
 // ─── Draggable Grid Cell Content ───
-const CellContent = ({ entry, cellId, isLabStart }) => {
+const CellContent = ({ entry, cellId, isLabStart, isSwapMode, isSelected, onClick }) => {
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
         id: cellId,
-        data: { type: 'placed', entry }
+        data: { type: 'placed', entry },
+        disabled: isSwapMode
     });
     const style = transform ? { transform: CSS.Translate.toString(transform), zIndex: 999 } : undefined;
 
@@ -100,8 +101,8 @@ const CellContent = ({ entry, cellId, isLabStart }) => {
     const isOE = entry.session_type === 'OPEN_ELECTIVE' || entry.course_code === 'OPEN_ELEC';
 
     return (
-        <div ref={setNodeRef} style={style} {...listeners} {...attributes}
-            className={`w-full h-full rounded-xl border-[1.5px] ${bg} ${border} ${text} cursor-grab active:cursor-grabbing transition-all hover:shadow-md group relative overflow-hidden flex flex-col justify-center p-2 shadow-sm`}>
+        <div ref={setNodeRef} style={style} {...listeners} {...attributes} onClick={isSwapMode ? onClick : undefined}
+            className={`w-full h-full rounded-xl border-[1.5px] ${bg} ${border} ${text} ${isSwapMode ? 'cursor-pointer hover:ring-2 hover:ring-violet-400' : 'cursor-grab active:cursor-grabbing'} ${isSelected ? 'ring-4 ring-fuchsia-500 shadow-xl scale-105 z-50' : ''} transition-all hover:shadow-md group relative overflow-hidden flex flex-col justify-center p-2 shadow-sm`}>
             {isMentor ? (
                 <div className="text-center">
                     <div className="font-bold text-[10px] uppercase tracking-wider opacity-90">MENTOR</div>
@@ -163,7 +164,7 @@ const GridCell = ({ id, children, isEmpty, isBreak, isLunch }) => {
 };
 
 // ─── Droppable Grid Cell Span (Preserved Logic) ───
-const DroppableGridCellSpan = ({ id, colSpan, entry, isLabStart, onDelete }) => {
+const DroppableGridCellSpan = ({ id, colSpan, entry, isLabStart, onDelete, isSwapMode, isSelected, onCellClick }) => {
     const { setNodeRef, isOver } = useDroppable({ id });
 
     return (
@@ -176,7 +177,14 @@ const DroppableGridCellSpan = ({ id, colSpan, entry, isLabStart, onDelete }) => 
             )}
             {entry ? (
                 <div className="relative group h-full w-full">
-                    <CellContent entry={entry} cellId={`placed-${id}`} isLabStart={isLabStart} />
+                    <CellContent
+                        entry={entry}
+                        cellId={`placed-${id}`}
+                        isLabStart={isLabStart}
+                        isSwapMode={isSwapMode}
+                        isSelected={isSelected}
+                        onClick={onCellClick}
+                    />
                     <button onClick={onDelete}
                         className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-rose-500 hover:bg-rose-600 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shadow-lg z-20 scale-75 group-hover:scale-100 cursor-pointer ring-2 ring-white">
                         <X className="w-3 h-3" />
@@ -198,6 +206,8 @@ export default function TimetableEditor({ department, semester, onSave, onExport
     const [departments, setDepartments] = useState([]);
     const [facultyMap, setFacultyMap] = useState({});
     const [draggedItem, setDraggedItem] = useState(null);
+    const [isSwapMode, setIsSwapMode] = useState(false);
+    const [swapSource, setSwapSource] = useState(null);
 
     // Filters
     const [paletteDept, setPaletteDept] = useState(department || '');
@@ -559,6 +569,74 @@ export default function TimetableEditor({ department, semester, onSave, onExport
         return prevEntry && prevEntry.course_code === entry.course_code && prevEntry.session_type === 'LAB';
     };
 
+    const handleSwapClick = (day, period, entry) => {
+        if (!isSwapMode || !entry) return;
+
+        if (!swapSource) {
+            setSwapSource({ day, period, entry });
+            return;
+        }
+
+        // Deselect if clicking same
+        if (swapSource.day === day && swapSource.period === period) {
+            setSwapSource(null);
+            return;
+        }
+
+        // Validate types
+        if (swapSource.entry.session_type !== entry.session_type) {
+            alert(`Cannot swap ${swapSource.entry.session_type} with ${entry.session_type}. Types must match.`);
+            setSwapSource(null);
+            return;
+        }
+
+        // Execute Swap
+        executeSwap(swapSource, { day, period, entry });
+        setSwapSource(null);
+        // setIsSwapMode(false); // User might want to do multiple swaps
+    };
+
+    const executeSwap = (source, target) => {
+        pushHistory();
+        let newEntries = [...entries];
+
+        const getRelatedEntries = (refEntry, d, p) => {
+            if (refEntry.session_type === 'LAB') {
+                return newEntries.filter(e =>
+                    e.day_of_week === d &&
+                    e.course_code === refEntry.course_code &&
+                    e.session_type === 'LAB' &&
+                    Math.abs(e.period_number - p) <= 1
+                );
+            } else {
+                return newEntries.filter(e => e.day_of_week === d && e.period_number === p);
+            }
+        };
+
+        const sourceGroup = getRelatedEntries(source.entry, source.day, source.period);
+        const targetGroup = getRelatedEntries(target.entry, target.day, target.period);
+
+        // Remove old positions
+        newEntries = newEntries.filter(e => !sourceGroup.includes(e) && !targetGroup.includes(e));
+
+        const sourceStartP = Math.min(...sourceGroup.map(e => e.period_number));
+        const targetStartP = Math.min(...targetGroup.map(e => e.period_number));
+
+        const updatedSourceGroup = sourceGroup.map(e => ({
+            ...e,
+            day_of_week: target.day,
+            period_number: targetStartP + (e.period_number - sourceStartP)
+        }));
+
+        const updatedTargetGroup = targetGroup.map(e => ({
+            ...e,
+            day_of_week: source.day,
+            period_number: sourceStartP + (e.period_number - targetStartP)
+        }));
+
+        setEntries([...newEntries, ...updatedSourceGroup, ...updatedTargetGroup]);
+    };
+
     // ═══════════════════════════════════════
     // RENDER (ELEGANT WHITES & PURPLES)
     // ═══════════════════════════════════════
@@ -579,26 +657,36 @@ export default function TimetableEditor({ department, semester, onSave, onExport
                             <span className="text-xs font-bold tracking-wide uppercase">{entries.length} Classes</span>
                         </div>
                     </div>
-                    <div className="flex items-center gap-4">
-                        <button onClick={undo} disabled={history.length === 0} title="Undo"
-                            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${history.length ? 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-gray-900 shadow-sm hover:shadow' : 'bg-gray-50 border border-transparent text-gray-300 cursor-not-allowed'}`}>
-                            <Undo2 className="w-4 h-4" /> Undo
+                </div>
+
+                {/* ─── FLOATING ACTION BAR (RIGHT) ─── */}
+                <div className="fixed right-6 top-1/2 -translate-y-1/2 flex flex-col gap-3 z-50">
+                    <button onClick={undo} disabled={history.length === 0} title="Undo"
+                        className={`p-3 rounded-full shadow-lg transition-all transform hover:scale-110 ${history.length ? 'bg-white text-gray-700 hover:text-gray-900 border border-gray-200' : 'bg-gray-100 text-gray-300 cursor-not-allowed'}`}>
+                        <Undo2 className="w-5 h-5" />
+                    </button>
+
+                    <button onClick={() => { setIsSwapMode(!isSwapMode); setSwapSource(null); }} title={isSwapMode ? "Exit Swap Mode" : "Swap Slots"}
+                        className={`p-3 rounded-full shadow-lg transition-all transform hover:scale-110 ${isSwapMode ? 'bg-fuchsia-600 text-white ring-4 ring-fuchsia-200' : 'bg-white text-fuchsia-600 border border-gray-200 hover:bg-fuchsia-50'}`}>
+                        <ArrowLeftRight className="w-5 h-5" />
+                    </button>
+
+                    <button onClick={() => { pushHistory(); setEntries([]); }} title="Clear Timetable"
+                        className="p-3 bg-white text-rose-500 rounded-full border border-gray-200 shadow-lg hover:bg-rose-50 hover:text-rose-600 transition-all transform hover:scale-110">
+                        <Trash2 className="w-5 h-5" />
+                    </button>
+
+                    {onExportPDF && (
+                        <button onClick={() => onExportPDF(entries)} title="Export PDF"
+                            className="p-3 bg-white text-violet-600 rounded-full border border-gray-200 shadow-lg hover:bg-violet-50 hover:text-violet-700 transition-all transform hover:scale-110">
+                            <Download className="w-5 h-5" />
                         </button>
-                        <button onClick={() => { pushHistory(); setEntries([]); }}
-                            className="flex items-center gap-2 px-4 py-2.5 bg-white border border-rose-100 text-rose-500 rounded-xl hover:bg-rose-50 hover:border-rose-200 text-sm font-semibold transition-all shadow-sm">
-                            <Trash2 className="w-4 h-4" /> Clear
-                        </button>
-                        {onExportPDF && (
-                            <button onClick={() => onExportPDF(entries)}
-                                className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-purple-50 hover:text-purple-700 hover:border-purple-200 text-sm font-semibold shadow-sm transition-all group">
-                                <Download className="w-4 h-4 text-gray-400 group-hover:text-purple-500" /> PDF
-                            </button>
-                        )}
-                        <button onClick={handleSave}
-                            className="flex items-center gap-2 px-6 py-2.5 bg-violet-600 text-white rounded-xl hover:bg-violet-700 text-sm font-bold shadow-lg shadow-violet-200 hover:shadow-violet-300 transition-all transform hover:-translate-y-0.5 active:scale-95 active:translate-y-0">
-                            <Save className="w-4 h-4" /> Save
-                        </button>
-                    </div>
+                    )}
+
+                    <button onClick={handleSave} title="Save Timetable"
+                        className="p-3 bg-violet-600 text-white rounded-full shadow-xl shadow-violet-300 hover:bg-violet-700 transition-all transform hover:scale-110 hover:shadow-violet-400">
+                        <Save className="w-5 h-5" />
+                    </button>
                 </div>
 
                 {/* ─── COURSE PALETTE (ELEGANT) ─── */}
@@ -700,6 +788,9 @@ export default function TimetableEditor({ department, semester, onSave, onExport
                                                 entry={entry}
                                                 isLabStart={labStart}
                                                 onDelete={() => handleDeleteEntry(day, p)}
+                                                isSwapMode={isSwapMode}
+                                                isSelected={swapSource?.day === day && Math.abs(swapSource?.period - p) < (entry.session_type === 'LAB' ? 2 : 1)}
+                                                onCellClick={() => handleSwapClick(day, p, entry)}
                                             />
                                         );
                                     });

@@ -5,6 +5,7 @@ Thumbs.db
 # Environments
 venv/
 venv2/
+ttvenv/
 node_modules/
 __pycache__/
 

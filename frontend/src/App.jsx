@@ -22,9 +22,11 @@ import {
     Pencil,
     ChevronLeft,
     ChevronRight,
-    Search 
+    Search,
+    MapPin
 } from 'lucide-react';
 import TimetableEditor from './components/TimetableEditor';
+import Venues from './components/Venues';
 import BITTimetable from './components/BITTimetable';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -244,18 +246,18 @@ function App() {
         // --- NEW LOGIC: Fetch data explicitly BEFORE switching tabs ---
         setLoading(true);
         try {
-             // 1. Fetch the data
-             const res = await api.getTimetableEntries(selectedDept, selectedSem);
-             
-             // 2. Set the data state
-             setTimetableEntries(res.data);
-             
-             // 3. Set the context states
-             setEditorDept(selectedDept);
-             setEditorSem(selectedSem);
-             
-             // 4. Finally switch the tab (now data is ready)
-             setActiveTab('print');
+            // 1. Fetch the data
+            const res = await api.getTimetableEntries(selectedDept, selectedSem);
+
+            // 2. Set the data state
+            setTimetableEntries(res.data);
+
+            // 3. Set the context states
+            setEditorDept(selectedDept);
+            setEditorSem(selectedSem);
+
+            // 4. Finally switch the tab (now data is ready)
+            setActiveTab('print');
         } catch (e) {
             console.error("Error loading print data:", e);
             alert("Could not load data for print view. Please ensure timetable is generated.");
@@ -729,7 +731,7 @@ function App() {
                             masterData={{ departments, semesters, slots, courses: allCourses, faculty: allFaculty }}
                             onSave={async (updatedEntries) => {
                                 try {
-                                    await api.saveTimetableEntries(editorDept, editorSem, updatedEntries);
+                                    await api.saveTimetable({ department_code: editorDept, semester: parseInt(editorSem), entries: updatedEntries });
                                     alert('Timetable saved successfully!');
                                     // Re-fetch to ensure state is consistent
                                     const res = await api.getTimetableEntries(editorDept, editorSem);
@@ -1055,7 +1057,7 @@ function App() {
         </div>
     );
 
-    const pageTitle = { dashboard: 'Timetable Generator', editor: 'Timetable Editor', print: 'Print View', timeslots: 'Time Slots', subjects: 'Course / Subject Details', faculty: 'Faculty Details', mappings: 'Course-Faculty Mappings' };
+    const pageTitle = { dashboard: 'Timetable Generator', editor: 'Timetable Editor', print: 'Print View', timeslots: 'Time Slots', subjects: 'Course / Subject Details', faculty: 'Faculty Details', mappings: 'Course-Faculty Mappings', venues: 'Venues & Classrooms' };
 
     const switchTab = (tab) => {
         setActiveTab(tab);
@@ -1099,7 +1101,8 @@ function App() {
                         { id: 'subjects', icon: BookOpen, label: 'Subjects' },
                         { id: 'faculty', icon: Users, label: 'Faculty' },
                         { id: 'mappings', icon: GraduationCap, label: 'Course-Faculty' },
-                        { id: 'timeslots', icon: Clock, label: 'Time Slots' }
+                        { id: 'timeslots', icon: Clock, label: 'Time Slots' },
+                        { id: 'venues', icon: MapPin, label: 'Venues' }
                     ].map(item => (
                         <button key={item.id} onClick={() => switchTab(item.id)}
                             title={isCollapsed ? item.label : ''}
@@ -1139,6 +1142,7 @@ function App() {
                         {activeTab === 'faculty' && renderFacultyPage()}
                         {activeTab === 'mappings' && renderMappingsPage()}
                         {activeTab === 'timeslots' && renderSlotsPage()}
+                        {activeTab === 'venues' && <Venues />}
                         {/* New Print View Render */}
                         {activeTab === 'print' && renderPrintViewPage()}
                     </div>

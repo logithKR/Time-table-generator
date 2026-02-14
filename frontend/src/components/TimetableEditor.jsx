@@ -101,8 +101,8 @@ const CellContent = ({ entry, cellId, isLabStart, isSwapMode, isSelected, onClic
     const isOE = entry.session_type === 'OPEN_ELECTIVE' || entry.course_code === 'OPEN_ELEC';
 
     return (
-        <div ref={setNodeRef} style={style} {...listeners} {...attributes} onClick={isSwapMode ? onClick : undefined}
-            className={`w-full h-full rounded-xl border-[1.5px] ${bg} ${border} ${text} ${isSwapMode ? 'cursor-pointer hover:ring-2 hover:ring-violet-400' : 'cursor-grab active:cursor-grabbing'} ${isSelected ? 'ring-4 ring-fuchsia-500 shadow-xl scale-105 z-50' : ''} transition-all hover:shadow-md group relative overflow-hidden flex flex-col justify-center p-2 shadow-sm`}>
+        <div ref={setNodeRef} style={style} {...listeners} {...attributes} onClick={onClick}
+            className={`w-full h-full rounded-xl border-[1.5px] ${bg} ${border} ${text} ${isSwapMode ? 'cursor-pointer hover:ring-2 hover:ring-violet-400' : 'cursor-pointer hover:ring-2 hover:ring-violet-200'} ${isSelected ? 'ring-4 ring-fuchsia-500 shadow-xl scale-105 z-50' : ''} transition-all hover:shadow-md group relative overflow-hidden flex flex-col justify-center p-2 shadow-sm min-h-[80px]`}>
             {isMentor ? (
                 <div className="text-center">
                     <div className="font-bold text-[10px] uppercase tracking-wider opacity-90">MENTOR</div>
@@ -116,12 +116,12 @@ const CellContent = ({ entry, cellId, isLabStart, isSwapMode, isSelected, onClic
             ) : (
                 <>
                     <div className="flex justify-between items-start w-full mb-0.5">
-                        <div className="font-bold text-xs leading-none truncate tracking-tight">{entry.course_code}</div>
+                        <div className="font-bold text-xs leading-tight tracking-tight whitespace-pre-wrap break-words">{entry.course_code}</div>
                         {entry.session_type === 'LAB' && isLabStart && (
                             <FlaskConical className="w-3 h-3 opacity-40 shrink-0 ml-1 fill-current" />
                         )}
                     </div>
-                    <div className="text-[10px] leading-tight truncate opacity-70 font-medium w-full" title={entry.course_name}>{entry.course_name || ''}</div>
+                    <div className="text-[10px] leading-tight opacity-70 font-medium w-full whitespace-pre-wrap break-words" title={entry.course_name}>{entry.course_name || ''}</div>
                     {entry.faculty_name && entry.faculty_name !== 'Unassigned' && (
                         <div className="text-[9px] mt-auto flex items-center gap-1 opacity-70 border-t border-current/10 pt-1.5 font-semibold w-full">
                             <Users2 className="w-2.5 h-2.5 opacity-80" />
@@ -135,7 +135,7 @@ const CellContent = ({ entry, cellId, isLabStart, isSwapMode, isSelected, onClic
 };
 
 // ─── Droppable Grid Cell (Preserved Logic) ───
-const GridCell = ({ id, children, isEmpty, isBreak, isLunch }) => {
+const GridCell = ({ id, children, isEmpty, isBreak, isLunch, onCellClick }) => {
     // Break/Lunch cells are purely visual (static)
     if (isBreak || isLunch) {
         return (
@@ -151,9 +151,9 @@ const GridCell = ({ id, children, isEmpty, isBreak, isLunch }) => {
     const { setNodeRef, isOver } = useDroppable({ id });
 
     return (
-        <td ref={setNodeRef}
-            className={`border-r border-b border-gray-100 relative min-w-[120px] transition-colors duration-200 ${isOver ? (isEmpty ? 'bg-emerald-50/50' : 'bg-amber-50/50') : (isEmpty ? 'bg-white hover:bg-purple-50/10' : '')}`}
-            style={{ height: 80, padding: 4 }}>
+        <td ref={setNodeRef} onClick={isEmpty ? onCellClick : undefined}
+            className={`border-r border-b border-gray-100 relative min-w-[120px] transition-colors duration-200 ${isOver ? (isEmpty ? 'bg-emerald-50/50' : 'bg-amber-50/50') : (isEmpty ? 'bg-white hover:bg-purple-50/10 cursor-pointer' : '')}`}
+            style={{ minHeight: 80, height: 'auto', padding: 4 }}>
             {/* Adding specific ring indicator for drops */}
             {isOver && (
                 <div className={`absolute inset-1 rounded-xl border-2 border-dashed pointer-events-none z-10 ${isEmpty ? 'border-emerald-400/50 bg-emerald-50/20' : 'border-amber-400/50 bg-amber-50/20'}`} />
@@ -170,8 +170,9 @@ const DroppableGridCellSpan = ({ id, colSpan, entry, isLabStart, onDelete, isSwa
     return (
         <td ref={setNodeRef}
             colSpan={colSpan}
-            className={`border-r border-b border-gray-100 relative transition-colors duration-200 ${isOver ? (entry ? 'bg-amber-50/50' : 'bg-emerald-50/50') : (entry ? '' : 'bg-white hover:bg-purple-50/10')}`}
-            style={{ height: 80, padding: 4, minWidth: colSpan > 1 ? 240 : 120 }}>
+            onClick={!entry ? onCellClick : undefined}
+            className={`border-r border-b border-gray-100 relative transition-colors duration-200 ${isOver ? (entry ? 'bg-amber-50/50' : 'bg-emerald-50/50') : (entry ? '' : 'bg-white hover:bg-purple-50/10 cursor-pointer')}`}
+            style={{ minHeight: 80, height: 'auto', padding: 4, minWidth: colSpan > 1 ? 240 : 120 }}>
             {isOver && (
                 <div className={`absolute inset-1 rounded-xl border-2 border-dashed pointer-events-none z-10 ${entry ? 'border-amber-400/50 bg-amber-50/20' : 'border-emerald-400/50 bg-emerald-50/20'}`} />
             )}
@@ -195,6 +196,46 @@ const DroppableGridCellSpan = ({ id, colSpan, entry, isLabStart, onDelete, isSwa
     );
 };
 
+const ManualEntryModal = ({ isOpen, onClose, onSave, initialData }) => {
+    if (!isOpen) return null;
+    const [formData, setFormData] = useState(initialData || { course_code: '', course_name: '', faculty_name: '' });
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        onSave(formData);
+        onClose();
+    };
+
+    return (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
+            <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md border border-gray-100" onClick={e => e.stopPropagation()}>
+                <h3 className="text-lg font-bold text-gray-800 mb-4">{initialData ? 'Edit Entry' : 'Add Manual Entry'}</h3>
+                <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+                    <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Title / Code</label>
+                        <input type="text" autoFocus className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-bold focus:ring-2 focus:ring-violet-400 outline-none"
+                            value={formData.course_code} onChange={e => setFormData({ ...formData, course_code: e.target.value })} placeholder="e.g. Meeting / CS101" />
+                    </div>
+                    <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Description / Name</label>
+                        <textarea className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-violet-400 outline-none resize-none h-24"
+                            value={formData.course_name} onChange={e => setFormData({ ...formData, course_name: e.target.value })} placeholder="Enter details..." />
+                    </div>
+                    <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Faculty / Note</label>
+                        <input type="text" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-violet-400 outline-none"
+                            value={formData.faculty_name} onChange={e => setFormData({ ...formData, faculty_name: e.target.value })} placeholder="Optional" />
+                    </div>
+                    <div className="flex justify-end gap-2 mt-2">
+                        <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-bold text-gray-500 hover:bg-gray-100 rounded-lg">Cancel</button>
+                        <button type="submit" className="px-4 py-2 text-sm font-bold text-white bg-violet-600 hover:bg-violet-700 rounded-lg shadow-lg hover:shadow-violet-200">Save</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+};
+
 // ═══════════════════════════════════════════
 // MAIN COMPONENT
 // ═══════════════════════════════════════════
@@ -208,6 +249,7 @@ export default function TimetableEditor({ department, semester, onSave, onExport
     const [draggedItem, setDraggedItem] = useState(null);
     const [isSwapMode, setIsSwapMode] = useState(false);
     const [swapSource, setSwapSource] = useState(null);
+    const [editModalData, setEditModalData] = useState(null);
 
     // Filters
     const [paletteDept, setPaletteDept] = useState(department || '');
@@ -637,6 +679,64 @@ export default function TimetableEditor({ department, semester, onSave, onExport
         setEntries([...newEntries, ...updatedSourceGroup, ...updatedTargetGroup]);
     };
 
+    const handleCellClick = (day, period, entry = null) => {
+        if (isSwapMode) {
+            handleSwapClick(day, period, entry);
+            return;
+        }
+        setEditModalData({
+            isOpen: true,
+            day,
+            period,
+            entry,
+            initialData: entry ? {
+                course_code: entry.course_code,
+                course_name: entry.course_name,
+                faculty_name: entry.faculty_name
+            } : null
+        });
+    };
+
+    const handleManualSave = (formData) => {
+        const { day, period, entry } = editModalData;
+        pushHistory();
+
+        const isLab = entry?.session_type === 'LAB';
+
+        const newEntry = {
+            department_code: department, semester: parseInt(semester),
+            course_code: formData.course_code || 'CUSTOM',
+            course_name: formData.course_name,
+            session_type: isLab ? 'LAB' : 'THEORY',
+            faculty_id: null,
+            faculty_name: formData.faculty_name || 'Unassigned',
+            slot_id: 0,
+            day_of_week: day,
+            period_number: period
+        };
+
+        let currentEntries = [...entries];
+
+        if (entry) {
+            // Edit existing
+            currentEntries = currentEntries.map(e => {
+                if (e === entry) return { ...e, ...newEntry };
+                // Update pair if Lab
+                if (isLab && e.day_of_week === day && e.course_code === entry.course_code && e.session_type === 'LAB' && Math.abs(e.period_number - period) === 1) {
+                    return { ...e, ...newEntry, period_number: e.period_number };
+                }
+                return e;
+            });
+        } else {
+            // New Entry
+            currentEntries = currentEntries.filter(e => !(e.day_of_week === day && e.period_number === period));
+            currentEntries.push(newEntry);
+        }
+
+        setEntries(currentEntries);
+        setEditModalData(null);
+    };
+
     // ═══════════════════════════════════════
     // RENDER (ELEGANT WHITES & PURPLES)
     // ═══════════════════════════════════════
@@ -790,7 +890,7 @@ export default function TimetableEditor({ department, semester, onSave, onExport
                                                 onDelete={() => handleDeleteEntry(day, p)}
                                                 isSwapMode={isSwapMode}
                                                 isSelected={swapSource?.day === day && Math.abs(swapSource?.period - p) < (entry.session_type === 'LAB' ? 2 : 1)}
-                                                onCellClick={() => handleSwapClick(day, p, entry)}
+                                                onCellClick={() => handleCellClick(day, p, entry)}
                                             />
                                         );
                                     });
@@ -822,6 +922,13 @@ export default function TimetableEditor({ department, semester, onSave, onExport
                     </div>
                 ) : null}
             </DragOverlay>
-        </DndContext>
+
+            <ManualEntryModal
+                isOpen={editModalData?.isOpen}
+                onClose={() => setEditModalData(null)}
+                onSave={handleManualSave}
+                initialData={editModalData?.initialData}
+            />
+        </DndContext >
     );
 }

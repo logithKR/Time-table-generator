@@ -71,7 +71,7 @@ function App() {
     const [selectedDept, setSelectedDept] = useState('');
     const [selectedSem, setSelectedSem] = useState('');
     const [mentorDay, setMentorDay] = useState('Friday');
-    const [mentorPeriod, setMentorPeriod] = useState(8);
+    const [mentorPeriod, setMentorPeriod] = useState(7);
 
     // Timetable Data
     const [timetableEntries, setTimetableEntries] = useState([]);

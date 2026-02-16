@@ -336,3 +336,101 @@ def save_timetable(request: schemas.TimetableSaveRequest, db: Session = Depends(
         raise HTTPException(status_code=400, detail=f"Save failed: {str(e)}")
         
     return {"status": "success", "count": len(new_entries)}
+
+
+# ============================================
+# VENUES
+# ============================================
+
+@app.get("/venues", response_model=List[schemas.Venue])
+def get_venues(db: Session = Depends(get_db)):
+    return db.query(models.VenueMaster).all()
+
+@app.post("/venues", response_model=schemas.Venue)
+def create_venue(req: schemas.VenueCreate, db: Session = Depends(get_db)):
+    # Check for duplicate
+    existing = db.query(models.VenueMaster).filter_by(venue_name=req.venue_name).first()
+    if existing:
+        raise HTTPException(status_code=400, detail=f"Venue '{req.venue_name}' already exists")
+    
+    venue = models.VenueMaster(
+        venue_name=req.venue_name,
+        block=req.block,
+        is_lab=req.is_lab,
+        capacity=req.capacity
+    )
+    db.add(venue)
+    try:
+        db.commit()
+        db.refresh(venue)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+    return venue
+
+@app.delete("/venues/{venue_id}")
+def delete_venue(venue_id: int, db: Session = Depends(get_db)):
+    venue = db.query(models.VenueMaster).filter_by(venue_id=venue_id).first()
+    if not venue:
+        raise HTTPException(status_code=404, detail="Venue not found")
+    db.delete(venue)
+    db.commit()
+    return {"status": "deleted", "venue_id": venue_id}
+
+@app.post("/venues/import")
+def import_venues(db: Session = Depends(get_db)):
+    import pandas as pd
+    import os
+    
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.dirname(base_dir)
+    file_path = os.path.join(project_root, "data", "campus_classrooms_labs_simplified.xlsx")
+    
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail=f"File not found: campus_classrooms_labs_simplified.xlsx")
+    
+    try:
+        df = pd.read_excel(file_path)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to read Excel file: {str(e)}")
+    
+    # Expected columns: 'Room Name', 'Block ID'
+    if 'Room Name' not in df.columns:
+        raise HTTPException(status_code=400, detail=f"Excel file missing 'Room Name' column. Found: {list(df.columns)}")
+    
+    imported_count = 0
+    skipped_count = 0
+    lab_keywords = ['lab', 'workshop', 'studio', 'drawing']
+    
+    for _, row in df.iterrows():
+        venue_name = str(row.get('Room Name', '')).strip()
+        block = str(row.get('Block ID', '')).strip() if pd.notna(row.get('Block ID')) else None
+        
+        if not venue_name or venue_name.lower() == 'nan':
+            continue
+        
+        # Auto-detect if it's a lab based on name
+        is_lab = any(kw in venue_name.lower() for kw in lab_keywords)
+        
+        # Skip if already exists
+        existing = db.query(models.VenueMaster).filter_by(venue_name=venue_name).first()
+        if existing:
+            skipped_count += 1
+            continue
+        
+        venue = models.VenueMaster(
+            venue_name=venue_name,
+            block=block,
+            is_lab=is_lab,
+            capacity=60
+        )
+        db.add(venue)
+        imported_count += 1
+    
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Import failed: {str(e)}")
+    
+    return {"status": "success", "imported_count": imported_count, "skipped_count": skipped_count}

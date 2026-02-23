@@ -1,9 +1,10 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 from typing import List, Optional
 import models, schemas
 from database import engine, get_db
 from fastapi.middleware.cors import CORSMiddleware
+import import_book1
 
 # Ensure tables exist
 models.Base.metadata.create_all(bind=engine)
@@ -20,6 +21,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.post("/import-book1")
+def run_import_book1(background_tasks: BackgroundTasks):
+    background_tasks.add_task(import_book1.import_book1_data)
+    return {"message": "Data import from Book1.xlsx has started in the background."}
+
 # ============================================
 # DEPARTMENTS
 # ============================================
@@ -33,10 +39,26 @@ def create_department(req: schemas.DepartmentCreate, db: Session = Depends(get_d
     existing = db.query(models.DepartmentMaster).filter_by(department_code=req.department_code).first()
     if existing:
         raise HTTPException(status_code=400, detail=f"Department {req.department_code} already exists")
-    dept = models.DepartmentMaster(department_code=req.department_code)
+    dept = models.DepartmentMaster(
+        department_code=req.department_code,
+        student_count=req.student_count
+    )
     db.add(dept)
     db.commit()
     return {"status": "success", "department_code": req.department_code}
+
+@app.put("/departments/{code}", response_model=schemas.Department)
+def update_department(code: str, req: schemas.DepartmentUpdate, db: Session = Depends(get_db)):
+    dept = db.query(models.DepartmentMaster).filter_by(department_code=code).first()
+    if not dept:
+        raise HTTPException(status_code=404, detail="Department not found")
+    
+    if req.student_count is not None:
+        dept.student_count = req.student_count
+        
+    db.commit()
+    db.refresh(dept)
+    return dept
 
 @app.delete("/departments/{code}")
 def delete_department(code: str, db: Session = Depends(get_db)):
@@ -434,3 +456,58 @@ def import_venues(db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail=f"Import failed: {str(e)}")
     
     return {"status": "success", "imported_count": imported_count, "skipped_count": skipped_count}
+
+# --- Department Venue Mapping ---
+@app.get("/department-venues", response_model=List[schemas.DepartmentVenueResponse])
+def get_department_venues(department_code: str = None, db: Session = Depends(get_db)):
+    query = db.query(models.DepartmentVenueMap)
+    if department_code:
+        query = query.filter(models.DepartmentVenueMap.department_code == department_code)
+    
+    maps = query.all()
+    result = []
+    for m in maps:
+        venue = db.query(models.VenueMaster).filter_by(venue_id=m.venue_id).first()
+        if venue:
+            result.append(schemas.DepartmentVenueResponse(
+                id=m.id,
+                department_code=m.department_code,
+                venue_id=venue.venue_id,
+                venue_name=venue.venue_name,
+                is_lab=venue.is_lab,
+                capacity=venue.capacity
+            ))
+    return result
+
+@app.post("/department-venues", response_model=schemas.DepartmentVenueResponse)
+def create_department_venue(req: schemas.DepartmentVenueCreate, db: Session = Depends(get_db)):
+    existing = db.query(models.DepartmentVenueMap).filter_by(
+        department_code=req.department_code,
+        venue_id=req.venue_id
+    ).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="This venue is already mapped to the department.")
+    
+    new_map = models.DepartmentVenueMap(department_code=req.department_code, venue_id=req.venue_id)
+    db.add(new_map)
+    db.commit()
+    db.refresh(new_map)
+    
+    venue = db.query(models.VenueMaster).filter_by(venue_id=req.venue_id).first()
+    return schemas.DepartmentVenueResponse(
+        id=new_map.id,
+        department_code=new_map.department_code,
+        venue_id=venue.venue_id,
+        venue_name=venue.venue_name,
+        is_lab=venue.is_lab,
+        capacity=venue.capacity
+    )
+
+@app.delete("/department-venues/{map_id}")
+def delete_department_venue(map_id: int, db: Session = Depends(get_db)):
+    m = db.query(models.DepartmentVenueMap).filter_by(id=map_id).first()
+    if not m:
+        raise HTTPException(status_code=404, detail="Mapping not found")
+    db.delete(m)
+    db.commit()
+    return {"status": "success", "id": map_id}

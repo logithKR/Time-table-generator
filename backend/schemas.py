@@ -23,6 +23,7 @@ class CourseCreate(BaseModel):
     is_minor: bool = False
     is_elective: bool = False
     is_open_elective: bool = False
+    is_add_course: bool = False
 
 class FacultyCreate(BaseModel):
     faculty_id: str
@@ -39,6 +40,10 @@ class CourseFacultyCreate(BaseModel):
 
 class DepartmentCreate(BaseModel):
     department_code: str
+    student_count: Optional[int] = 0
+
+class DepartmentUpdate(BaseModel):
+    student_count: Optional[int] = None
 
 class SlotCreate(BaseModel):
     day_of_week: str
@@ -58,6 +63,7 @@ class SlotUpdate(BaseModel):
 
 class Department(BaseModel):
     department_code: str
+    student_count: Optional[int] = 0
     class Config:
         orm_mode = True
 
@@ -85,6 +91,7 @@ class Course(BaseModel):
     is_minor: Optional[bool] = False
     is_elective: Optional[bool] = False
     is_open_elective: Optional[bool] = False
+    is_add_course: Optional[bool] = False
     class Config:
         orm_mode = True
 
@@ -143,3 +150,18 @@ class TimetableSaveRequest(BaseModel):
     department_code: str
     semester: int
     entries: List[TimetableEntryCreate]
+
+class DepartmentVenueCreate(BaseModel):
+    department_code: str
+    venue_id: int
+
+class DepartmentVenueResponse(BaseModel):
+    id: int
+    department_code: str
+    venue_id: int
+    venue_name: Optional[str] = None
+    is_lab: Optional[bool] = False
+    capacity: Optional[int] = 60
+    
+    class Config:
+        orm_mode = True

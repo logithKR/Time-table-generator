@@ -23,10 +23,13 @@ import {
     ChevronLeft,
     ChevronRight,
     Search,
-    MapPin
+    MapPin,
+    Building2
 } from 'lucide-react';
 import TimetableEditor from './components/TimetableEditor';
 import Venues from './components/Venues';
+import VenueMapping from './components/VenueMapping';
+import DepartmentsManager from './components/DepartmentsManager';
 import BITTimetable from './components/BITTimetable';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -1058,7 +1061,7 @@ function App() {
         </div>
     );
 
-    const pageTitle = { dashboard: 'Timetable Generator', editor: 'Timetable Editor', print: 'Print View', timeslots: 'Time Slots', subjects: 'Course / Subject Details', faculty: 'Faculty Details', mappings: 'Course-Faculty Mappings', venues: 'Venues & Classrooms' };
+    const pageTitle = { dashboard: 'Timetable Generator', editor: 'Timetable Editor', print: 'Print View', timeslots: 'Time Slots', departments: 'Departments Setup', subjects: 'Course / Subject Details', faculty: 'Faculty Details', mappings: 'Course-Faculty Mappings', venues: 'Venues & Classrooms', venue_mappings: 'Department Venues' };
 
     const switchTab = (tab) => {
         setActiveTab(tab);
@@ -1099,11 +1102,13 @@ function App() {
                         { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
                         { id: 'editor', icon: Edit2, label: 'Editor' },
                         { id: 'print', icon: Download, label: 'Print View' },
+                        { id: 'departments', icon: Building2, label: 'Departments' },
                         { id: 'subjects', icon: BookOpen, label: 'Subjects' },
                         { id: 'faculty', icon: Users, label: 'Faculty' },
                         { id: 'mappings', icon: GraduationCap, label: 'Course-Faculty' },
                         { id: 'timeslots', icon: Clock, label: 'Time Slots' },
-                        { id: 'venues', icon: MapPin, label: 'Venues' }
+                        { id: 'venues', icon: MapPin, label: 'Venues' },
+                        { id: 'venue_mappings', icon: Layers, label: 'Venue Mapping' }
                     ].map(item => (
                         <button key={item.id} onClick={() => switchTab(item.id)}
                             title={isCollapsed ? item.label : ''}
@@ -1139,11 +1144,13 @@ function App() {
                     <div className="max-w-7xl mx-auto">
                         {activeTab === 'dashboard' && renderDashboard()}
                         {activeTab === 'editor' && renderEditorPage()}
+                        {activeTab === 'departments' && <DepartmentsManager />}
                         {activeTab === 'subjects' && renderSubjectsPage()}
                         {activeTab === 'faculty' && renderFacultyPage()}
                         {activeTab === 'mappings' && renderMappingsPage()}
                         {activeTab === 'timeslots' && renderSlotsPage()}
                         {activeTab === 'venues' && <Venues />}
+                        {activeTab === 'venue_mappings' && <VenueMapping />}
                         {/* New Print View Render */}
                         {activeTab === 'print' && renderPrintViewPage()}
                     </div>

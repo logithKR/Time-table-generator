@@ -5,6 +5,7 @@ class DepartmentMaster(Base):
     __tablename__ = "department_master"
     
     department_code = Column(String, primary_key=True)
+    student_count = Column(Integer, default=0, nullable=True)
 
 
 class FacultyMaster(Base):
@@ -44,6 +45,7 @@ class CourseMaster(Base):
     is_open_elective = Column(Boolean, default=False)
     is_honours = Column(Boolean, default=False)
     is_minor = Column(Boolean, default=False)
+    is_add_course = Column(Boolean, default=False)
 
 
 # Index for faster queries
@@ -111,3 +113,13 @@ class VenueMaster(Base):
 
 # Index for fast retrieval by dept/sem
 Index('idx_timetable_dept_sem', TimetableEntry.department_code, TimetableEntry.semester)
+
+class DepartmentVenueMap(Base):
+    __tablename__ = "department_venue_map"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    department_code = Column(String, ForeignKey('department_master.department_code'), nullable=False)
+    venue_id = Column(Integer, ForeignKey('venue_master.venue_id'), nullable=False)
+
+# Index for fast retrieval by dept
+Index('idx_dept_venue', DepartmentVenueMap.department_code, DepartmentVenueMap.venue_id)

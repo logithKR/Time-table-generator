@@ -33,6 +33,7 @@ export const createCourseFaculty = (data) => axios.post(`${API_URL}/course-facul
 export const createSlot = (data) => axios.post(`${API_URL}/slots`, data);
 
 // --- PUT (Update) ---
+export const updateDepartment = (code, data) => axios.put(`${API_URL}/departments/${code}`, data);
 export const updateSlot = (slotId, data) => axios.put(`${API_URL}/slots/${slotId}`, data);
 
 // --- DELETE ---
@@ -53,3 +54,12 @@ export const getVenues = () => axios.get(`${API_URL}/venues`);
 export const createVenue = (data) => axios.post(`${API_URL}/venues`, data);
 export const deleteVenue = (id) => axios.delete(`${API_URL}/venues/${id}`);
 export const importVenues = () => axios.post(`${API_URL}/venues/import`);
+
+// --- Department Venues ---
+export const getDepartmentVenues = (deptCode) => {
+    let url = `${API_URL}/department-venues`;
+    if (deptCode) url += `?department_code=${deptCode}`;
+    return axios.get(url);
+};
+export const mapVenueToDepartment = (data) => axios.post(`${API_URL}/department-venues`, data);
+export const removeVenueMapping = (id) => axios.delete(`${API_URL}/department-venues/${id}`);

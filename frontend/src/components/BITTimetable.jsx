@@ -84,7 +84,7 @@ const BITTimetable = ({ timetableData, department, semester, onRefresh }) => {
                             ? `<span style="font-size:8px;padding:0 4px;border-radius:4px;margin:4px auto 0;background-color:#e5e7eb;font-family:Arial,sans-serif;display:inline-block;">${cell.department_code || ''}</span>`
                             : '';
                         const venueBadge = cell.venue_name
-                            ? `<span style="font-size:8.5px;padding:0 4px;border-radius:4px;margin:2px auto 0;background-color:#fef3c7;color:#b45309;font-family:Arial,sans-serif;display:inline-block;font-weight:bold;">${cell.venue_name}</span>`
+                            ? `<span style="font-size:8.5px;padding:0 4px;border-radius:4px;margin:2px auto 0;background-color:#e0e7ff;color:#3730a3;font-family:Arial,sans-serif;display:inline-block;font-weight:bold;border:1px solid #c7d2fe;">${cell.venue_name}</span>`
                             : '';
                         return `<td style="border:1px solid black;padding:4px;text-align:center;vertical-align:middle;background-color:${bg};">
                             <div style="display:flex;flex-direction:column;gap:2px;justify-content:center;height:100%;">
@@ -335,7 +335,7 @@ body { background: white; color: black; font-family: 'Times New Roman', serif; }
                                                         <span className="font-bold text-[11px] block font-sans tracking-tight" style={{ color: '#000000' }}>{cell.course_code}</span>
                                                         <span className="text-[10px] font-semibold leading-tight block px-1 font-serif" style={{ color: '#000000' }}>{cell.course_name}</span>
                                                         <span className="text-[9px] block italic font-serif" style={{ color: '#4b5563' }}>{cell.faculty_name}</span>
-                                                        {cell.venue_name && <span className="text-[8.5px] px-1 rounded mx-auto mt-0.5 font-sans font-bold shadow-sm" style={{ backgroundColor: '#fef3c7', color: '#b45309', border: '1px solid #fde68a' }}>{cell.venue_name}</span>}
+                                                        {cell.venue_name && <span className="text-[8.5px] px-1 rounded mx-auto mt-0.5 font-sans font-bold shadow-sm" style={{ backgroundColor: '#e0e7ff', color: '#3730a3', border: '1px solid #c7d2fe' }}>{cell.venue_name}</span>}
                                                         {isMasterView && <span className="text-[8px] px-1 rounded mx-auto mt-1 font-sans" style={{ backgroundColor: '#e5e7eb', color: '#000000' }}>{cell.department_code}</span>}
                                                     </div>
                                                 ) : (

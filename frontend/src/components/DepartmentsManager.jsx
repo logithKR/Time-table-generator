@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { getDepartments, createDepartment, updateDepartment, deleteDepartment } from '../utils/api';
+import { getDepartments, createDepartment, updateDepartment, deleteDepartment, getDepartmentCapacities, upsertDepartmentCapacity } from '../utils/api';
 import { Building2, Plus, Pencil, Check, X, Trash2, Users } from 'lucide-react';
 
 const DepartmentsManager = () => {
     const [departments, setDepartments] = useState([]);
+    const [capacities, setCapacities] = useState({}); // { dept_code: [ {semester, student_count} ] }
     const [isAdding, setIsAdding] = useState(false);
 
     // Edit state
-    const [editingCode, setEditingCode] = useState(null);
+    const [editingDept, setEditingDept] = useState(null);
+    const [selectedSemester, setSelectedSemester] = useState(6);
     const [editCount, setEditCount] = useState('');
 
     useEffect(() => {
@@ -18,6 +20,15 @@ const DepartmentsManager = () => {
         try {
             const res = await getDepartments();
             setDepartments(res.data);
+
+            // Fetch capacities for all departments
+            const caps = {};
+            for (let d of res.data) {
+                const cRes = await getDepartmentCapacities(d.department_code);
+                caps[d.department_code] = cRes.data;
+            }
+            setCapacities(caps);
+
         } catch (err) {
             console.error("Failed to fetch departments", err);
         }
@@ -27,12 +38,11 @@ const DepartmentsManager = () => {
         e.preventDefault();
         const fd = new FormData(e.target);
         const code = fd.get('department_code').toUpperCase();
-        const count = fd.get('student_count') || 0;
 
         try {
             await createDepartment({
                 department_code: code,
-                student_count: parseInt(count)
+                student_count: 0
             });
             await fetchDepartments();
             setIsAdding(false);
@@ -42,13 +52,13 @@ const DepartmentsManager = () => {
         }
     };
 
-    const handleSaveEdit = async (code) => {
+    const handleSaveCapacity = async (code) => {
         try {
-            await updateDepartment(code, {
+            await upsertDepartmentCapacity(code, selectedSemester, {
                 student_count: parseInt(editCount) || 0
             });
             await fetchDepartments();
-            setEditingCode(null);
+            setEditingDept(null);
             setEditCount('');
         } catch (err) {
             alert(err.response?.data?.detail || err.message);
@@ -65,14 +75,23 @@ const DepartmentsManager = () => {
         }
     };
 
-    const startEdit = (dept) => {
-        setEditingCode(dept.department_code);
-        setEditCount(dept.student_count || 0);
+    const startEditCapacity = (deptCode) => {
+        setEditingDept(deptCode);
+        const currentCap = capacities[deptCode]?.find(c => c.semester === selectedSemester)?.student_count || 0;
+        setEditCount(currentCap);
     };
 
     const cancelEdit = () => {
-        setEditingCode(null);
+        setEditingDept(null);
         setEditCount('');
+    };
+
+    const handleSemesterChange = (deptCode, newSem) => {
+        setSelectedSemester(newSem);
+        if (editingDept === deptCode) {
+            const currentCap = capacities[deptCode]?.find(c => c.semester === newSem)?.student_count || 0;
+            setEditCount(currentCap);
+        }
     };
 
     return (
@@ -82,7 +101,7 @@ const DepartmentsManager = () => {
                     <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
                         <Building2 className="w-6 h-6 text-indigo-600" /> Department Manager
                     </h3>
-                    <p className="text-sm text-slate-500 mt-1">Manage departments and maximum student capacities.</p>
+                    <p className="text-sm text-slate-500 mt-1">Manage departments and semester-wise student capacities.</p>
                 </div>
 
                 <button
@@ -105,13 +124,6 @@ const DepartmentsManager = () => {
                             required
                             className="flex-1 p-2.5 border border-indigo-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400 focus:outline-none shadow-sm uppercase placeholder:normal-case"
                         />
-                        <input
-                            name="student_count"
-                            type="number"
-                            placeholder="Student Capacity (Optional)"
-                            min="0"
-                            className="flex-1 p-2.5 border border-indigo-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400 focus:outline-none shadow-sm"
-                        />
                         <div className="flex gap-2 shrink-0">
                             <button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-indigo-200 transition-all">Save</button>
                             <button type="button" onClick={() => setIsAdding(false)} className="bg-gray-100 hover:bg-gray-200 text-gray-600 px-4 py-2.5 rounded-xl text-sm font-medium transition-all">Cancel</button>
@@ -120,66 +132,80 @@ const DepartmentsManager = () => {
                 </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {departments.map(dept => (
-                    <div key={dept.department_code} className="bg-white rounded-2xl border border-indigo-100 shadow-sm hover:shadow-md transition-shadow p-5 relative group overflow-hidden">
-                        {/* Status decoration */}
-                        <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500"></div>
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                {departments.map(dept => {
+                    const deptCaps = capacities[dept.department_code] || [];
+                    const selectedCap = deptCaps.find(c => c.semester === selectedSemester)?.student_count || 0;
 
-                        <div className="flex justify-between items-start mb-4">
-                            <div>
-                                <h4 className="text-xl font-black text-slate-800 tracking-tight">
-                                    {dept.department_code}
-                                </h4>
-                                <p className="text-xs text-slate-400 font-medium">Department Code</p>
+                    return (
+                        <div key={dept.department_code} className="bg-white rounded-2xl border border-indigo-100 shadow-sm hover:shadow-md transition-shadow p-5 relative group overflow-hidden">
+                            <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500"></div>
+
+                            <div className="flex justify-between items-start mb-4">
+                                <div>
+                                    <h4 className="text-xl font-black text-slate-800 tracking-tight">
+                                        {dept.department_code}
+                                    </h4>
+                                    <p className="text-xs text-slate-400 font-medium">Department Code</p>
+                                </div>
+
+                                <button onClick={() => handleDelete(dept.department_code)} className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100" title="Delete Department">
+                                    <Trash2 className="w-4 h-4" />
+                                </button>
                             </div>
 
-                            <div className="flex gap-1">
-                                {editingCode !== dept.department_code ? (
-                                    <>
-                                        <button onClick={() => startEdit(dept)} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors" title="Edit Capacity">
-                                            <Pencil className="w-4 h-4" />
-                                        </button>
-                                        <button onClick={() => handleDelete(dept.department_code)} className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100" title="Delete Department">
-                                            <Trash2 className="w-4 h-4" />
-                                        </button>
-                                    </>
-                                ) : null}
+                            <div className="bg-slate-50 rounded-xl p-4 border border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                <div>
+                                    <div className="flex items-center text-sm font-medium text-slate-600 mb-1">
+                                        <Users className="w-4 h-4 mr-1.5" /> Semester Capacity
+                                    </div>
+                                    <select
+                                        className="text-sm p-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-200 outline-none bg-white font-medium text-slate-700"
+                                        value={selectedSemester}
+                                        onChange={(e) => handleSemesterChange(dept.department_code, parseInt(e.target.value))}
+                                    >
+                                        {[1, 2, 3, 4, 5, 6, 7, 8].map(s => (
+                                            <option key={s} value={s}>Semester {s}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div className="flex items-center justify-end">
+                                    {editingDept === dept.department_code ? (
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                type="number"
+                                                autoFocus
+                                                value={editCount}
+                                                onChange={(e) => setEditCount(e.target.value)}
+                                                className="w-24 p-2 text-sm border-2 border-indigo-300 rounded-lg focus:outline-none focus:ring-0 focus:border-indigo-500"
+                                                min="0"
+                                            />
+                                            <button onClick={() => handleSaveCapacity(dept.department_code)} className="bg-emerald-500 text-white hover:bg-emerald-600 p-2 rounded-lg transition-colors shadow-sm" title="Save">
+                                                <Check className="w-4 h-4" />
+                                            </button>
+                                            <button onClick={cancelEdit} className="bg-slate-200 text-slate-600 hover:bg-slate-300 p-2 rounded-lg transition-colors" title="Cancel">
+                                                <X className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center gap-3">
+                                            <div className="flex items-baseline">
+                                                <span className="text-3xl font-black text-indigo-700">
+                                                    {selectedCap}
+                                                </span>
+                                                <span className="text-xs text-slate-500 ml-1 font-medium">students</span>
+                                            </div>
+                                            <button onClick={() => startEditCapacity(dept.department_code)} className="p-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-lg transition-colors border border-indigo-100" title="Edit Capacity">
+                                                <Pencil className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </div>
-
-                        <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
-                            <div className="flex items-center text-sm font-medium text-slate-600 mb-2">
-                                <Users className="w-4 h-4 mr-1.5" /> Student Capacity
-                            </div>
-
-                            {editingCode === dept.department_code ? (
-                                <div className="flex items-center gap-2">
-                                    <input
-                                        type="number"
-                                        autoFocus
-                                        value={editCount}
-                                        onChange={(e) => setEditCount(e.target.value)}
-                                        className="w-24 p-1.5 text-sm border-2 border-indigo-300 rounded focus:outline-none focus:ring-0 focus:border-indigo-500"
-                                    />
-                                    <button onClick={() => handleSaveEdit(dept.department_code)} className="text-emerald-600 hover:bg-emerald-50 p-1.5 rounded transition-colors" title="Save">
-                                        <Check className="w-4 h-4" />
-                                    </button>
-                                    <button onClick={cancelEdit} className="text-slate-400 hover:bg-slate-100 p-1.5 rounded transition-colors" title="Cancel">
-                                        <X className="w-4 h-4" />
-                                    </button>
-                                </div>
-                            ) : (
-                                <div className="flex items-baseline">
-                                    <span className="text-2xl font-bold text-indigo-700">
-                                        {dept.student_count || 0}
-                                    </span>
-                                    <span className="text-xs text-slate-500 ml-1">students</span>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                ))}
+                    )
+                })}
 
                 {departments.length === 0 && !isAdding && (
                     <div className="col-span-full py-12 text-center text-slate-500 bg-white rounded-2xl border border-dashed border-slate-300">

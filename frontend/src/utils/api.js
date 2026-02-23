@@ -63,3 +63,17 @@ export const getDepartmentVenues = (deptCode) => {
 };
 export const mapVenueToDepartment = (data) => axios.post(`${API_URL}/department-venues`, data);
 export const removeVenueMapping = (id) => axios.delete(`${API_URL}/department-venues/${id}`);
+
+// --- Course Venue Mapping ---
+export const getCourseVenues = (deptCode) => {
+    let url = `${API_URL}/course-venues`;
+    if (deptCode) url += `?department_code=${deptCode}`;
+    return axios.get(url);
+};
+export const mapVenueToCourse = (data) => axios.post(`${API_URL}/course-venues`, data);
+export const removeCourseVenueMapping = (id) => axios.delete(`${API_URL}/course-venues/${id}`);
+
+// --- Department Semester Capacities ---
+export const getDepartmentCapacities = (deptCode) => axios.get(`${API_URL}/departments/${deptCode}/capacities`);
+export const upsertDepartmentCapacity = (deptCode, semester, data) =>
+    axios.post(`${API_URL}/departments/${deptCode}/capacities?semester=${semester}`, data);

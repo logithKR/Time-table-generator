@@ -129,6 +129,7 @@ class TimetableEntry(BaseModel):
     slot_id: int
     day_of_week: str
     period_number: int
+    venue_name: Optional[str] = None
     
     class Config:
         orm_mode = True
@@ -145,6 +146,7 @@ class TimetableEntryCreate(BaseModel):
     slot_id: int
     day_of_week: str
     period_number: int
+    venue_name: Optional[str] = None
 
 class TimetableSaveRequest(BaseModel):
     department_code: str
@@ -162,6 +164,35 @@ class DepartmentVenueResponse(BaseModel):
     venue_name: Optional[str] = None
     is_lab: Optional[bool] = False
     capacity: Optional[int] = 60
+    
+    class Config:
+        orm_mode = True
+
+class CourseVenueCreate(BaseModel):
+    department_code: str
+    course_code: str
+    venue_id: int
+
+class CourseVenueResponse(BaseModel):
+    id: int
+    department_code: str
+    course_code: str
+    venue_id: int
+    venue_name: Optional[str] = None
+    is_lab: Optional[bool] = False
+    capacity: Optional[int] = 60
+    
+    class Config:
+        orm_mode = True
+
+class DepartmentSemesterCountUpdate(BaseModel):
+    student_count: int
+
+class DepartmentSemesterCountResponse(BaseModel):
+    id: int
+    department_code: str
+    semester: int
+    student_count: int
     
     class Config:
         orm_mode = True

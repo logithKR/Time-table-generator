@@ -98,6 +98,7 @@ class TimetableEntry(Base):
     # Denormalized for easier querying
     day_of_week = Column(String)
     period_number = Column(Integer)
+    venue_name = Column(String, nullable=True) # Override venue specifically for this class
     
     created_at = Column(String)
 
@@ -123,3 +124,25 @@ class DepartmentVenueMap(Base):
 
 # Index for fast retrieval by dept
 Index('idx_dept_venue', DepartmentVenueMap.department_code, DepartmentVenueMap.venue_id)
+
+class DepartmentSemesterCount(Base):
+    __tablename__ = "department_semester_count"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    department_code = Column(String, ForeignKey('department_master.department_code'), nullable=False)
+    semester = Column(Integer, nullable=False)
+    student_count = Column(Integer, default=0, nullable=False)
+
+# Index for fast retrieval by dept/sem
+Index('idx_dept_sem_count', DepartmentSemesterCount.department_code, DepartmentSemesterCount.semester)
+
+class CourseVenueMap(Base):
+    __tablename__ = "course_venue_map"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    department_code = Column(String, ForeignKey('department_master.department_code'), nullable=False)
+    course_code = Column(String, ForeignKey('course_master.course_code'), nullable=False)
+    venue_id = Column(Integer, ForeignKey('venue_master.venue_id'), nullable=False)
+
+# Index for fast retrieval by course
+Index('idx_course_venue', CourseVenueMap.course_code, CourseVenueMap.venue_id)

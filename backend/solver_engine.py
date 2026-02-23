@@ -63,6 +63,18 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
     for d in day_periods:
         day_periods[d] = sorted(set(day_periods[d]))
 
+    # Pre-fetch course-specific venues
+    course_venues = db.query(models.CourseVenueMap).filter_by(department_code=department_code).all()
+    cv_lookup = {}
+    for cv in course_venues:
+        v = db.query(models.VenueMaster).filter_by(venue_id=cv.venue_id).first()
+        if v:
+            cv_lookup[cv.course_code] = v.venue_name
+            day_periods[s.day_of_week] = []
+        day_periods[s.day_of_week].append(s.period_number)
+    for d in day_periods:
+        day_periods[d] = sorted(set(day_periods[d]))
+
     lab_block_starts = [1, 3, 5]
     mentor_day_clean = mentor_day.strip().capitalize()
 
@@ -372,6 +384,7 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
         fid = fids[0][0] if fids else None
         fname = fids[0][1] if fids else None
         cname = course_names.get(c.course_code, c.course_code)
+        c_venue = cv_lookup.get(c.course_code)
 
         for day in all_days:
             for period in day_periods.get(day, []):
@@ -386,6 +399,7 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                             session_type='THEORY',
                             slot_id=slot_obj.slot_id,
                             day_of_week=day, period_number=period,
+                            venue_name=c_venue,
                             created_at="now"
                         )
                         db.add(entry)
@@ -400,6 +414,7 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
         fid = fids[0][0] if fids else None
         fname = fids[0][1] if fids else None
         cname = course_names.get(c.course_code, c.course_code)
+        c_venue = cv_lookup.get(c.course_code)
 
         for day in all_days:
             for bs in lab_block_starts:
@@ -415,6 +430,7 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                                 session_type='LAB',
                                 slot_id=slot_obj.slot_id,
                                 day_of_week=day, period_number=p,
+                                venue_name=c_venue,
                                 created_at="now"
                             )
                             db.add(entry)
@@ -439,13 +455,14 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
             fname = fids[0][1] if fids else None
             cname = course_names.get(c.course_code, c.course_code)
             total = c.weekly_sessions or (course_theory_count[c.course_code] + course_lab_blocks[c.course_code] * 2)
+            c_venue = cv_lookup.get(c.course_code)
             
             queue = []
             for _ in range(total):
                 queue.append({
                     'course_code': c.course_code, 'course_name': cname,
                     'faculty_id': fid, 'faculty_name': fname,
-                    'session_type': 'THEORY'
+                    'session_type': 'THEORY', 'venue_name': c_venue
                 })
             if queue:
                 course_queues.append(queue)
@@ -470,6 +487,7 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                 session_type=hs['session_type'],
                 slot_id=slot_obj.slot_id,
                 day_of_week=day, period_number=period,
+                venue_name=hs['venue_name'],
                 created_at="now"
             )
             db.add(entry)
@@ -549,6 +567,7 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
             fids = course_faculty.get(mp.course_code, [])
             fid = fids[0][0] if fids else None
             fname = fids[0][1] if fids else None
+            c_venue = cv_lookup.get(mp.course_code)
             
             for p in [p1, p2]:
                 slot_obj = slot_lookup.get((day, p))
@@ -560,6 +579,7 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                         session_type='LAB',
                         slot_id=slot_obj.slot_id,
                         day_of_week=day, period_number=p,
+                        venue_name=c_venue,
                         created_at="now"
                     ))
                     filled_slots.add((day, p))
@@ -590,6 +610,7 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                 fids = course_faculty.get(c.course_code, [])
                 fid = fids[0][0] if fids else None
                 fname = fids[0][1] if fids else None
+                c_venue = cv_lookup.get(c.course_code)
                 
                 for p in [p1, p2]:
                     slot_obj = slot_lookup.get((day, p))
@@ -601,6 +622,7 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                             session_type='LAB',
                             slot_id=slot_obj.slot_id,
                             day_of_week=day, period_number=p,
+                            venue_name=c_venue,
                             created_at="now"
                         ))
                         filled_slots.add((day, p))
@@ -631,6 +653,7 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                 fids = course_faculty.get(c.course_code, [])
                 fid = fids[0][0] if fids else None
                 fname = fids[0][1] if fids else None
+                c_venue = cv_lookup.get(c.course_code)
                 
                 slot_obj = slot_lookup.get((day, p))
                 if slot_obj:
@@ -641,6 +664,7 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                         session_type='THEORY',
                         slot_id=slot_obj.slot_id,
                         day_of_week=day, period_number=p,
+                        venue_name=c_venue,
                         created_at="now"
                     ))
                     filled_slots.add((day, p))
@@ -671,6 +695,7 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                 fids = course_faculty.get(c.course_code, [])
                 fid = fids[0][0] if fids else None
                 fname = fids[0][1] if fids else None
+                c_venue = cv_lookup.get(c.course_code)
                 
                 slot_obj = slot_lookup.get((day, p))
                 if slot_obj:
@@ -681,6 +706,7 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                         session_type='THEORY',
                         slot_id=slot_obj.slot_id,
                         day_of_week=day, period_number=p,
+                        venue_name=c_venue,
                         created_at="now"
                     ))
                     filled_slots.add((day, p))

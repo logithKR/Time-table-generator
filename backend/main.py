@@ -60,6 +60,43 @@ def update_department(code: str, req: schemas.DepartmentUpdate, db: Session = De
     db.refresh(dept)
     return dept
 
+@app.get("/departments/{code}/capacities", response_model=List[schemas.DepartmentSemesterCountResponse])
+def get_department_capacities(code: str, db: Session = Depends(get_db)):
+    dept = db.query(models.DepartmentMaster).filter_by(department_code=code).first()
+    if not dept:
+        raise HTTPException(status_code=404, detail="Department not found")
+    
+    return db.query(models.DepartmentSemesterCount).filter_by(department_code=code).order_by(models.DepartmentSemesterCount.semester).all()
+
+@app.post("/departments/{code}/capacities", response_model=schemas.DepartmentSemesterCountResponse)
+def upsert_department_capacity(
+    code: str, 
+    semester: int, 
+    req: schemas.DepartmentSemesterCountUpdate, 
+    db: Session = Depends(get_db)
+):
+    dept = db.query(models.DepartmentMaster).filter_by(department_code=code).first()
+    if not dept:
+        raise HTTPException(status_code=404, detail="Department not found")
+    
+    record = db.query(models.DepartmentSemesterCount).filter_by(
+        department_code=code, semester=semester
+    ).first()
+    
+    if record:
+        record.student_count = req.student_count
+    else:
+        record = models.DepartmentSemesterCount(
+            department_code=code,
+            semester=semester,
+            student_count=req.student_count
+        )
+        db.add(record)
+        
+    db.commit()
+    db.refresh(record)
+    return record
+
 @app.delete("/departments/{code}")
 def delete_department(code: str, db: Session = Depends(get_db)):
     dept = db.query(models.DepartmentMaster).filter_by(department_code=code).first()
@@ -506,6 +543,68 @@ def create_department_venue(req: schemas.DepartmentVenueCreate, db: Session = De
 @app.delete("/department-venues/{map_id}")
 def delete_department_venue(map_id: int, db: Session = Depends(get_db)):
     m = db.query(models.DepartmentVenueMap).filter_by(id=map_id).first()
+    if not m:
+        raise HTTPException(status_code=404, detail="Mapping not found")
+    db.delete(m)
+    db.commit()
+    return {"status": "success", "id": map_id}
+
+# --- Course Venue Mapping ---
+@app.get("/course-venues", response_model=List[schemas.CourseVenueResponse])
+def get_course_venues(department_code: str = None, db: Session = Depends(get_db)):
+    query = db.query(models.CourseVenueMap)
+    if department_code:
+        query = query.filter(models.CourseVenueMap.department_code == department_code)
+    
+    maps = query.all()
+    result = []
+    for m in maps:
+        venue = db.query(models.VenueMaster).filter_by(venue_id=m.venue_id).first()
+        if venue:
+            result.append(schemas.CourseVenueResponse(
+                id=m.id,
+                department_code=m.department_code,
+                course_code=m.course_code,
+                venue_id=venue.venue_id,
+                venue_name=venue.venue_name,
+                is_lab=venue.is_lab,
+                capacity=venue.capacity
+            ))
+    return result
+
+@app.post("/course-venues", response_model=schemas.CourseVenueResponse)
+def create_course_venue(req: schemas.CourseVenueCreate, db: Session = Depends(get_db)):
+    existing = db.query(models.CourseVenueMap).filter_by(
+        department_code=req.department_code,
+        course_code=req.course_code,
+        venue_id=req.venue_id
+    ).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="This venue is already mapped to the course.")
+    
+    new_map = models.CourseVenueMap(
+        department_code=req.department_code, 
+        course_code=req.course_code, 
+        venue_id=req.venue_id
+    )
+    db.add(new_map)
+    db.commit()
+    db.refresh(new_map)
+    
+    venue = db.query(models.VenueMaster).filter_by(venue_id=req.venue_id).first()
+    return schemas.CourseVenueResponse(
+        id=new_map.id,
+        department_code=new_map.department_code,
+        course_code=new_map.course_code,
+        venue_id=venue.venue_id,
+        venue_name=venue.venue_name,
+        is_lab=venue.is_lab,
+        capacity=venue.capacity
+    )
+
+@app.delete("/course-venues/{map_id}")
+def delete_course_venue(map_id: int, db: Session = Depends(get_db)):
+    m = db.query(models.CourseVenueMap).filter_by(id=map_id).first()
     if not m:
         raise HTTPException(status_code=404, detail="Mapping not found")
     db.delete(m)

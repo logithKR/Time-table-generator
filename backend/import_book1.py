@@ -101,7 +101,7 @@ def import_book1_data():
         is_honours = 'HONOURS' in course_type
         is_minor = 'MINOR' in course_type
         is_elective = 'ELECTIVE' in course_type
-        is_open_elective = 'OPEN ELECTIVE' in course_type
+        is_open_elective = 'OPEN ELECTIVE' in course_type or (len(course_code) > 2 and course_code[2].upper() == 'O')
         is_add_course = 'ADD COURSE' in course_type
 
         course = db.query(models.CourseMaster).filter_by(course_code=course_code).first()
@@ -134,6 +134,7 @@ def import_book1_data():
             course.is_honours = is_honours
             course.is_minor = is_minor
             course.is_elective = is_elective
+            course.is_open_elective = is_open_elective
             db.commit()
 
         # 4. Course Faculty Map (Only if faculty provided)

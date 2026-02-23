@@ -25,7 +25,7 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
     # 1. FETCH DATA
     # =========================================================
     courses = db.query(models.CourseMaster).filter_by(
-        department_code=department_code, semester=semester
+        department_code=department_code, semester=semester, is_open_elective=False
     ).all()
     slots = db.query(models.SlotMaster).filter_by(is_active=True).all()
 
@@ -523,64 +523,30 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                 single_frees.append((day, periods[i]))
                 i += 1
                 
-    # 2. Identify Mini Projects and Highest Credit Courses
+    # 2. Organize Courses by Category
     mini_projects = [c for c in courses if "mini project" in (c.course_name or "").lower()]
+    core_courses = [c for c in courses if not c.is_elective and c not in mini_projects]
+    elective_courses = [c for c in courses if c.is_elective and c not in mini_projects]
     
-    highest_credits = 0
-    if courses:
-        highest_credits = max((c.credits or 0) for c in courses)
-    high_credit_courses = [c for c in courses if (c.credits or 0) == highest_credits and c not in mini_projects]
+    # Sort electives by descending credits
+    elective_courses.sort(key=lambda x: x.credits or 0, reverse=True)
     
-    # 3. Assign Mini Projects to 2-period blocks first
-    for mp in mini_projects:
-        if not free_blocks_2:
-            break # No more free 2-blocks available
-            
-        fids = course_faculty.get(mp.course_code, [])
-        fid = fids[0][0] if fids else None
-        fname = fids[0][1] if fids else None
-        
-        # Pop the first available 2-period block
-        day, p1, p2 = free_blocks_2.pop(0)
-        
-        for p in [p1, p2]:
-            slot_obj = slot_lookup.get((day, p))
-            if slot_obj:
-                db.add(models.TimetableEntry(
-                    department_code=department_code, semester=semester,
-                    course_code=mp.course_code, course_name=mp.course_name,
-                    faculty_id=fid, faculty_name=fname,
-                    session_type='LAB',
-                    slot_id=slot_obj.slot_id,
-                    day_of_week=day, period_number=p,
-                    created_at="now"
-                ))
-                filled_slots.add((day, p))
-                count += 1
-                
-    # 4. Process remaining free blocks for High-Credit courses
-    # Check if a specific day already has a LAB session assigned to ANY course
+    daily_extra_counts = {c.course_code: {d: 0 for d in all_days} for c in courses}
+    weekly_extra_counts = {c.course_code: 0 for c in courses}
+    
+    # Helper to check if a day has a LAB for any course
     def day_has_lab(target_day):
-        # We check the database session objects we've staged or the current state
-        # the quickest way given our `filled_slots` structure is to reconstruct it:
-        # Actually, simpler: in this generation run, we can look through what we've staged to `db`
         for entry in db.new:
             if isinstance(entry, models.TimetableEntry) and entry.day_of_week == target_day and entry.session_type == 'LAB':
                 return True
         return False
 
-    high_idx = 0
-    
-    # First, handle remaining 2-period blocks
-    for day, p1, p2 in list(free_blocks_2):  # iterate over a copy
-        if high_idx >= len(high_credit_courses):
-            break
-            
-        # Check if the ENTIRE DAY has NO lab
-        if not day_has_lab(day):
-            # SAFE to assign 2-period block as LAB
-            hc = high_credit_courses[high_idx]
-            fids = course_faculty.get(hc.course_code, [])
+    # 3. Assign Mini Projects to 2-period blocks first (Max 4 periods / 2 blocks)
+    for mp in mini_projects:
+        while free_blocks_2 and weekly_extra_counts[mp.course_code] < 4:
+            day, p1, p2 = free_blocks_2.pop(0)
+
+            fids = course_faculty.get(mp.course_code, [])
             fid = fids[0][0] if fids else None
             fname = fids[0][1] if fids else None
             
@@ -589,7 +555,7 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                 if slot_obj:
                     db.add(models.TimetableEntry(
                         department_code=department_code, semester=semester,
-                        course_code=hc.course_code, course_name=hc.course_name,
+                        course_code=mp.course_code, course_name=mp.course_name,
                         faculty_id=fid, faculty_name=fname,
                         session_type='LAB',
                         slot_id=slot_obj.slot_id,
@@ -598,57 +564,152 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                     ))
                     filled_slots.add((day, p))
                     count += 1
+                    weekly_extra_counts[mp.course_code] += 1
+                    daily_extra_counts[mp.course_code][day] += 1
                     
-            high_idx += 1
-            free_blocks_2.remove((day, p1, p2))
-        else:
-            # Day has a lab. Break the 2-period block into two single periods
-            free_blocks_2.remove((day, p1, p2))
-            single_frees.extend([(day, p1), (day, p2)])
-
-    # 5. Handle all remaining Single Periods for High-Credit courses
-    for day, p in single_frees:
-        if high_idx >= len(high_credit_courses):
-            break
+    def fill_remaining_slots(target_courses):
+        nonlocal count
+        if not target_courses:
+            return
             
-        hc = high_credit_courses[high_idx]
-        fids = course_faculty.get(hc.course_code, [])
-        fid = fids[0][0] if fids else None
-        fname = fids[0][1] if fids else None
+        idx = 0
+        consecutive_failures = 0
         
-        slot_obj = slot_lookup.get((day, p))
-        if slot_obj:
-            db.add(models.TimetableEntry(
-                department_code=department_code, semester=semester,
-                course_code=hc.course_code, course_name=hc.course_name,
-                faculty_id=fid, faculty_name=fname,
-                session_type='THEORY',
-                slot_id=slot_obj.slot_id,
-                day_of_week=day, period_number=p,
-                created_at="now"
-            ))
-            filled_slots.add((day, p))
-            count += 1
-        
-        high_idx += 1
-
-    # --- Fill OPEN ELECTIVE for remaining empty slots ---
-    for day in all_days:
-        for period in day_periods.get(day, []):
-            if (day, period) not in filled_slots:
-                slot_obj = slot_lookup.get((day, period))
+        # 4. Fill remaining 2-period blocks
+        while free_blocks_2 and consecutive_failures < len(target_courses):
+            c = target_courses[idx % len(target_courses)]
+            idx += 1
+            
+            day, p1, p2 = free_blocks_2[0]
+            
+            # Check limits: 2 periods added -> daily + 2, weekly + 2
+            if weekly_extra_counts[c.course_code] <= 1 and daily_extra_counts[c.course_code][day] == 0 and not day_has_lab(day):
+                free_blocks_2.pop(0)
+                consecutive_failures = 0
+                
+                fids = course_faculty.get(c.course_code, [])
+                fid = fids[0][0] if fids else None
+                fname = fids[0][1] if fids else None
+                
+                for p in [p1, p2]:
+                    slot_obj = slot_lookup.get((day, p))
+                    if slot_obj:
+                        db.add(models.TimetableEntry(
+                            department_code=department_code, semester=semester,
+                            course_code=c.course_code, course_name=c.course_name,
+                            faculty_id=fid, faculty_name=fname,
+                            session_type='LAB',
+                            slot_id=slot_obj.slot_id,
+                            day_of_week=day, period_number=p,
+                            created_at="now"
+                        ))
+                        filled_slots.add((day, p))
+                        count += 1
+                        weekly_extra_counts[c.course_code] += 1
+                        daily_extra_counts[c.course_code][day] += 1
+            else:
+                consecutive_failures += 1
+                
+        # If any 2-period blocks couldn't be filled safely, break them into singles
+        while free_blocks_2:
+            day, p1, p2 = free_blocks_2.pop(0)
+            single_frees.extend([(day, p1), (day, p2)])
+            
+        # 5. Fill single periods
+        idx = 0
+        consecutive_failures = 0
+        while single_frees and consecutive_failures < len(target_courses):
+            c = target_courses[idx % len(target_courses)]
+            idx += 1
+            
+            day, p = single_frees[0]
+            
+            if weekly_extra_counts[c.course_code] < 3 and daily_extra_counts[c.course_code][day] < 2:
+                single_frees.pop(0)
+                consecutive_failures = 0
+                
+                fids = course_faculty.get(c.course_code, [])
+                fid = fids[0][0] if fids else None
+                fname = fids[0][1] if fids else None
+                
+                slot_obj = slot_lookup.get((day, p))
                 if slot_obj:
-                    entry = models.TimetableEntry(
+                    db.add(models.TimetableEntry(
                         department_code=department_code, semester=semester,
-                        course_code='OPEN_ELEC', course_name='Open Elective',
-                        faculty_id=None, faculty_name=None,
-                        session_type='OPEN_ELECTIVE',
+                        course_code=c.course_code, course_name=c.course_name,
+                        faculty_id=fid, faculty_name=fname,
+                        session_type='THEORY',
                         slot_id=slot_obj.slot_id,
-                        day_of_week=day, period_number=period,
+                        day_of_week=day, period_number=p,
                         created_at="now"
-                    )
-                    db.add(entry)
+                    ))
+                    filled_slots.add((day, p))
                     count += 1
+                    weekly_extra_counts[c.course_code] += 1
+                    daily_extra_counts[c.course_code][day] += 1
+            else:
+                consecutive_failures += 1
+
+    # Apply to Core Courses first
+    fill_remaining_slots(core_courses)
+    
+    # If slots still remain, apply to Elective Courses (sorted by credits)
+    if free_blocks_2 or single_frees:
+        fill_remaining_slots(elective_courses)
+        
+    # Absolute Fallback: Zero Free Slots Allowed
+    if free_blocks_2 or single_frees:
+        while free_blocks_2:
+            day, p1, p2 = free_blocks_2.pop(0)
+            single_frees.extend([(day, p1), (day, p2)])
+        
+        idx = 0
+        fallback_courses = core_courses or elective_courses or courses
+        if fallback_courses:
+            for day, p in single_frees:
+                c = fallback_courses[idx % len(fallback_courses)]
+                fids = course_faculty.get(c.course_code, [])
+                fid = fids[0][0] if fids else None
+                fname = fids[0][1] if fids else None
+                
+                slot_obj = slot_lookup.get((day, p))
+                if slot_obj:
+                    db.add(models.TimetableEntry(
+                        department_code=department_code, semester=semester,
+                        course_code=c.course_code, course_name=c.course_name,
+                        faculty_id=fid, faculty_name=fname,
+                        session_type='THEORY',
+                        slot_id=slot_obj.slot_id,
+                        day_of_week=day, period_number=p,
+                        created_at="now"
+                    ))
+                    filled_slots.add((day, p))
+                    count += 1
+                idx += 1
+
+    # =========================================================
+    # 8. OPEN ELECTIVE MERGING
+    # =========================================================
+    # Check if ANY open elective exists globally for this semester
+    global_oe = db.query(models.CourseMaster).filter_by(semester=semester, is_open_elective=True).first()
+    
+    if global_oe:
+        # Find the highest numbered elective in the current department's scheduled courses
+        dept_electives = [c for c in courses if c.is_elective]
+        if dept_electives:
+            def get_elective_num(c):
+                import re
+                m = re.search(r'\d+', c.course_name or c.course_code)
+                return int(m.group()) if m else 0
+            
+            dept_electives.sort(key=get_elective_num, reverse=True)
+            highest_elective = dept_electives[0]
+            
+            # Find all entries for this highest elective and update the name
+            for entry in db.new:
+                if isinstance(entry, models.TimetableEntry) and entry.course_code == highest_elective.course_code:
+                    if "OPEN ELECTIVE" not in str(entry.course_name).upper():
+                        entry.course_name = f"{entry.course_name} / OPEN ELECTIVE"
 
     db.commit()
     print(f"💾 Saved {count} timetable entries.")

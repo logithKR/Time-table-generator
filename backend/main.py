@@ -310,7 +310,7 @@ def generate_timetable(request: schemas.GenerateRequest, db: Session = Depends(g
         return {"status": "success", "message": "Timetable generated successfully"}
     else:
         courses = db.query(models.CourseMaster).filter_by(
-            department_code=request.department_code, semester=request.semester
+            department_code=request.department_code, semester=request.semester, is_open_elective=False
         ).all()
         if not courses:
             raise HTTPException(status_code=400, detail=f"No courses found for {request.department_code} Sem {request.semester}. Check data import.")

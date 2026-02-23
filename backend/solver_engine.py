@@ -298,8 +298,8 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
             if not fid or str(fid).lower() in ['nan', 'none']: 
                 continue # Skip faculty clash check if no real faculty ID
             if fid not in faculty_courses_map:
-                faculty_courses_map[fid] = []
-            faculty_courses_map[fid].append(c.course_code)
+                faculty_courses_map[fid] = set()
+            faculty_courses_map[fid].add(c.course_code)
 
     for fid, taught_codes in faculty_courses_map.items():
         if len(taught_codes) <= 1:
@@ -725,15 +725,19 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
         if dept_electives:
             def get_elective_num(c):
                 import re
+                m = re.search(r'\d+', c.course_category or "")
+                if m: return int(m.group())
                 m = re.search(r'\d+', c.course_name or c.course_code)
                 return int(m.group()) if m else 0
             
             dept_electives.sort(key=get_elective_num, reverse=True)
             highest_elective = dept_electives[0]
             
-            # Find all entries for this highest elective and update the name
+            # Find all entries for this highest elective and update the name/code
             for entry in db.new:
                 if isinstance(entry, models.TimetableEntry) and entry.course_code == highest_elective.course_code:
+                    if "OPEN ELECTIVE" not in str(entry.course_code).upper():
+                        entry.course_code = f"{entry.course_code} / OE"
                     if "OPEN ELECTIVE" not in str(entry.course_name).upper():
                         entry.course_name = f"{entry.course_name} / OPEN ELECTIVE"
 

@@ -748,9 +748,8 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
             for entry in db.new:
                 if isinstance(entry, models.TimetableEntry) and entry.course_code == highest_elective.course_code:
                     if "OPEN ELECTIVE" not in str(entry.course_code).upper():
-                        entry.course_code = f"{entry.course_code} / OE"
-                    if "OPEN ELECTIVE" not in str(entry.course_name).upper():
-                        entry.course_name = f"{entry.course_name} / OPEN ELECTIVE"
+                        entry.course_code = f"{entry.course_code} / OPEN ELECTIVE"
+                    # Leave course_name intact so it doesn't double-print in the UI
 
     db.commit()
     print(f"💾 Saved {count} timetable entries.")

@@ -575,6 +575,9 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
     empty_by_day = {day: [] for day in all_days}
     for day in all_days:
         for p in day_periods.get(day, []):
+            # Exclude P8 from extra credit filling unless explicitly required for overload
+            if p == 8 and not use_p8_for_regular:
+                continue
             if (day, p) not in filled_slots:
                 empty_by_day[day].append(p)
     

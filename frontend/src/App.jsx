@@ -301,7 +301,7 @@ function App() {
                                     const entry = timetableEntries.find(t => t.day_of_week === day && t.period_number === p);
                                     if (isLabStart(day, p)) {
                                         skipNext = true;
-                                        cells.push(<td key={p} colSpan={2} className="p-2 border border-gray-300 text-center align-middle h-20" style={{ backgroundColor: '#FEF9C3' }}><div className="flex flex-col justify-center h-full"><div className="font-bold text-amber-900 text-xs">{entry.course_code}</div><div className="text-[10px] text-amber-800 mt-0.5 font-medium">{entry.course_name || ''}</div><div className="text-[10px] text-amber-700 mt-0.5 italic">{entry.faculty_name || ''}</div><div className="text-[9px] text-amber-600 mt-0.5 font-medium">LAB</div></div></td>);
+                                        cells.push(<td key={p} colSpan={2} className="p-2 border border-gray-300 text-center align-middle h-20" style={{ backgroundColor: '#FEF9C3' }}><div className="flex flex-col justify-center h-full"><div className="font-bold text-amber-900 text-xs">{entry.course_code}</div><div className="text-[10px] text-amber-800 mt-0.5 font-medium">{entry.course_name || ''}</div><div className="text-[10px] text-amber-700 mt-0.5 italic">{entry.faculty_name || ''}</div>{entry.venue_name && <div className="text-[8.5px] px-1 rounded border border-amber-300 bg-amber-100 font-bold text-amber-900 mt-0.5 mx-auto">{entry.venue_name}</div>}</div></td>);
                                         return;
                                     }
                                     if (isLabEnd(day, p)) return;
@@ -314,7 +314,7 @@ function App() {
                                         cells.push(<td key={p} className="p-2 border border-gray-300 text-center align-middle h-20 bg-gray-100"><div className="flex flex-col justify-center h-full"><div className="font-bold text-gray-600 text-xs">OPEN</div><div className="text-xs text-gray-500">ELECTIVE</div></div></td>);
                                         return;
                                     }
-                                    cells.push(<td key={p} className="p-2 border border-gray-300 text-center align-middle h-20 hover:bg-blue-50 transition-colors"><div className="flex flex-col justify-center h-full"><div className="font-bold text-blue-800 text-xs">{entry.course_code}</div><div className="text-[10px] text-blue-600 mt-0.5 line-clamp-2">{entry.course_name || ''}</div><div className="text-[10px] text-gray-500 mt-0.5 italic">{entry.faculty_name || ''}</div></div></td>);
+                                    cells.push(<td key={p} className="p-2 border border-gray-300 text-center align-middle h-20 hover:bg-blue-50 transition-colors"><div className="flex flex-col justify-center h-full"><div className="font-bold text-blue-800 text-xs">{entry.course_code}</div><div className="text-[10px] text-blue-600 mt-0.5 line-clamp-2">{entry.course_name || ''}</div><div className="text-[10px] text-gray-500 mt-0.5 italic">{entry.faculty_name || ''}</div>{entry.venue_name && <div className="text-[8.5px] px-1 rounded border border-indigo-200 bg-indigo-50 font-bold text-indigo-700 mt-0.5 mx-auto">{entry.venue_name}</div>}</div></td>);
                                 });
                                 return (<tr key={day}><td className="p-2 border border-gray-300 font-bold text-gray-700 bg-gray-50 sticky left-0 z-10 text-xs">{day.substring(0, 3).toUpperCase()}</td>{cells}</tr>);
                             })}

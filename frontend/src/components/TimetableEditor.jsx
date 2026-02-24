@@ -122,12 +122,19 @@ const CellContent = ({ entry, cellId, isLabStart, isSwapMode, isSelected, onClic
                         )}
                     </div>
                     <div className="text-[10px] leading-tight opacity-70 font-medium w-full whitespace-pre-wrap break-words" title={entry.course_name}>{entry.course_name || ''}</div>
-                    {entry.faculty_name && entry.faculty_name !== 'Unassigned' && (
-                        <div className="text-[9px] mt-auto flex items-center gap-1 opacity-70 border-t border-current/10 pt-1.5 font-semibold w-full">
-                            <Users2 className="w-2.5 h-2.5 opacity-80" />
-                            <span className="truncate">{entry.faculty_name}</span>
-                        </div>
-                    )}
+                    <div className="mt-auto pt-1.5 flex flex-col gap-1 w-full border-t border-current/10">
+                        {entry.venue_name && (
+                            <div className="text-[8.5px] flex items-center gap-1 font-bold text-indigo-700 bg-indigo-50/80 px-1 py-0.5 rounded border border-indigo-200 w-fit">
+                                <span className="truncate">{entry.venue_name}</span>
+                            </div>
+                        )}
+                        {entry.faculty_name && entry.faculty_name !== 'Unassigned' && (
+                            <div className="text-[9px] flex items-center gap-1 opacity-70 font-semibold w-full">
+                                <Users2 className="w-2.5 h-2.5 opacity-80" />
+                                <span className="truncate">{entry.faculty_name}</span>
+                            </div>
+                        )}
+                    </div>
                 </>
             )}
         </div>

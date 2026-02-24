@@ -42,10 +42,14 @@ const BITTimetable = ({ timetableData, department, semester, onRefresh }) => {
             "THU": "Thursday", "FRI": "Friday", "SAT": "Saturday"
         };
         const dbDay = displayToDbDay[day] || day;
-        return timetableData.find(t =>
+        const found = timetableData.find(t =>
             t.day_of_week?.toLowerCase() === dbDay.toLowerCase() &&
             parseInt(t.period_number) === targetPeriod
         );
+        if (found && day === 'THU' && targetPeriod === 4) {
+            console.log("DEBUG FRONTEND CELL", found);
+        }
+        return found;
     }, [timetableData]);
 
     // --- PDF Download: render in isolated iframe, capture, remove ---

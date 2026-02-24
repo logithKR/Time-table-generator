@@ -605,12 +605,16 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
         i = 0
         while i < len(periods):
             if i < len(periods) - 1 and periods[i+1] == periods[i] + 1:
-                # We found a continuous 2-period block
-                free_blocks_2.append((day, periods[i], periods[i+1]))
-                i += 2
-            else:
-                single_frees.append((day, periods[i]))
-                i += 1
+                # We found mathematically consecutive periods, but we must verify visually contiguous (no break)
+                s1 = slot_lookup.get((day, periods[i]))
+                s2 = slot_lookup.get((day, periods[i+1]))
+                if s1 and s2 and s1.end_time == s2.start_time:
+                    # Purely contiguous without any lunch or tea breaks jumping between them
+                    free_blocks_2.append((day, periods[i], periods[i+1]))
+                    i += 2
+                    continue
+            single_frees.append((day, periods[i]))
+            i += 1
                 
     # 2. Organize Courses by Category
     mini_projects = [c for c in courses if "mini project" in (c.course_name or "").lower()]

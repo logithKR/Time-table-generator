@@ -53,10 +53,10 @@ const Legend = () => (
 );
 
 // ─── Draggable Course Chip (Palette) ───
-const CourseChip = ({ course, colorStyle, facultyName }) => {
+const CourseChip = ({ course, colorStyle, facultyName, venueName }) => {
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
         id: `palette-${course.course_code}`,
-        data: { type: 'new', course, facultyName }
+        data: { type: 'new', course, facultyName, venueName }
     });
     const style = transform ? { transform: CSS.Translate.toString(transform), zIndex: 1000 } : undefined;
 
@@ -68,6 +68,13 @@ const CourseChip = ({ course, colorStyle, facultyName }) => {
                 <span className="font-bold text-xs whitespace-nowrap tracking-tight">{course.course_code}</span>
             </div>
             <div className="text-[10px] opacity-70 truncate max-w-[140px] leading-tight font-medium tracking-wide">{course.course_name}</div>
+
+            {venueName && (
+                <div className="text-[8.5px] font-bold mt-1 text-indigo-700 bg-indigo-50/50 px-1 py-0.5 rounded border border-indigo-200 w-fit truncate max-w-full">
+                    {venueName}
+                </div>
+            )}
+
             {course.is_lab && <span className="text-[9px] font-bold opacity-60 block mt-1 tracking-wider uppercase text-amber-800">2 Periods</span>}
         </div>
     );
@@ -121,7 +128,9 @@ const CellContent = ({ entry, cellId, isLabStart, isSwapMode, isSelected, onClic
                             <FlaskConical className="w-3 h-3 opacity-40 shrink-0 ml-1 fill-current" />
                         )}
                     </div>
+
                     <div className="text-[10px] leading-tight opacity-70 font-medium w-full whitespace-pre-wrap break-words" title={entry.course_name}>{entry.course_name || ''}</div>
+
                     <div className="mt-auto pt-1.5 flex flex-col gap-1 w-full border-t border-current/10">
                         {entry.venue_name && (
                             <div className="text-[8.5px] flex items-center gap-1 font-bold text-indigo-700 bg-indigo-50/80 px-1 py-0.5 rounded border border-indigo-200 w-fit">
@@ -205,7 +214,7 @@ const DroppableGridCellSpan = ({ id, colSpan, entry, isLabStart, onDelete, isSwa
 
 const ManualEntryModal = ({ isOpen, onClose, onSave, initialData }) => {
     if (!isOpen) return null;
-    const [formData, setFormData] = useState(initialData || { course_code: '', course_name: '', faculty_name: '' });
+    const [formData, setFormData] = useState(initialData || { course_code: '', course_name: '', faculty_name: '', venue_name: '' });
 
     const handleSubmit = (e) => {
         e.preventDefault();
@@ -231,7 +240,12 @@ const ManualEntryModal = ({ isOpen, onClose, onSave, initialData }) => {
                     <div>
                         <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Faculty / Note</label>
                         <input type="text" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-violet-400 outline-none"
-                            value={formData.faculty_name} onChange={e => setFormData({ ...formData, faculty_name: e.target.value })} placeholder="Optional" />
+                            value={formData.faculty_name || ''} onChange={e => setFormData({ ...formData, faculty_name: e.target.value })} placeholder="Optional" />
+                    </div>
+                    <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Venue / Room</label>
+                        <input type="text" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-violet-400 outline-none"
+                            value={formData.venue_name || ''} onChange={e => setFormData({ ...formData, venue_name: e.target.value })} placeholder="e.g. CS 203" />
                     </div>
                     <div className="flex justify-end gap-2 mt-2">
                         <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-bold text-gray-500 hover:bg-gray-100 rounded-lg">Cancel</button>
@@ -253,6 +267,7 @@ export default function TimetableEditor({ department, semester, onSave, onExport
     const [slots, setSlots] = useState([]);
     const [departments, setDepartments] = useState([]);
     const [facultyMap, setFacultyMap] = useState({});
+    const [venueMap, setVenueMap] = useState({});
     const [draggedItem, setDraggedItem] = useState(null);
     const [isSwapMode, setIsSwapMode] = useState(false);
     const [swapSource, setSwapSource] = useState(null);
@@ -291,14 +306,48 @@ export default function TimetableEditor({ department, semester, onSave, onExport
         if (!paletteDept) return;
         const loadCourses = async () => {
             try {
-                const [cRes, fRes] = await Promise.all([
+                const [cRes, fRes, cvRes, dvRes] = await Promise.all([
                     api.getCourses(paletteDept),
-                    api.getCourseFaculty(paletteDept)
+                    api.getCourseFaculty(paletteDept),
+                    api.getCourseVenues ? api.getCourseVenues(paletteDept).catch(() => ({ data: [] })) : Promise.resolve({ data: [] }),
+                    api.getDepartmentVenues ? api.getDepartmentVenues(paletteDept).catch(() => ({ data: [] })) : Promise.resolve({ data: [] })
                 ]);
                 setAllCourses(cRes.data || []);
                 const fMap = {};
                 (fRes.data || []).forEach(m => { fMap[m.course_code] = m.faculty_name || m.faculty_id; });
                 setFacultyMap(fMap);
+
+                const vMap = {};
+                const theoryVenues = [];
+                const labVenues = [];
+
+                (dvRes.data || []).forEach(dv => {
+                    const isLab = dv.venue?.is_lab;
+                    const vName = dv.venue?.venue_name || dv.venue_name || `Venue ${dv.venue_id}`;
+                    if (isLab) labVenues.push(vName);
+                    else theoryVenues.push(vName);
+                });
+
+                (cvRes.data || []).forEach(cv => {
+                    vMap[cv.course_code] = cv.venue?.venue_name || cv.venue_name || `Venue ${cv.venue_id}`;
+                });
+
+                let tIdx = 0;
+                let lIdx = 0;
+
+                (cRes.data || []).forEach(c => {
+                    if (!vMap[c.course_code]) {
+                        if (c.is_lab) {
+                            vMap[c.course_code] = labVenues.length > 0 ? labVenues[lIdx % labVenues.length] : 'No Lab Venue';
+                            if (labVenues.length > 0) lIdx++;
+                        } else {
+                            vMap[c.course_code] = theoryVenues.length > 0 ? theoryVenues[tIdx % theoryVenues.length] : 'No Theory Venue';
+                            if (theoryVenues.length > 0) tIdx++;
+                        }
+                    }
+                });
+
+                setVenueMap(vMap);
             } catch (err) { console.error('Load courses error:', err); }
         };
         loadCourses();
@@ -398,13 +447,13 @@ export default function TimetableEditor({ department, semester, onSave, onExport
         pushHistory();
 
         if (activeData.type === 'new') {
-            placeCourse(activeData.course, activeData.facultyName, targetDay, targetPeriod);
+            placeCourse(activeData.course, activeData.facultyName, activeData.venueName, targetDay, targetPeriod);
         } else if (activeData.type === 'placed') {
             moveEntry(activeData.entry, targetDay, targetPeriod);
         }
     };
 
-    const placeCourse = (course, facultyName, day, period) => {
+    const placeCourse = (course, facultyName, venueName, day, period) => {
         const isLab = course.is_lab;
         if (isLab) {
             if (!isValidPeriod(day, period)) return;
@@ -419,6 +468,7 @@ export default function TimetableEditor({ department, semester, onSave, onExport
             course_code: course.course_code, course_name: course.course_name,
             session_type: isLab ? 'LAB' : 'THEORY',
             faculty_id: null, faculty_name: fName, slot_id: 0,
+            venue_name: venueName || '',
             day_of_week: day, period_number: period
         };
 
@@ -699,7 +749,8 @@ export default function TimetableEditor({ department, semester, onSave, onExport
             initialData: entry ? {
                 course_code: entry.course_code,
                 course_name: entry.course_name,
-                faculty_name: entry.faculty_name
+                faculty_name: entry.faculty_name,
+                venue_name: entry.venue_name || ''
             } : null
         });
     };
@@ -717,6 +768,7 @@ export default function TimetableEditor({ department, semester, onSave, onExport
             session_type: isLab ? 'LAB' : 'THEORY',
             faculty_id: null,
             faculty_name: formData.faculty_name || 'Unassigned',
+            venue_name: formData.venue_name || '',
             slot_id: 0,
             day_of_week: day,
             period_number: period
@@ -832,7 +884,8 @@ export default function TimetableEditor({ department, semester, onSave, onExport
                         {filteredCourses.map(c => (
                             <CourseChip key={c.course_code} course={c}
                                 colorStyle={c.is_lab ? LAB_STYLE : THEORY_STYLE}
-                                facultyName={facultyMap[c.course_code]} />
+                                facultyName={facultyMap[c.course_code]}
+                                venueName={venueMap[c.course_code]} />
                         ))}
                     </div>
                 </div>
@@ -862,50 +915,44 @@ export default function TimetableEditor({ department, semester, onSave, onExport
                             </thead>
                             <tbody>
                                 {activeDays.map((day, dayIdx) => {
-                                    const renderedCols = [];
                                     let skipNext = false;
-
-                                    periodColumns.forEach((col, colIdx) => {
-                                        if (skipNext) { skipNext = false; return; }
-
-                                        if (col.type !== 'PERIOD') {
-                                            renderedCols.push(
-                                                <GridCell key={`${day}-${col.type}-${colIdx}`} id={`${day}-${col.type}-${colIdx}`} isBreak={true} isLunch={col.type === 'LUNCH'} />
-                                            );
-                                            return;
-                                        }
-
-                                        const p = col.period;
-                                        const key = `${day}-${p}`;
-                                        const entry = gridMap[key];
-
-                                        if (isLabBlockTail(day, p)) return;
-
-                                        const labStart = isLabBlockStart(day, p);
-                                        const nextCol = periodColumns[colIdx + 1];
-                                        const spanTwo = labStart && nextCol && nextCol.type === 'PERIOD';
-
-                                        if (spanTwo) skipNext = true;
-
-                                        renderedCols.push(
-                                            <DroppableGridCellSpan
-                                                key={key}
-                                                id={key}
-                                                colSpan={spanTwo ? 2 : 1}
-                                                entry={entry}
-                                                isLabStart={labStart}
-                                                onDelete={() => handleDeleteEntry(day, p)}
-                                                isSwapMode={isSwapMode}
-                                                isSelected={swapSource?.day === day && Math.abs(swapSource?.period - p) < (entry.session_type === 'LAB' ? 2 : 1)}
-                                                onCellClick={() => handleCellClick(day, p, entry)}
-                                            />
-                                        );
-                                    });
 
                                     return (
                                         <tr key={day} className={`border-b border-gray-50 last:border-b-0 hover:bg-slate-50/50 transition-colors duration-300 ${dayIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'}`}>
                                             <td className="py-6 px-6 font-bold text-xs text-gray-500 border-r border-gray-100 bg-gray-50/50 uppercase tracking-widest">{day.slice(0, 3)}</td>
-                                            {renderedCols}
+                                            {periodColumns.map((col, colIdx) => {
+                                                if (skipNext) { skipNext = false; return null; }
+
+                                                if (col.type !== 'PERIOD') {
+                                                    return (
+                                                        <GridCell key={`${day}-${col.type}-${colIdx}`} id={`${day}-${col.type}-${colIdx}`} isBreak={true} isLunch={col.type === 'LUNCH'} />
+                                                    );
+                                                }
+
+                                                const p = col.period;
+                                                const key = `${day}-${p}`;
+                                                const entry = gridMap[key];
+
+                                                const labStart = isLabBlockStart(day, p);
+                                                const nextCol = periodColumns[colIdx + 1];
+                                                const spanTwo = labStart && nextCol && nextCol.type === 'PERIOD';
+
+                                                if (spanTwo) skipNext = true;
+
+                                                return (
+                                                    <DroppableGridCellSpan
+                                                        key={key}
+                                                        id={key}
+                                                        colSpan={spanTwo ? 2 : 1}
+                                                        entry={entry}
+                                                        isLabStart={labStart}
+                                                        onDelete={() => handleDeleteEntry(day, p)}
+                                                        isSwapMode={isSwapMode}
+                                                        isSelected={swapSource?.day === day && Math.abs(swapSource?.period - p) < (entry?.session_type === 'LAB' ? 2 : 1)}
+                                                        onCellClick={() => handleCellClick(day, p, entry)}
+                                                    />
+                                                );
+                                            })}
                                         </tr>
                                     );
                                 })}
@@ -922,10 +969,32 @@ export default function TimetableEditor({ department, semester, onSave, onExport
                 {draggedItem ? (
                     <div className={`px-5 py-4 rounded-2xl shadow-[0_20px_50px_-12px_rgba(0,0,0,0.25)] border-2 transform scale-105 backdrop-blur-xl ${draggedItem.type === 'new'
                         ? (draggedItem.course.is_lab ? 'bg-amber-50/90 border-amber-400 text-amber-900' : 'bg-blue-50/90 border-blue-400 text-blue-900')
-                        : 'bg-white/90 border-violet-400 text-violet-900 ring-4 ring-violet-400/10'
+                        : (draggedItem.entry.session_type === 'LAB' ? 'bg-amber-50/90 border-amber-400 text-amber-900' : 'bg-blue-50/90 border-blue-400 text-blue-900')
                         } flex flex-col items-center justify-center min-w-[160px]`}>
-                        <div className="font-bold text-sm tracking-tight">{draggedItem.type === 'new' ? draggedItem.course.course_code : draggedItem.entry.course_code}</div>
-                        <div className="text-[10px] opacity-80 font-medium mt-1 tracking-wide">{draggedItem.type === 'new' ? draggedItem.course.course_name : (draggedItem.entry.course_name || '')}</div>
+
+                        <div className="font-bold text-sm tracking-tight flex items-center justify-center gap-1.5 w-full">
+                            {(draggedItem.type === 'new' ? draggedItem.course.is_lab : draggedItem.entry.session_type === 'LAB')
+                                ? <FlaskConical className="w-4 h-4 text-amber-700/80" />
+                                : <BookOpen className="w-4 h-4 opacity-50" />}
+                            {draggedItem.type === 'new' ? draggedItem.course.course_code : draggedItem.entry.course_code}
+                        </div>
+
+                        <div className="text-[10px] opacity-80 font-medium mt-1 tracking-wide text-center">
+                            {draggedItem.type === 'new' ? draggedItem.course.course_name : (draggedItem.entry.course_name || '')}
+                        </div>
+
+                        {(draggedItem.type === 'new' ? draggedItem.venueName : draggedItem.entry.venue_name) && (
+                            <div className="text-[9px] font-bold mt-2 text-indigo-700 bg-indigo-50/90 px-2 py-0.5 rounded border border-indigo-200 shadow-sm text-center">
+                                {draggedItem.type === 'new' ? draggedItem.venueName : draggedItem.entry.venue_name}
+                            </div>
+                        )}
+
+                        {(draggedItem.type === 'new' ? draggedItem.course.is_lab : draggedItem.entry.session_type === 'LAB') && (
+                            <span className="text-[9px] font-bold opacity-70 block mt-1 tracking-wider uppercase text-amber-800 text-center">
+                                2 Periods
+                            </span>
+                        )}
+
                     </div>
                 ) : null}
             </DragOverlay>

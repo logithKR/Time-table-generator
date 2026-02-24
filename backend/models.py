@@ -7,7 +7,6 @@ class DepartmentMaster(Base):
     department_code = Column(String, primary_key=True)
     student_count = Column(Integer, default=0, nullable=True)
 
-
 class FacultyMaster(Base):
     __tablename__ = "faculty_master"
     
@@ -25,10 +24,12 @@ Index('idx_faculty_department', FacultyMaster.department_code)
 class CourseMaster(Base):
     __tablename__ = "course_master"
     
+    # We must establish a composite primary key so same course can exist in multiple departments
     course_code = Column(String, primary_key=True)
+    department_code = Column(String, ForeignKey('department_master.department_code'), primary_key=True)
+    semester = Column(Integer, primary_key=True)
+
     course_name = Column(String, nullable=False)
-    department_code = Column(String, ForeignKey('department_master.department_code'), nullable=False)
-    semester = Column(Integer, nullable=False)
     
     course_category = Column(String)
     delivery_type = Column(String)

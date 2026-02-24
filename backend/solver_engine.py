@@ -53,6 +53,21 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
     day_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
     all_days = sorted(set(s.day_of_week for s in slots), key=lambda d: day_order.index(d))
 
+    # Reject Language Electives with no faculty
+    valid_courses = []
+    for course in courses:
+        is_lang = course.course_category and "LANGUAGE" in course.course_category.upper()
+        has_fac = len(course_faculty.get(course.course_code, [])) > 0
+        if is_lang and not has_fac:
+            print(f"Skipping {course.course_code} - Language Elective missing faculty.")
+            continue
+        valid_courses.append(course)
+    courses = valid_courses
+    
+    if not courses:
+        print("❌ No valid courses left after filtering constraints.")
+        return False
+
     slot_lookup = {}
     day_periods = {}
     for s in slots:

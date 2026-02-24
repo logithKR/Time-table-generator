@@ -83,8 +83,8 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
             else:
                 default_classrooms.append(v.venue_name)
     
-    default_classroom_str = ", ".join(default_classrooms) if default_classrooms else None
-    default_lab_str = ", ".join(default_labs) if default_labs else None
+    # We will no longer concatenate default_classrooms into a single string.
+    # Keep them as lists default_classrooms and default_labs.
 
     lab_block_starts = [1, 3, 5]
     mentor_day_clean = mentor_day.strip().capitalize()
@@ -380,6 +380,48 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
     print(f"✅ Solution Found ({solver.StatusName(status)})")
 
     # =========================================================
+    # 4b. GLOBAL VENUE TRACKING
+    # =========================================================
+    from sqlalchemy import and_
+    other_entries = db.query(models.TimetableEntry).filter(
+        and_(
+            models.TimetableEntry.semester == semester,
+            models.TimetableEntry.department_code != department_code
+        )
+    ).all()
+    
+    global_occupancy = {}
+    for e in other_entries:
+        if not e.venue_name: continue
+        venues = [v.strip() for v in e.venue_name.split(',')]
+        key = (e.day_of_week, e.period_number)
+        if key not in global_occupancy:
+            global_occupancy[key] = set()
+        global_occupancy[key].update(venues)
+        
+    current_run_occupancy = {}
+
+    def assign_venue(day, period, course_code, is_lab, required_idx):
+        if course_code in cv_lookup:
+            return cv_lookup[course_code]
+        pool = default_labs if is_lab else default_classrooms
+        if not pool:
+            return None
+        key = (day, period)
+        occupied_g = global_occupancy.get(key, set())
+        occupied_l = current_run_occupancy.get(key, set())
+        available = [v for v in pool if v not in occupied_g and v not in occupied_l]
+        if not available:
+            # Overloaded room globally; fallback to spreading locally
+            assigned = pool[required_idx % len(pool)]
+        else:
+            assigned = available[required_idx % len(available)]
+        if key not in current_run_occupancy:
+            current_run_occupancy[key] = set()
+        current_run_occupancy[key].add(assigned)
+        return assigned
+
+    # =========================================================
     # 5. SAVE ENTRIES
     # =========================================================
     db.query(models.TimetableEntry).filter_by(
@@ -395,14 +437,13 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
         fid = fids[0][0] if fids else None
         fname = fids[0][1] if fids else None
         cname = course_names.get(c.course_code, c.course_code)
-        c_venue = cv_lookup.get(c.course_code) or default_classroom_str
-
         for day in all_days:
             for period in day_periods.get(day, []):
                 key = (c.course_code, day, period)
                 if key in theory_vars and solver.Value(theory_vars[key]):
                     slot_obj = slot_lookup.get((day, period))
                     if slot_obj:
+                        c_venue = assign_venue(day, period, c.course_code, False, count)
                         entry = models.TimetableEntry(
                             department_code=department_code, semester=semester,
                             course_code=c.course_code, course_name=cname,
@@ -425,13 +466,14 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
         fid = fids[0][0] if fids else None
         fname = fids[0][1] if fids else None
         cname = course_names.get(c.course_code, c.course_code)
-        c_venue = cv_lookup.get(c.course_code) or default_lab_str
-
         for day in all_days:
             for bs in lab_block_starts:
                 lkey = (c.course_code, day, bs)
                 if lkey in lab_vars and solver.Value(lab_vars[lkey]):
-                    for p in [bs, bs + 1]:
+                    cv1 = assign_venue(day, bs, c.course_code, True, count)
+                    cv2 = assign_venue(day, bs + 1, c.course_code, True, count)
+                    
+                    for p, c_v in [(bs, cv1), (bs + 1, cv2)]:
                         slot_obj = slot_lookup.get((day, p))
                         if slot_obj:
                             entry = models.TimetableEntry(
@@ -441,7 +483,7 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                                 session_type='LAB',
                                 slot_id=slot_obj.slot_id,
                                 day_of_week=day, period_number=p,
-                                venue_name=c_venue,
+                                venue_name=c_v,
                                 created_at="now"
                             )
                             db.add(entry)
@@ -466,14 +508,13 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
             fname = fids[0][1] if fids else None
             cname = course_names.get(c.course_code, c.course_code)
             total = c.weekly_sessions or (course_theory_count[c.course_code] + course_lab_blocks[c.course_code] * 2)
-            c_venue = cv_lookup.get(c.course_code) or default_classroom_str
             
             queue = []
             for _ in range(total):
                 queue.append({
                     'course_code': c.course_code, 'course_name': cname,
                     'faculty_id': fid, 'faculty_name': fname,
-                    'session_type': 'THEORY', 'venue_name': c_venue
+                    'session_type': 'THEORY'
                 })
             if queue:
                 course_queues.append(queue)
@@ -491,6 +532,7 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
             
             # Save the entry
             slot_obj = slot_lookup[(day, period)]
+            c_venue = assign_venue(day, period, hs['course_code'], False, count)
             entry = models.TimetableEntry(
                 department_code=department_code, semester=semester,
                 course_code=hs['course_code'], course_name=hs['course_name'],
@@ -498,7 +540,7 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                 session_type=hs['session_type'],
                 slot_id=slot_obj.slot_id,
                 day_of_week=day, period_number=period,
-                venue_name=hs['venue_name'],
+                venue_name=c_venue,
                 created_at="now"
             )
             db.add(entry)
@@ -578,9 +620,11 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
             fids = course_faculty.get(mp.course_code, [])
             fid = fids[0][0] if fids else None
             fname = fids[0][1] if fids else None
-            c_venue = cv_lookup.get(mp.course_code) or default_lab_str
             
-            for p in [p1, p2]:
+            cv1 = assign_venue(day, p1, mp.course_code, True, count)
+            cv2 = assign_venue(day, p2, mp.course_code, True, count)
+            
+            for p, c_v in [(p1, cv1), (p2, cv2)]:
                 slot_obj = slot_lookup.get((day, p))
                 if slot_obj:
                     db.add(models.TimetableEntry(
@@ -590,7 +634,7 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                         session_type='LAB',
                         slot_id=slot_obj.slot_id,
                         day_of_week=day, period_number=p,
-                        venue_name=c_venue,
+                        venue_name=c_v,
                         created_at="now"
                     ))
                     filled_slots.add((day, p))
@@ -621,9 +665,11 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                 fids = course_faculty.get(c.course_code, [])
                 fid = fids[0][0] if fids else None
                 fname = fids[0][1] if fids else None
-                c_venue = cv_lookup.get(c.course_code) or default_lab_str
                 
-                for p in [p1, p2]:
+                cv1 = assign_venue(day, p1, c.course_code, True, count)
+                cv2 = assign_venue(day, p2, c.course_code, True, count)
+                
+                for p, c_v in [(p1, cv1), (p2, cv2)]:
                     slot_obj = slot_lookup.get((day, p))
                     if slot_obj:
                         db.add(models.TimetableEntry(
@@ -633,7 +679,7 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                             session_type='LAB',
                             slot_id=slot_obj.slot_id,
                             day_of_week=day, period_number=p,
-                            venue_name=c_venue,
+                            venue_name=c_v,
                             created_at="now"
                         ))
                         filled_slots.add((day, p))
@@ -664,7 +710,7 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                 fids = course_faculty.get(c.course_code, [])
                 fid = fids[0][0] if fids else None
                 fname = fids[0][1] if fids else None
-                c_venue = cv_lookup.get(c.course_code) or default_classroom_str
+                c_venue = assign_venue(day, p, c.course_code, False, count)
                 
                 slot_obj = slot_lookup.get((day, p))
                 if slot_obj:
@@ -706,7 +752,7 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                 fids = course_faculty.get(c.course_code, [])
                 fid = fids[0][0] if fids else None
                 fname = fids[0][1] if fids else None
-                c_venue = cv_lookup.get(c.course_code) or default_classroom_str
+                c_venue = assign_venue(day, p, c.course_code, False, count)
                 
                 slot_obj = slot_lookup.get((day, p))
                 if slot_obj:

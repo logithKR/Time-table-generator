@@ -617,7 +617,8 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
     core_courses = [c for c in courses if not c.is_elective and c not in mini_projects]
     elective_courses = [c for c in courses if c.is_elective and c not in mini_projects]
     
-    # Sort electives by descending credits
+    # Rank all courses by descending credits mathematically
+    core_courses.sort(key=lambda x: x.credits or 0, reverse=True)
     elective_courses.sort(key=lambda x: x.credits or 0, reverse=True)
     
     daily_extra_counts = {c.course_code: {d: 0 for d in all_days} for c in courses}
@@ -676,7 +677,9 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
             day, p1, p2 = free_blocks_2[0]
             
             # Check limits: 2 periods added -> daily + 2, weekly + 2
-            if weekly_extra_counts[c.course_code] <= 1 and daily_extra_counts[c.course_code][day] == 0 and not day_has_lab(day):
+            # AND strictly demand the course physically possesses Practical (P) Hours > 0 before locking a LAB block
+            course_has_practicals = (c.practical_hours or 0) > 0
+            if course_has_practicals and weekly_extra_counts[c.course_code] <= 1 and daily_extra_counts[c.course_code][day] == 0 and not day_has_lab(day):
                 free_blocks_2.pop(0)
                 consecutive_failures = 0
                 
@@ -762,9 +765,10 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
             day, p1, p2 = free_blocks_2.pop(0)
             single_frees.extend([(day, p1), (day, p2)])
         
-        idx = 0
+        # Absolute Fallback: Zero Free Slots Allowed
         fallback_courses = core_courses or elective_courses or courses
         if fallback_courses:
+            fallback_courses.sort(key=lambda x: x.credits or 0, reverse=True)
             for day, p in single_frees:
                 c = fallback_courses[idx % len(fallback_courses)]
                 fids = course_faculty.get(c.course_code, [])

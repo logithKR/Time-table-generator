@@ -615,3 +615,40 @@ def delete_course_venue(map_id: int, db: Session = Depends(get_db)):
     db.delete(m)
     db.commit()
     return {"status": "success", "id": map_id}
+
+# ============================================
+# AUTHENTICATION
+# ============================================
+
+# Hardcoded admin credentials for registration verification
+ADMIN_REGISTER_EMAIL = "admin.register@gmail.com"
+ADMIN_REGISTER_PASSWORD = "123456"
+
+@app.post("/auth/admin-verify")
+def admin_verify(req: schemas.AdminVerify):
+    if req.email_id == ADMIN_REGISTER_EMAIL and req.password == ADMIN_REGISTER_PASSWORD:
+        return {"verified": True, "message": "Admin verified successfully"}
+    raise HTTPException(status_code=403, detail="Invalid admin credentials")
+
+@app.post("/auth/register")
+def register_user(req: schemas.UserRegister, db: Session = Depends(get_db)):
+    existing = db.query(models.UserAccount).filter_by(email_id=req.email_id).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    user = models.UserAccount(
+        name=req.name,
+        email_id=req.email_id,
+        phone_number=req.phone_number,
+        password=req.password
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return {"status": "success", "message": "Registration successful", "user": {"id": user.id, "name": user.name, "email_id": user.email_id}}
+
+@app.post("/auth/login")
+def login_user(req: schemas.UserLogin, db: Session = Depends(get_db)):
+    user = db.query(models.UserAccount).filter_by(email_id=req.email_id).first()
+    if not user or user.password != req.password:
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+    return {"status": "success", "message": "Login successful", "user": {"id": user.id, "name": user.name, "email_id": user.email_id}}

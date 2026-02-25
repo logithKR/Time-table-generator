@@ -156,10 +156,12 @@ class TimetableSaveRequest(BaseModel):
 class DepartmentVenueCreate(BaseModel):
     department_code: str
     venue_id: int
+    semester: int
 
 class DepartmentVenueResponse(BaseModel):
     id: int
     department_code: str
+    semester: int
     venue_id: int
     venue_name: Optional[str] = None
     is_lab: Optional[bool] = False

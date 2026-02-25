@@ -87,7 +87,7 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
             cv_lookup[cv.course_code] = v.venue_name
 
     # Pre-fetch department default venues
-    dept_venue_maps = db.query(models.DepartmentVenueMap).filter_by(department_code=department_code).all()
+    dept_venue_maps = db.query(models.DepartmentVenueMap).filter_by(department_code=department_code, semester=semester).all()
     default_labs = []
     default_classrooms = []
     for dvm in dept_venue_maps:

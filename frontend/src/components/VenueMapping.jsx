@@ -10,6 +10,7 @@ const VenueMapping = () => {
     const [courseVenues, setCourseVenues] = useState([]);
 
     const [selectedDept, setSelectedDept] = useState('');
+    const [selectedSemester, setSelectedSemester] = useState('6');
     const [selectedVenue, setSelectedVenue] = useState('');
     const [selectedCourse, setSelectedCourse] = useState('');
     const [selectedCourseVenue, setSelectedCourseVenue] = useState('');
@@ -23,13 +24,13 @@ const VenueMapping = () => {
 
     useEffect(() => {
         if (selectedDept) {
-            fetchDepartmentData(selectedDept);
+            fetchDepartmentData(selectedDept, selectedSemester);
         } else {
             setDepartmentVenues([]);
             setCourses([]);
             setCourseVenues([]);
         }
-    }, [selectedDept]);
+    }, [selectedDept, selectedSemester]);
 
     const fetchInitialData = async () => {
         try {
@@ -47,10 +48,10 @@ const VenueMapping = () => {
         }
     };
 
-    const fetchDepartmentData = async (deptCode) => {
+    const fetchDepartmentData = async (deptCode, semester) => {
         try {
             const [dvRes, cRes, cvRes] = await Promise.all([
-                getDepartmentVenues(deptCode),
+                getDepartmentVenues(deptCode, semester),
                 getCourses(deptCode),
                 getCourseVenues(deptCode)
             ]);
@@ -70,9 +71,10 @@ const VenueMapping = () => {
             setIsMapping(true);
             await mapVenueToDepartment({
                 department_code: selectedDept,
-                venue_id: parseInt(selectedVenue)
+                venue_id: parseInt(selectedVenue),
+                semester: parseInt(selectedSemester)
             });
-            await fetchDepartmentData(selectedDept);
+            await fetchDepartmentData(selectedDept, selectedSemester);
             setSelectedVenue('');
         } catch (err) {
             console.error(err);
@@ -93,7 +95,7 @@ const VenueMapping = () => {
                 course_code: selectedCourse,
                 venue_id: parseInt(selectedCourseVenue)
             });
-            await fetchDepartmentData(selectedDept);
+            await fetchDepartmentData(selectedDept, selectedSemester);
             setSelectedCourse('');
             setSelectedCourseVenue('');
         } catch (err) {
@@ -109,7 +111,7 @@ const VenueMapping = () => {
 
         try {
             await removeVenueMapping(id);
-            await fetchDepartmentData(selectedDept);
+            await fetchDepartmentData(selectedDept, selectedSemester);
         } catch (err) {
             console.error(err);
             alert("Error removing mapping: " + (err.response?.data?.detail || err.message));
@@ -121,7 +123,7 @@ const VenueMapping = () => {
 
         try {
             await removeCourseVenueMapping(id);
-            await fetchDepartmentData(selectedDept);
+            await fetchDepartmentData(selectedDept, selectedSemester);
         } catch (err) {
             console.error(err);
             alert("Error removing mapping: " + (err.response?.data?.detail || err.message));
@@ -144,9 +146,23 @@ const VenueMapping = () => {
                     <p className="text-slate-500 text-sm">Map laboratories and classrooms to departments</p>
                 </div>
 
-                <div className="w-full md:w-64">
+                <div className="w-full md:w-auto flex flex-col sm:flex-row gap-3">
                     <select
-                        className="w-full p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none bg-white font-medium"
+                        className="w-full sm:w-48 p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none bg-white font-medium"
+                        value={selectedSemester}
+                        onChange={(e) => setSelectedSemester(e.target.value)}
+                    >
+                        <option value="1">Semester 1</option>
+                        <option value="2">Semester 2</option>
+                        <option value="3">Semester 3</option>
+                        <option value="4">Semester 4</option>
+                        <option value="5">Semester 5</option>
+                        <option value="6">Semester 6</option>
+                        <option value="7">Semester 7</option>
+                        <option value="8">Semester 8</option>
+                    </select>
+                    <select
+                        className="w-full sm:w-64 p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none bg-white font-medium"
                         value={selectedDept}
                         onChange={(e) => setSelectedDept(e.target.value)}
                     >

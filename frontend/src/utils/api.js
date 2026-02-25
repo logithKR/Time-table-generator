@@ -56,9 +56,12 @@ export const deleteVenue = (id) => axios.delete(`${API_URL}/venues/${id}`);
 export const importVenues = () => axios.post(`${API_URL}/venues/import`);
 
 // --- Department Venues ---
-export const getDepartmentVenues = (deptCode) => {
+export const getDepartmentVenues = (deptCode, semester) => {
     let url = `${API_URL}/department-venues`;
-    if (deptCode) url += `?department_code=${deptCode}`;
+    const params = [];
+    if (deptCode) params.push(`department_code=${deptCode}`);
+    if (semester) params.push(`semester=${semester}`);
+    if (params.length) url += `?${params.join('&')}`;
     return axios.get(url);
 };
 export const mapVenueToDepartment = (data) => axios.post(`${API_URL}/department-venues`, data);

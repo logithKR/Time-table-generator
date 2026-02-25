@@ -496,10 +496,12 @@ def import_venues(db: Session = Depends(get_db)):
 
 # --- Department Venue Mapping ---
 @app.get("/department-venues", response_model=List[schemas.DepartmentVenueResponse])
-def get_department_venues(department_code: str = None, db: Session = Depends(get_db)):
+def get_department_venues(department_code: str = None, semester: int = None, db: Session = Depends(get_db)):
     query = db.query(models.DepartmentVenueMap)
     if department_code:
         query = query.filter(models.DepartmentVenueMap.department_code == department_code)
+    if semester:
+        query = query.filter(models.DepartmentVenueMap.semester == semester)
     
     maps = query.all()
     result = []
@@ -509,6 +511,7 @@ def get_department_venues(department_code: str = None, db: Session = Depends(get
             result.append(schemas.DepartmentVenueResponse(
                 id=m.id,
                 department_code=m.department_code,
+                semester=m.semester,
                 venue_id=venue.venue_id,
                 venue_name=venue.venue_name,
                 is_lab=venue.is_lab,
@@ -520,12 +523,13 @@ def get_department_venues(department_code: str = None, db: Session = Depends(get
 def create_department_venue(req: schemas.DepartmentVenueCreate, db: Session = Depends(get_db)):
     existing = db.query(models.DepartmentVenueMap).filter_by(
         department_code=req.department_code,
+        semester=req.semester,
         venue_id=req.venue_id
     ).first()
     if existing:
-        raise HTTPException(status_code=400, detail="This venue is already mapped to the department.")
+        raise HTTPException(status_code=400, detail="This venue is already mapped to this department's semester.")
     
-    new_map = models.DepartmentVenueMap(department_code=req.department_code, venue_id=req.venue_id)
+    new_map = models.DepartmentVenueMap(department_code=req.department_code, semester=req.semester, venue_id=req.venue_id)
     db.add(new_map)
     db.commit()
     db.refresh(new_map)
@@ -534,6 +538,7 @@ def create_department_venue(req: schemas.DepartmentVenueCreate, db: Session = De
     return schemas.DepartmentVenueResponse(
         id=new_map.id,
         department_code=new_map.department_code,
+        semester=new_map.semester,
         venue_id=venue.venue_id,
         venue_name=venue.venue_name,
         is_lab=venue.is_lab,

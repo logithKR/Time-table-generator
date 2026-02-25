@@ -122,9 +122,10 @@ class DepartmentVenueMap(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     department_code = Column(String, ForeignKey('department_master.department_code'), nullable=False)
     venue_id = Column(Integer, ForeignKey('venue_master.venue_id'), nullable=False)
+    semester = Column(Integer, default=6, nullable=False)
 
-# Index for fast retrieval by dept
-Index('idx_dept_venue', DepartmentVenueMap.department_code, DepartmentVenueMap.venue_id)
+# Index for fast retrieval by dept AND semester
+Index('idx_dept_sem_venue', DepartmentVenueMap.department_code, DepartmentVenueMap.semester, DepartmentVenueMap.venue_id)
 
 class DepartmentSemesterCount(Base):
     __tablename__ = "department_semester_count"

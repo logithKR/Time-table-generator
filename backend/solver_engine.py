@@ -763,6 +763,41 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
     if free_blocks_2 or single_frees:
         fill_remaining_slots(elective_courses)
         
+    # =========================================================
+    # 7.5 SEMESTER 5 OPEN ELECTIVE INJECTION
+    # =========================================================
+    global_oe = db.query(models.CourseMaster).filter_by(semester=semester, is_open_elective=True).first()
+    
+    if semester == 5 and global_oe:
+        # We need 3 periods for an Open Elective natively.
+        oe_slots_needed = 3
+        
+        # Flatten any remaining 2-blocks into single frees
+        while free_blocks_2:
+            day, p1, p2 = free_blocks_2.pop(0)
+            single_frees.extend([(day, p1), (day, p2)])
+            
+        while oe_slots_needed > 0 and single_frees:
+            day, p = single_frees.pop(0)
+            
+            c_venue = assign_venue(day, p, global_oe.course_code, False, count)
+            slot_obj = slot_lookup.get((day, p))
+            
+            if slot_obj:
+                db.add(models.TimetableEntry(
+                    department_code=department_code, semester=semester,
+                    course_code=global_oe.course_code, course_name=global_oe.course_name,
+                    faculty_id=None, faculty_name="Unassigned",
+                    session_type='OPEN_ELECTIVE',
+                    slot_id=slot_obj.slot_id,
+                    day_of_week=day, period_number=p,
+                    venue_name=c_venue,
+                    created_at="now"
+                ))
+                filled_slots.add((day, p))
+                count += 1
+                oe_slots_needed -= 1
+
     # Absolute Fallback: Zero Free Slots Allowed
     if free_blocks_2 or single_frees:
         while free_blocks_2:
@@ -797,12 +832,9 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                 idx += 1
 
     # =========================================================
-    # 8. OPEN ELECTIVE MERGING
+    # 8. OPEN ELECTIVE MERGING (SEMESTER 6 ONLY)
     # =========================================================
-    # Check if ANY open elective exists globally for this semester
-    global_oe = db.query(models.CourseMaster).filter_by(semester=semester, is_open_elective=True).first()
-    
-    if global_oe:
+    if semester == 6 and global_oe:
         # Find the highest numbered elective in the current department's scheduled courses
         dept_electives = [c for c in courses if c.is_elective]
         if dept_electives:
@@ -816,12 +848,11 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
             dept_electives.sort(key=get_elective_num, reverse=True)
             highest_elective = dept_electives[0]
             
-            # Find all entries for this highest elective and update the name/code
+            # Find all entries for this highest elective and update the name
             for entry in db.new:
                 if isinstance(entry, models.TimetableEntry) and entry.course_code == highest_elective.course_code:
-                    if "OPEN ELECTIVE" not in str(entry.course_code).upper():
-                        entry.course_code = f"{entry.course_code} / OPEN ELECTIVE"
-                    # Leave course_name intact so it doesn't double-print in the UI
+                    if "OPEN ELECTIVE" not in str(entry.course_name).upper():
+                        entry.course_name = f"{entry.course_name} / OPEN ELECTIVE"
 
     db.commit()
     print(f"💾 Saved {count} timetable entries.")

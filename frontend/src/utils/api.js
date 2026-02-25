@@ -80,3 +80,8 @@ export const removeCourseVenueMapping = (id) => axios.delete(`${API_URL}/course-
 export const getDepartmentCapacities = (deptCode) => axios.get(`${API_URL}/departments/${deptCode}/capacities`);
 export const upsertDepartmentCapacity = (deptCode, semester, data) =>
     axios.post(`${API_URL}/departments/${deptCode}/capacities?semester=${semester}`, data);
+
+// --- Auth ---
+export const adminVerify = (data) => axios.post(`${API_URL}/auth/admin-verify`, data);
+export const registerUser = (data) => axios.post(`${API_URL}/auth/register`, data);
+export const loginUser = (data) => axios.post(`${API_URL}/auth/login`, data);

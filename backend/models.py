@@ -150,11 +150,3 @@ class CourseVenueMap(Base):
 # Index for fast retrieval by course
 Index('idx_course_venue', CourseVenueMap.course_code, CourseVenueMap.venue_id)
 
-class UserAccount(Base):
-    __tablename__ = "user_accounts"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    name = Column(String, nullable=False)
-    email_id = Column(String, unique=True, nullable=False, index=True)
-    phone_number = Column(String, nullable=True)
-    password = Column(String, nullable=False)

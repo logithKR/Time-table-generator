@@ -201,17 +201,3 @@ class DepartmentSemesterCountResponse(BaseModel):
     class Config:
         orm_mode = True
 
-# --- Auth ---
-class UserRegister(BaseModel):
-    name: str
-    email_id: str
-    phone_number: Optional[str] = None
-    password: str
-
-class UserLogin(BaseModel):
-    email_id: str
-    password: str
-
-class AdminVerify(BaseModel):
-    email_id: str
-    password: str

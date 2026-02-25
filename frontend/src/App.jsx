@@ -28,7 +28,6 @@ import {
     LogOut
 } from 'lucide-react';
 import TimetableEditor from './components/TimetableEditor';
-import LoginPage from './components/LoginPage';
 import Venues from './components/Venues';
 import VenueMapping from './components/VenueMapping';
 import DepartmentsManager from './components/DepartmentsManager';
@@ -38,8 +37,6 @@ import autoTable from 'jspdf-autotable';
 import * as api from './utils/api';
 
 function App() {
-    const [isLoggedIn, setIsLoggedIn] = useState(false);
-    const [loggedInUser, setLoggedInUser] = useState(null);
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [isCollapsed, setIsCollapsed] = useState(false);
     const [activeTab, setActiveTab] = useState('dashboard');
@@ -1223,9 +1220,7 @@ function App() {
         setShowAddMapping(false);
     };
 
-    if (!isLoggedIn) {
-        return <LoginPage onLoginSuccess={(user) => { setLoggedInUser(user); setIsLoggedIn(true); }} />;
-    }
+    // Auth code removed
 
     return (
         <div className="flex h-screen bg-slate-50 font-sans text-gray-900 overflow-hidden">
@@ -1270,20 +1265,12 @@ function App() {
                 </nav>
                 <div className="p-4 border-t border-gray-100">
                     <div className={`bg-slate-50 rounded-xl p-3 border border-slate-100 flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} transition-all duration-300`}>
-                        <div className="h-9 w-9 rounded-full bg-violet-100 flex items-center justify-center text-violet-600 font-bold text-xs flex-shrink-0">{loggedInUser ? loggedInUser.name.charAt(0).toUpperCase() : 'U'}</div>
+                        <div className="h-9 w-9 rounded-full bg-violet-100 flex items-center justify-center text-violet-600 font-bold text-xs flex-shrink-0">A</div>
                         <div className={`overflow-hidden transition-all duration-300 ${isCollapsed ? 'w-0 opacity-0 hidden' : 'w-auto opacity-100'}`}>
-                            <p className="text-sm font-bold text-gray-800 truncate">{loggedInUser ? loggedInUser.name : 'User'}</p>
-                            <p className="text-xs text-gray-500">{loggedInUser ? loggedInUser.email_id : ''}</p>
+                            <p className="text-sm font-bold text-gray-800 truncate">Admin</p>
+                            <p className="text-xs text-gray-500">System Administrator</p>
                         </div>
                     </div>
-                    <button
-                        onClick={() => { setIsLoggedIn(false); setLoggedInUser(null); }}
-                        title={isCollapsed ? 'Logout' : ''}
-                        className={`flex items-center ${isCollapsed ? 'justify-center px-0' : 'gap-2 px-3'} w-full mt-2 py-2.5 rounded-xl text-red-400 hover:bg-red-50 hover:text-red-600 transition-all duration-200 font-medium`}
-                    >
-                        <LogOut className="w-4 h-4 flex-shrink-0" />
-                        <span className={`text-sm whitespace-nowrap transition-all duration-300 ${isCollapsed ? 'opacity-0 w-0 hidden' : 'opacity-100'}`}>Logout</span>
-                    </button>
                 </div>
             </aside>
 
@@ -1294,14 +1281,7 @@ function App() {
                         <h2 className="text-2xl font-bold text-gray-800">{pageTitle[activeTab] || 'Dashboard'}</h2>
                     </div>
                     <div className="flex items-center space-x-4">
-                        <div className="h-10 w-10 bg-violet-100 rounded-full flex items-center justify-center text-violet-700 font-bold border-2 border-white shadow-sm">{loggedInUser ? loggedInUser.name.charAt(0).toUpperCase() : 'U'}</div>
-                        <button
-                            onClick={() => { setIsLoggedIn(false); setLoggedInUser(null); }}
-                            className="flex items-center gap-2 text-sm text-red-400 hover:text-red-600 hover:bg-red-50 px-3 py-2 rounded-xl transition-all font-medium"
-                        >
-                            <LogOut className="w-4 h-4" />
-                            <span>Logout</span>
-                        </button>
+                        <div className="h-10 w-10 bg-violet-100 rounded-full flex items-center justify-center text-violet-700 font-bold border-2 border-white shadow-sm">A</div>
                     </div>
                 </header>
 

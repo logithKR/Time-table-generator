@@ -81,7 +81,7 @@ const CourseChip = ({ course, colorStyle, facultyName, venueName }) => {
 };
 
 // ─── Draggable Grid Cell Content ───
-const CellContent = ({ entry, cellId, isLabStart, isSwapMode, isSelected, onClick }) => {
+const CellContent = ({ entry, sections, cellId, isLabStart, isSwapMode, isSelected, onClick }) => {
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
         id: cellId,
         data: { type: 'placed', entry },
@@ -106,6 +106,13 @@ const CellContent = ({ entry, cellId, isLabStart, isSwapMode, isSelected, onClic
 
     const isMentor = entry.session_type === 'MENTOR';
     const isOE = entry.session_type === 'OPEN_ELECTIVE' || entry.course_code === 'OPEN_ELEC';
+    const hasMultipleSections = sections && sections.length > 1;
+
+    // Compute pairing info before render
+    const uniqueCodes = hasMultipleSections
+        ? [...new Set(sections.map(s => s.course_code))]
+        : [entry.course_code];
+    const isPaired = uniqueCodes.length > 1;
 
     return (
         <div ref={setNodeRef} style={style} {...listeners} {...attributes} onClick={onClick}
@@ -123,27 +130,55 @@ const CellContent = ({ entry, cellId, isLabStart, isSwapMode, isSelected, onClic
             ) : (
                 <>
                     <div className="flex justify-between items-start w-full mb-0.5">
-                        <div className="font-bold text-xs leading-tight tracking-tight whitespace-pre-wrap break-words">{entry.course_code}</div>
+                        <div className="font-bold text-xs leading-tight tracking-tight truncate" title={uniqueCodes.join(' / ')}>
+                            {uniqueCodes.join(' / ')}
+                        </div>
                         {entry.session_type === 'LAB' && isLabStart && (
                             <FlaskConical className="w-3 h-3 opacity-40 shrink-0 ml-1 fill-current" />
                         )}
                     </div>
 
-                    <div className="text-[10px] leading-tight opacity-70 font-medium w-full whitespace-pre-wrap break-words" title={entry.course_name}>{entry.course_name || ''}</div>
+                    {isPaired ? (
+                        <div className="text-[9px] leading-tight opacity-70 font-medium w-full">
+                            {[...new Set(sections.map(s => s.course_name))].map((name, i) => (
+                                <div key={i} className="truncate" title={name}>{name || ''}</div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="text-[10px] leading-tight opacity-70 font-medium w-full truncate" title={entry.course_name}>{entry.course_name || ''}</div>
+                    )}
 
-                    <div className="mt-auto pt-1.5 flex flex-col gap-1 w-full border-t border-current/10">
-                        {entry.venue_name && (
-                            <div className="text-[8.5px] flex items-center gap-1 font-bold text-indigo-700 bg-indigo-50/80 px-1 py-0.5 rounded border border-indigo-200 w-fit">
-                                <span className="truncate">{entry.venue_name}</span>
-                            </div>
-                        )}
-                        {entry.faculty_name && entry.faculty_name !== 'Unassigned' && (
-                            <div className="text-[9px] flex items-center gap-1 opacity-70 font-semibold w-full">
-                                <Users2 className="w-2.5 h-2.5 opacity-80" />
-                                <span className="truncate">{entry.faculty_name}</span>
-                            </div>
-                        )}
-                    </div>
+                    {hasMultipleSections ? (
+                        <div className="mt-auto pt-1 flex flex-col gap-0.5 w-full border-t border-current/10">
+                            {sections.map((sec, idx) => (
+                                <div key={idx} className="flex items-center gap-1 text-[8px] leading-tight">
+                                    {isPaired && (
+                                        <span className="font-bold opacity-60 shrink-0">{sec.course_code.slice(-3)}:</span>
+                                    )}
+                                    <span className="font-semibold truncate flex-1 opacity-80">{sec.faculty_name || ''}</span>
+                                    {sec.venue_name && (
+                                        <span className="font-bold text-indigo-600 bg-indigo-50/80 px-1 rounded border border-indigo-200 shrink-0 truncate max-w-[60px]" title={sec.venue_name}>
+                                            {sec.venue_name}
+                                        </span>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="mt-auto pt-1.5 flex flex-col gap-1 w-full border-t border-current/10">
+                            {entry.venue_name && (
+                                <div className="text-[8.5px] flex items-center gap-1 font-bold text-indigo-700 bg-indigo-50/80 px-1 py-0.5 rounded border border-indigo-200 w-fit">
+                                    <span className="truncate">{entry.venue_name}</span>
+                                </div>
+                            )}
+                            {entry.faculty_name && entry.faculty_name !== 'Unassigned' && (
+                                <div className="text-[9px] flex items-center gap-1 opacity-70 font-semibold w-full">
+                                    <Users2 className="w-2.5 h-2.5 opacity-80" />
+                                    <span className="truncate">{entry.faculty_name}</span>
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </>
             )}
         </div>
@@ -180,7 +215,7 @@ const GridCell = ({ id, children, isEmpty, isBreak, isLunch, onCellClick }) => {
 };
 
 // ─── Droppable Grid Cell Span (Preserved Logic) ───
-const DroppableGridCellSpan = ({ id, colSpan, entry, isLabStart, onDelete, isSwapMode, isSelected, onCellClick }) => {
+const DroppableGridCellSpan = ({ id, colSpan, entry, sections, isLabStart, onDelete, isSwapMode, isSelected, onCellClick }) => {
     const { setNodeRef, isOver } = useDroppable({ id });
 
     return (
@@ -196,6 +231,7 @@ const DroppableGridCellSpan = ({ id, colSpan, entry, isLabStart, onDelete, isSwa
                 <div className="relative group h-full w-full">
                     <CellContent
                         entry={entry}
+                        sections={sections}
                         cellId={`placed-${id}`}
                         isLabStart={isLabStart}
                         isSwapMode={isSwapMode}
@@ -394,10 +430,18 @@ export default function TimetableEditor({ department, semester, onSave, onExport
         [slots]
     );
 
-    const gridMap = useMemo(() => {
+    const { gridMap, sectionsMap } = useMemo(() => {
         const gm = {};
-        entries.forEach(e => { gm[`${e.day_of_week}-${e.period_number}`] = e; });
-        return gm;
+        const sm = {};
+        entries.forEach(e => {
+            const key = `${e.day_of_week}-${e.period_number}`;
+            // gridMap: keep the first entry (section 1 or first encountered) as the primary for drag-and-drop
+            if (!gm[key]) gm[key] = e;
+            // sectionsMap: group all entries for the same slot
+            if (!sm[key]) sm[key] = [];
+            sm[key].push(e);
+        });
+        return { gridMap: gm, sectionsMap: sm };
     }, [entries]);
 
     const filteredCourses = useMemo(() => {
@@ -899,7 +943,7 @@ export default function TimetableEditor({ department, semester, onSave, onExport
                                     <th className="py-5 px-6 text-left text-xs font-bold uppercase tracking-widest border-r border-gray-100 w-32">Day</th>
                                     {periodColumns.map((col, i) => (
                                         col.type === 'PERIOD' ? (
-                                            <th key={`h-${col.period}`} className="py-4 px-3 text-center border-r border-gray-100 last:border-r-0 min-w-[120px]">
+                                            <th key={`h-${col.period}`} className="py-4 px-3 text-center border-r border-gray-100 last:border-r-0 min-w-[145px]">
                                                 <div className="text-[10px] font-black text-gray-400 tracking-widest mb-1 uppercase">Period {col.period}</div>
                                                 <div className="text-[11px] font-medium text-gray-600 font-mono tracking-tight bg-gray-50 rounded-full px-2 py-0.5 inline-block border border-gray-200">{col.start} – {col.end}</div>
                                             </th>
@@ -945,6 +989,7 @@ export default function TimetableEditor({ department, semester, onSave, onExport
                                                         id={key}
                                                         colSpan={spanTwo ? 2 : 1}
                                                         entry={entry}
+                                                        sections={sectionsMap[key]}
                                                         isLabStart={labStart}
                                                         onDelete={() => handleDeleteEntry(day, p)}
                                                         isSwapMode={isSwapMode}

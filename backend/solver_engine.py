@@ -1,6 +1,7 @@
 from ortools.sat.python import cp_model
 from sqlalchemy.orm import Session
 import models
+import math
 
 def generate_schedule(db: Session, department_code: str, semester: int, mentor_day: str, mentor_period: int = 8):
     """
@@ -36,8 +37,8 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
         print("❌ No active slots found.")
         return False
 
-    # Faculty lookups
-    course_faculty = {}
+    # Faculty lookups — now with delivery_type for priority sorting
+    course_faculty = {}     # course_code -> [(fac_id, fac_name, delivery_type), ...]
     course_names = {}
     for course in courses:
         course_names[course.course_code] = course.course_name
@@ -46,7 +47,8 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
         for m in mappings:
             fac = db.query(models.FacultyMaster).filter_by(faculty_id=m.faculty_id).first()
             fname = fac.faculty_name if fac else m.faculty_id
-            f_list.append((m.faculty_id, fname))
+            dtype = (m.delivery_type or 'OFFLINE').strip().upper()
+            f_list.append((m.faculty_id, fname, dtype))
         course_faculty[course.course_code] = f_list
 
     # Organize slots
@@ -101,12 +103,128 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
     # We will no longer concatenate default_classrooms into a single string.
     # Keep them as lists default_classrooms and default_labs.
 
+    # =========================================================
+    # 1b. MULTI-SECTION CALCULATION
+    # =========================================================
+    sem_count = db.query(models.DepartmentSemesterCount).filter_by(
+        department_code=department_code, semester=semester
+    ).first()
+    student_count = sem_count.student_count if sem_count and sem_count.student_count > 0 else 60
+
+    # Get venue capacity info for classrooms and labs
+    classroom_venues_info = []  # [(venue_name, capacity), ...]
+    lab_venues_info = []
+    for dvm in dept_venue_maps:
+        v = db.query(models.VenueMaster).filter_by(venue_id=dvm.venue_id).first()
+        if v:
+            if v.is_lab:
+                lab_venues_info.append((v.venue_name, v.capacity or 60))
+            else:
+                classroom_venues_info.append((v.venue_name, v.capacity or 60))
+
+    max_classroom_cap = max((c[1] for c in classroom_venues_info), default=60)
+    max_lab_cap = max((c[1] for c in lab_venues_info), default=60)
+
+    # Compute theory sections needed
+    theory_sections = math.ceil(student_count / max_classroom_cap) if max_classroom_cap > 0 else 1
+    if student_count % max_classroom_cap > 0 and student_count % max_classroom_cap < 30:
+        theory_sections = max(theory_sections - 1, 1)
+
+    # Compute lab sections needed
+    lab_sections = math.ceil(student_count / max_lab_cap) if max_lab_cap > 0 else 1
+    if student_count % max_lab_cap > 0 and student_count % max_lab_cap < 30:
+        lab_sections = max(lab_sections - 1, 1)
+
+    print(f"  👥 Student count: {student_count}")
+    print(f"  🏫 Theory sections: {theory_sections} (classrooms: {len(classroom_venues_info)}, max cap: {max_classroom_cap})")
+    print(f"  🔬 Lab sections: {lab_sections} (labs: {len(lab_venues_info)}, max cap: {max_lab_cap})")
+
+    # Faculty priority helpers
+    def get_theory_faculty(course_code):
+        """Returns faculty sorted: THEORY -> THEORY WITH LAB -> LAB -> OFFLINE"""
+        all_fac = course_faculty.get(course_code, [])
+        priority = {'THEORY': 0, 'THEORY WITH LAB': 1, 'LAB': 2, 'OFFLINE': 1}
+        return sorted(all_fac, key=lambda f: priority.get(f[2], 3))
+
+    def get_lab_faculty(course_code):
+        """Returns faculty sorted: LAB -> THEORY WITH LAB -> THEORY -> OFFLINE"""
+        all_fac = course_faculty.get(course_code, [])
+        priority = {'LAB': 0, 'THEORY WITH LAB': 1, 'THEORY': 2, 'OFFLINE': 1}
+        return sorted(all_fac, key=lambda f: priority.get(f[2], 3))
+
+    # Global faculty occupancy: check what faculty are busy across ALL departments
+    global_faculty_busy = {}  # (day, period) -> set(faculty_ids)
+    all_existing = db.query(models.TimetableEntry).filter(
+        models.TimetableEntry.department_code != department_code
+    ).all()
+    for e in all_existing:
+        key = (e.day_of_week, e.period_number)
+        if key not in global_faculty_busy:
+            global_faculty_busy[key] = set()
+        if e.faculty_id:
+            global_faculty_busy[key].add(e.faculty_id)
+
+    # Current run faculty occupancy (within this generation)
+    run_faculty_busy = {}  # (day, period) -> set(faculty_ids)
+
+    def is_faculty_free(fac_id, day, period):
+        if not fac_id:
+            return True
+        key = (day, period)
+        if fac_id in global_faculty_busy.get(key, set()):
+            return False
+        if fac_id in run_faculty_busy.get(key, set()):
+            return False
+        return True
+
+    def mark_faculty_busy(fac_id, day, period):
+        if not fac_id:
+            return
+        key = (day, period)
+        if key not in run_faculty_busy:
+            run_faculty_busy[key] = set()
+        run_faculty_busy[key].add(fac_id)
+
+    generation_warnings = []  # Collect warnings for the user
+
     lab_block_starts = [1, 3, 5]
     mentor_day_clean = mentor_day.strip().capitalize()
 
     # Separate courses
     regular_courses = [c for c in courses if not (c.is_honours or c.is_minor)]
     honours_courses = [c for c in courses if c.is_honours or c.is_minor]
+
+    # ── Build elective pair groups ──
+    # Courses with the same course_category (e.g. "ELECTIVE 3") share the same slots
+    elective_groups = {}  # course_category -> [course, ...]
+    elective_representative = {}  # course_code -> course_category (only for representatives)
+    elective_partners = {}  # representative_course_code -> [partner_course, ...]
+    solver_regular_courses = []  # courses that actually go into the solver
+    
+    for c in regular_courses:
+        cat = (c.course_category or '').strip().upper()
+        is_elective_cat = cat.startswith('ELECTIVE') and c.is_elective
+        
+        if is_elective_cat:
+            if cat not in elective_groups:
+                elective_groups[cat] = []
+            elective_groups[cat].append(c)
+        else:
+            solver_regular_courses.append(c)
+    
+    # For each elective group, pick the first as representative, rest are partners
+    for cat, group in elective_groups.items():
+        rep = group[0]  # representative goes into solver
+        solver_regular_courses.append(rep)
+        elective_representative[rep.course_code] = cat
+        partners = group[1:]  # partners piggyback on the same slots
+        elective_partners[rep.course_code] = partners
+        if partners:
+            partner_names = ', '.join(p.course_code for p in partners)
+            print(f"  🔗 {cat}: {rep.course_code} (solver) ↔ {partner_names} (paired)")
+    
+    # Replace regular_courses with solver_regular_courses for the CP-SAT model
+    regular_courses = solver_regular_courses
 
     # Split theory vs lab
     course_theory_count = {}
@@ -320,7 +438,7 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
     # --- C5: Faculty clash ---
     faculty_courses_map = {}
     for c in regular_courses:
-        for fid, fname in course_faculty.get(c.course_code, []):
+        for fid, fname, dtype in course_faculty.get(c.course_code, []):
             if not fid or str(fid).lower() in ['nan', 'none']: 
                 continue # Skip faculty clash check if no real faculty ID
             if fid not in faculty_courses_map:
@@ -446,64 +564,120 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
     count = 0
     filled_slots = set()
 
-    # --- Save THEORY entries ---
+    # --- Save THEORY entries (multi-section + elective pairing) ---
     for c in regular_courses:
-        fids = course_faculty.get(c.course_code, [])
-        fid = fids[0][0] if fids else None
-        fname = fids[0][1] if fids else None
+        sorted_fac = get_theory_faculty(c.course_code)
         cname = course_names.get(c.course_code, c.course_code)
+        partners = elective_partners.get(c.course_code, [])
+        all_group_courses = [c] + partners  # c is the representative + any partners
+        
         for day in all_days:
             for period in day_periods.get(day, []):
                 key = (c.course_code, day, period)
                 if key in theory_vars and solver.Value(theory_vars[key]):
                     slot_obj = slot_lookup.get((day, period))
-                    if slot_obj:
-                        c_venue = assign_venue(day, period, c.course_code, False, count)
-                        entry = models.TimetableEntry(
-                            department_code=department_code, semester=semester,
-                            course_code=c.course_code, course_name=cname,
-                            faculty_id=fid, faculty_name=fname,
-                            session_type='THEORY',
-                            slot_id=slot_obj.slot_id,
-                            day_of_week=day, period_number=period,
-                            venue_name=c_venue,
-                            created_at="now"
-                        )
-                        db.add(entry)
-                        filled_slots.add((day, period))
-                        count += 1
+                    if not slot_obj:
+                        continue
+                    
+                    # For each course in the elective group (or just the single course)
+                    for gc in all_group_courses:
+                        gc_fac = get_theory_faculty(gc.course_code)
+                        gc_name = course_names.get(gc.course_code, gc.course_code)
+                        
+                        assigned_sections = 0
+                        for sec in range(theory_sections):
+                            # Find available faculty for this course
+                            fac_assigned = None
+                            for fid, fname, dtype in gc_fac:
+                                if is_faculty_free(fid, day, period):
+                                    fac_assigned = (fid, fname)
+                                    break
+                            
+                            if not fac_assigned and gc_fac:
+                                fac_assigned = (gc_fac[sec % len(gc_fac)][0], gc_fac[sec % len(gc_fac)][1])
+                                generation_warnings.append(
+                                    f"\u26a0\ufe0f  {gc.course_code} (THEORY) {day} P{period} Sec {sec+1}: "
+                                    f"Reusing faculty {fac_assigned[1]} \u2014 not enough unique theory faculty. "
+                                    f"Need {theory_sections}, have {len(gc_fac)} mapped."
+                                )
+                            elif not fac_assigned:
+                                fac_assigned = (None, 'Unassigned')
+                                generation_warnings.append(
+                                    f"\u274c {gc.course_code} (THEORY): No faculty mapped at all!"
+                                )
+                            
+                            c_venue = assign_venue(day, period, gc.course_code, False, count + sec)
+                            
+                            entry = models.TimetableEntry(
+                                department_code=department_code, semester=semester,
+                                course_code=gc.course_code, course_name=gc_name,
+                                faculty_id=fac_assigned[0], faculty_name=fac_assigned[1],
+                                session_type='THEORY',
+                                slot_id=slot_obj.slot_id,
+                                day_of_week=day, period_number=period,
+                                venue_name=c_venue,
+                                section_number=sec + 1,
+                                created_at="now"
+                            )
+                            db.add(entry)
+                            mark_faculty_busy(fac_assigned[0], day, period)
+                            assigned_sections += 1
+                    
+                    filled_slots.add((day, period))
+                    count += assigned_sections * len(all_group_courses)
 
-    # --- Save LAB entries ---
+    # --- Save LAB entries (multi-section + elective pairing) ---
     for c in regular_courses:
         if course_lab_blocks[c.course_code] == 0:
             continue
-        fids = course_faculty.get(c.course_code, [])
-        fid = fids[0][0] if fids else None
-        fname = fids[0][1] if fids else None
-        cname = course_names.get(c.course_code, c.course_code)
+        partners = elective_partners.get(c.course_code, [])
+        all_group_courses = [c] + partners
+        
         for day in all_days:
             for bs in lab_block_starts:
                 lkey = (c.course_code, day, bs)
                 if lkey in lab_vars and solver.Value(lab_vars[lkey]):
-                    cv1 = assign_venue(day, bs, c.course_code, True, count)
-                    cv2 = assign_venue(day, bs + 1, c.course_code, True, count)
-                    
-                    for p, c_v in [(bs, cv1), (bs + 1, cv2)]:
-                        slot_obj = slot_lookup.get((day, p))
-                        if slot_obj:
-                            entry = models.TimetableEntry(
-                                department_code=department_code, semester=semester,
-                                course_code=c.course_code, course_name=cname,
-                                faculty_id=fid, faculty_name=fname,
-                                session_type='LAB',
-                                slot_id=slot_obj.slot_id,
-                                day_of_week=day, period_number=p,
-                                venue_name=c_v,
-                                created_at="now"
-                            )
-                            db.add(entry)
-                            filled_slots.add((day, p))
-                            count += 1
+                    for gc in all_group_courses:
+                        gc_fac = get_lab_faculty(gc.course_code)
+                        gc_name = course_names.get(gc.course_code, gc.course_code)
+                        
+                        for sec in range(lab_sections):
+                            fac_assigned = None
+                            for fid, fname, dtype in gc_fac:
+                                if is_faculty_free(fid, day, bs) and is_faculty_free(fid, day, bs + 1):
+                                    fac_assigned = (fid, fname)
+                                    break
+                            
+                            if not fac_assigned and gc_fac:
+                                fac_assigned = (gc_fac[sec % len(gc_fac)][0], gc_fac[sec % len(gc_fac)][1])
+                                generation_warnings.append(
+                                    f"\u26a0\ufe0f  {gc.course_code} (LAB) {day} P{bs}-P{bs+1} Sec {sec+1}: "
+                                    f"Reusing faculty {fac_assigned[1]} \u2014 not enough unique lab faculty. "
+                                    f"Need {lab_sections}, have {len(gc_fac)} mapped."
+                                )
+                            elif not fac_assigned:
+                                fac_assigned = (None, 'Unassigned')
+                            
+                            for p in [bs, bs + 1]:
+                                c_v = assign_venue(day, p, gc.course_code, True, count + sec)
+                                slot_obj = slot_lookup.get((day, p))
+                                if slot_obj:
+                                    entry = models.TimetableEntry(
+                                        department_code=department_code, semester=semester,
+                                        course_code=gc.course_code, course_name=gc_name,
+                                        faculty_id=fac_assigned[0], faculty_name=fac_assigned[1],
+                                        session_type='LAB',
+                                        slot_id=slot_obj.slot_id,
+                                        day_of_week=day, period_number=p,
+                                        venue_name=c_v,
+                                        section_number=sec + 1,
+                                        created_at="now"
+                                    )
+                                    db.add(entry)
+                                    filled_slots.add((day, p))
+                                    count += 1
+                            mark_faculty_busy(fac_assigned[0], day, bs)
+                            mark_faculty_busy(fac_assigned[0], day, bs + 1)
 
     # =========================================================
     # 6. POST-SOLVE: Honours in P8, fill gaps
@@ -522,7 +696,7 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
             fid = fids[0][0] if fids else None
             fname = fids[0][1] if fids else None
             cname = course_names.get(c.course_code, c.course_code)
-            total = c.weekly_sessions or (course_theory_count[c.course_code] + course_lab_blocks[c.course_code] * 2)
+            total = c.weekly_sessions or (course_theory_count.get(c.course_code, 3) + course_lab_blocks.get(c.course_code, 0) * 2)
             
             queue = []
             for _ in range(total):
@@ -537,15 +711,11 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
         # Loop through P8 slots, picking from the front queue, then rotating it to the back
         for day, period in p8_slots:
             if not course_queues:
-                break # All honours sessions assigned
+                break
                 
-            # Pop the first queue
             current_queue = course_queues.pop(0)
-            
-            # Pop one session from that queue
             hs = current_queue.pop(0)
             
-            # Save the entry
             slot_obj = slot_lookup[(day, period)]
             c_venue = assign_venue(day, period, hs['course_code'], False, count)
             entry = models.TimetableEntry(
@@ -556,13 +726,13 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                 slot_id=slot_obj.slot_id,
                 day_of_week=day, period_number=period,
                 venue_name=c_venue,
+                section_number=1,
                 created_at="now"
             )
             db.add(entry)
             filled_slots.add((day, period))
             count += 1
             
-            # If the queue still has sessions left, push it to the BACK of the line
             if current_queue:
                 course_queues.append(current_queue)
 
@@ -618,8 +788,8 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                 
     # 2. Organize Courses by Category
     mini_projects = [c for c in courses if "mini project" in (c.course_name or "").lower()]
-    core_courses = [c for c in courses if not c.is_elective and c not in mini_projects]
-    elective_courses = [c for c in courses if c.is_elective and c not in mini_projects]
+    core_courses = [c for c in courses if not c.is_elective and not c.is_honours and not c.is_minor and c not in mini_projects]
+    elective_courses = [c for c in courses if c.is_elective and not c.is_honours and not c.is_minor and c not in mini_projects]
     
     # Rank all courses by descending credits mathematically
     core_courses.sort(key=lambda x: x.credits or 0, reverse=True)
@@ -640,31 +810,40 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
         while free_blocks_2 and weekly_extra_counts[mp.course_code] < 4:
             day, p1, p2 = free_blocks_2.pop(0)
 
-            fids = course_faculty.get(mp.course_code, [])
-            fid = fids[0][0] if fids else None
-            fname = fids[0][1] if fids else None
+            gc_fac = get_lab_faculty(mp.course_code)
+            for sec in range(lab_sections):
+                fac_assigned = None
+                for fid, fname, dtype in gc_fac:
+                    if is_faculty_free(fid, day, p1) and is_faculty_free(fid, day, p2):
+                        fac_assigned = (fid, fname)
+                        break
+                if not fac_assigned and gc_fac:
+                    fac_assigned = (gc_fac[sec % len(gc_fac)][0], gc_fac[sec % len(gc_fac)][1])
+                elif not fac_assigned:
+                    fac_assigned = (None, 'Unassigned')
+
+                for p in [p1, p2]:
+                    slot_obj = slot_lookup.get((day, p))
+                    c_v = assign_venue(day, p, mp.course_code, True, count + sec)
+                    if slot_obj:
+                        db.add(models.TimetableEntry(
+                            department_code=department_code, semester=semester,
+                            course_code=mp.course_code, course_name=mp.course_name,
+                            faculty_id=fac_assigned[0], faculty_name=fac_assigned[1],
+                            session_type='LAB',
+                            slot_id=slot_obj.slot_id,
+                            day_of_week=day, period_number=p,
+                            venue_name=c_v,
+                            section_number=sec + 1,
+                            created_at="now"
+                        ))
+                        filled_slots.add((day, p))
+                        count += 1
+                mark_faculty_busy(fac_assigned[0], day, p1)
+                mark_faculty_busy(fac_assigned[0], day, p2)
             
-            cv1 = assign_venue(day, p1, mp.course_code, True, count)
-            cv2 = assign_venue(day, p2, mp.course_code, True, count)
-            
-            for p, c_v in [(p1, cv1), (p2, cv2)]:
-                slot_obj = slot_lookup.get((day, p))
-                if slot_obj:
-                    db.add(models.TimetableEntry(
-                        department_code=department_code, semester=semester,
-                        course_code=mp.course_code, course_name=mp.course_name,
-                        faculty_id=fid, faculty_name=fname,
-                        session_type='LAB',
-                        slot_id=slot_obj.slot_id,
-                        day_of_week=day, period_number=p,
-                        venue_name=c_v,
-                        created_at="now"
-                    ))
-                    filled_slots.add((day, p))
-                    count += 1
-                    weekly_extra_counts[mp.course_code] += 1
-                    daily_extra_counts[mp.course_code][day] += 1
-                    
+            weekly_extra_counts[mp.course_code] += 1
+            daily_extra_counts[mp.course_code][day] += 1
     def fill_remaining_slots(target_courses):
         nonlocal count
         if not target_courses:
@@ -687,30 +866,40 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                 free_blocks_2.pop(0)
                 consecutive_failures = 0
                 
-                fids = course_faculty.get(c.course_code, [])
-                fid = fids[0][0] if fids else None
-                fname = fids[0][1] if fids else None
+                gc_fac = get_lab_faculty(c.course_code)
+                for sec in range(lab_sections):
+                    fac_assigned = None
+                    for fid, fname, dtype in gc_fac:
+                        if is_faculty_free(fid, day, p1) and is_faculty_free(fid, day, p2):
+                            fac_assigned = (fid, fname)
+                            break
+                    if not fac_assigned and gc_fac:
+                        fac_assigned = (gc_fac[sec % len(gc_fac)][0], gc_fac[sec % len(gc_fac)][1])
+                    elif not fac_assigned:
+                        fac_assigned = (None, 'Unassigned')
+
+                    for p in [p1, p2]:
+                        slot_obj = slot_lookup.get((day, p))
+                        c_v = assign_venue(day, p, c.course_code, True, count + sec)
+                        if slot_obj:
+                            db.add(models.TimetableEntry(
+                                department_code=department_code, semester=semester,
+                                course_code=c.course_code, course_name=c.course_name,
+                                faculty_id=fac_assigned[0], faculty_name=fac_assigned[1],
+                                session_type='LAB',
+                                slot_id=slot_obj.slot_id,
+                                day_of_week=day, period_number=p,
+                                venue_name=c_v,
+                                section_number=sec + 1,
+                                created_at="now"
+                            ))
+                            filled_slots.add((day, p))
+                            count += 1
+                    mark_faculty_busy(fac_assigned[0], day, p1)
+                    mark_faculty_busy(fac_assigned[0], day, p2)
                 
-                cv1 = assign_venue(day, p1, c.course_code, True, count)
-                cv2 = assign_venue(day, p2, c.course_code, True, count)
-                
-                for p, c_v in [(p1, cv1), (p2, cv2)]:
-                    slot_obj = slot_lookup.get((day, p))
-                    if slot_obj:
-                        db.add(models.TimetableEntry(
-                            department_code=department_code, semester=semester,
-                            course_code=c.course_code, course_name=c.course_name,
-                            faculty_id=fid, faculty_name=fname,
-                            session_type='LAB',
-                            slot_id=slot_obj.slot_id,
-                            day_of_week=day, period_number=p,
-                            venue_name=c_v,
-                            created_at="now"
-                        ))
-                        filled_slots.add((day, p))
-                        count += 1
-                        weekly_extra_counts[c.course_code] += 1
-                        daily_extra_counts[c.course_code][day] += 1
+                weekly_extra_counts[c.course_code] += 1
+                daily_extra_counts[c.course_code][day] += 1
             else:
                 consecutive_failures += 1
                 
@@ -732,27 +921,38 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                 single_frees.pop(0)
                 consecutive_failures = 0
                 
-                fids = course_faculty.get(c.course_code, [])
-                fid = fids[0][0] if fids else None
-                fname = fids[0][1] if fids else None
-                c_venue = assign_venue(day, p, c.course_code, False, count)
+                gc_fac = get_theory_faculty(c.course_code)
+                for sec in range(theory_sections):
+                    fac_assigned = None
+                    for fid, fname, dtype in gc_fac:
+                        if is_faculty_free(fid, day, p):
+                            fac_assigned = (fid, fname)
+                            break
+                    if not fac_assigned and gc_fac:
+                        fac_assigned = (gc_fac[sec % len(gc_fac)][0], gc_fac[sec % len(gc_fac)][1])
+                    elif not fac_assigned:
+                        fac_assigned = (None, 'Unassigned')
+
+                    slot_obj = slot_lookup.get((day, p))
+                    c_venue = assign_venue(day, p, c.course_code, False, count + sec)
+                    if slot_obj:
+                        db.add(models.TimetableEntry(
+                            department_code=department_code, semester=semester,
+                            course_code=c.course_code, course_name=c.course_name,
+                            faculty_id=fac_assigned[0], faculty_name=fac_assigned[1],
+                            session_type='THEORY',
+                            slot_id=slot_obj.slot_id,
+                            day_of_week=day, period_number=p,
+                            venue_name=c_venue,
+                            section_number=sec + 1,
+                            created_at="now"
+                        ))
+                        filled_slots.add((day, p))
+                        count += 1
+                    mark_faculty_busy(fac_assigned[0], day, p)
                 
-                slot_obj = slot_lookup.get((day, p))
-                if slot_obj:
-                    db.add(models.TimetableEntry(
-                        department_code=department_code, semester=semester,
-                        course_code=c.course_code, course_name=c.course_name,
-                        faculty_id=fid, faculty_name=fname,
-                        session_type='THEORY',
-                        slot_id=slot_obj.slot_id,
-                        day_of_week=day, period_number=p,
-                        venue_name=c_venue,
-                        created_at="now"
-                    ))
-                    filled_slots.add((day, p))
-                    count += 1
-                    weekly_extra_counts[c.course_code] += 1
-                    daily_extra_counts[c.course_code][day] += 1
+                weekly_extra_counts[c.course_code] += 1
+                daily_extra_counts[c.course_code][day] += 1
             else:
                 consecutive_failures += 1
 
@@ -810,25 +1010,35 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
             fallback_courses.sort(key=lambda x: x.credits or 0, reverse=True)
             for day, p in single_frees:
                 c = fallback_courses[idx % len(fallback_courses)]
-                fids = course_faculty.get(c.course_code, [])
-                fid = fids[0][0] if fids else None
-                fname = fids[0][1] if fids else None
-                c_venue = assign_venue(day, p, c.course_code, False, count)
-                
-                slot_obj = slot_lookup.get((day, p))
-                if slot_obj:
-                    db.add(models.TimetableEntry(
-                        department_code=department_code, semester=semester,
-                        course_code=c.course_code, course_name=c.course_name,
-                        faculty_id=fid, faculty_name=fname,
-                        session_type='THEORY',
-                        slot_id=slot_obj.slot_id,
-                        day_of_week=day, period_number=p,
-                        venue_name=c_venue,
-                        created_at="now"
-                    ))
-                    filled_slots.add((day, p))
-                    count += 1
+                gc_fac = get_theory_faculty(c.course_code)
+                for sec in range(theory_sections):
+                    fac_assigned = None
+                    for fid, fname, dtype in gc_fac:
+                        if is_faculty_free(fid, day, p):
+                            fac_assigned = (fid, fname)
+                            break
+                    if not fac_assigned and gc_fac:
+                        fac_assigned = (gc_fac[sec % len(gc_fac)][0], gc_fac[sec % len(gc_fac)][1])
+                    elif not fac_assigned:
+                        fac_assigned = (None, 'Unassigned')
+
+                    slot_obj = slot_lookup.get((day, p))
+                    c_venue = assign_venue(day, p, c.course_code, False, count + sec)
+                    if slot_obj:
+                        db.add(models.TimetableEntry(
+                            department_code=department_code, semester=semester,
+                            course_code=c.course_code, course_name=c.course_name,
+                            faculty_id=fac_assigned[0], faculty_name=fac_assigned[1],
+                            session_type='THEORY',
+                            slot_id=slot_obj.slot_id,
+                            day_of_week=day, period_number=p,
+                            venue_name=c_venue,
+                            section_number=sec + 1,
+                            created_at="now"
+                        ))
+                        filled_slots.add((day, p))
+                        count += 1
+                    mark_faculty_busy(fac_assigned[0], day, p)
                 idx += 1
 
     # =========================================================
@@ -853,6 +1063,15 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                 if isinstance(entry, models.TimetableEntry) and entry.course_code == highest_elective.course_code:
                     if "OPEN ELECTIVE" not in str(entry.course_name).upper():
                         entry.course_name = f"{entry.course_name} / OPEN ELECTIVE"
+
+    # Print warnings before commit
+    if generation_warnings:
+        print(f"\n{'='*60}")
+        print(f"⚠️  GENERATION WARNINGS ({len(generation_warnings)} issues):")
+        print(f"{'='*60}")
+        for w in generation_warnings:
+            print(f"  {w}")
+        print(f"{'='*60}\n")
 
     db.commit()
     print(f"💾 Saved {count} timetable entries.")

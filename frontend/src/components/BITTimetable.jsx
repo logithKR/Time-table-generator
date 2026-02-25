@@ -3,9 +3,15 @@ import { Printer, AlertCircle, RefreshCw, Download, Loader2 } from 'lucide-react
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 
-const BITTimetable = ({ timetableData, department, semester, onRefresh }) => {
+const BITTimetable = ({ timetableData, department, semester, courses, onRefresh }) => {
     const componentRef = useRef();
     const [downloading, setDownloading] = useState(false);
+
+    // Display Toggles
+    const [showLabels, setShowLabels] = useState(true);
+    const [showCourseCode, setShowCourseCode] = useState(true);
+    const [showFaculty, setShowFaculty] = useState(true);
+    const [showVenues, setShowVenues] = useState(true);
 
     const handlePrint = () => {
         window.print();
@@ -34,23 +40,38 @@ const BITTimetable = ({ timetableData, department, semester, onRefresh }) => {
     const deptName = isMasterView ? "ALL DEPARTMENTS (MASTER VIEW)" : (department || (timetableData && timetableData[0]?.department_code) || "UNKNOWN");
     const semNum = isMasterView ? "ALL" : (semester || (timetableData && timetableData[0]?.semester) || "UNKNOWN");
 
-    const getCellData = useCallback((day, periodIndex) => {
-        if (!timetableData) return null;
+    const getCellsData = useCallback((day, periodIndex) => {
+        if (!timetableData) return [];
         const targetPeriod = periodIndex + 1;
         const displayToDbDay = {
             "MON": "Monday", "TUE": "Tuesday", "WED": "Wednesday",
             "THU": "Thursday", "FRI": "Friday", "SAT": "Saturday"
         };
         const dbDay = displayToDbDay[day] || day;
-        const found = timetableData.find(t =>
+        return timetableData.filter(t =>
             t.day_of_week?.toLowerCase() === dbDay.toLowerCase() &&
             parseInt(t.period_number) === targetPeriod
         );
-        if (found && day === 'THU' && targetPeriod === 4) {
-            console.log("DEBUG FRONTEND CELL", found);
-        }
-        return found;
     }, [timetableData]);
+
+    const getCourseBadge = useCallback((courseCode, isPdf = false) => {
+        if (!courses) return isPdf ? '' : null;
+        const course = courses.find(c => c.course_code === courseCode);
+        if (!course) return isPdf ? '' : null;
+
+        if (isPdf) {
+            if (!showLabels) return '';
+            if (course.is_honours) return `<span style="font-size:7px;background-color:#f3e8ff;color:#7e22ce;padding:1px 3px;border-radius:2px;border:1px solid #e9d5ff;margin-left:3px;text-transform:uppercase;letter-spacing:0.05em;display:inline-block;vertical-align:middle;">Honours</span>`;
+            if (course.is_minor) return `<span style="font-size:7px;background-color:#e0e7ff;color:#4338ca;padding:1px 3px;border-radius:2px;border:1px solid #c7d2fe;margin-left:3px;text-transform:uppercase;letter-spacing:0.05em;display:inline-block;vertical-align:middle;">Minor</span>`;
+            if (course.is_elective) return `<span style="font-size:7px;background-color:#dcfce7;color:#15803d;padding:1px 3px;border-radius:2px;border:1px solid #bbf7d0;margin-left:3px;text-transform:uppercase;letter-spacing:0.05em;display:inline-block;vertical-align:middle;">Elective</span>`;
+        } else {
+            if (!showLabels) return null;
+            if (course.is_honours) return <span className="text-[7.5px] bg-purple-100 text-purple-700 px-1 py-0.5 rounded shadow-sm font-bold border border-purple-200 uppercase tracking-wider ml-1 align-middle">Honours</span>;
+            if (course.is_minor) return <span className="text-[7.5px] bg-indigo-100 text-indigo-700 px-1 py-0.5 rounded shadow-sm font-bold border border-indigo-200 uppercase tracking-wider ml-1 align-middle">Minor</span>;
+            if (course.is_elective) return <span className="text-[7.5px] bg-green-100 text-green-700 px-1 py-0.5 rounded shadow-sm font-bold border border-green-200 uppercase tracking-wider ml-1 align-middle">Elective</span>;
+        }
+        return isPdf ? '' : null;
+    }, [courses]);
 
     // --- PDF Download: render in isolated iframe, capture, remove ---
     const handleDownloadPDF = useCallback(async () => {
@@ -76,26 +97,67 @@ const BITTimetable = ({ timetableData, department, semester, onRefresh }) => {
             // Build table rows
             const rowsHTML = DAYS.map(day => {
                 const cellsHTML = PERIODS.map((p, i) => {
-                    const cell = getCellData(day, i);
-                    const isLab = cell && (cell.session_type === 'LAB' || cell.session_type === 'Lab');
-                    const isMentor = cell && (cell.session_type === 'MENTOR' || cell.session_type === 'Mentor');
+                    const cells = getCellsData(day, i);
+                    const primaryCell = cells[0];
+                    const isLab = primaryCell && (primaryCell.session_type === 'LAB' || primaryCell.session_type === 'Lab');
+                    const isMentor = primaryCell && (primaryCell.session_type === 'MENTOR' || primaryCell.session_type === 'Mentor');
                     let bg = '#ffffff';
                     if (isLab) bg = '#fefce8';
                     if (isMentor) bg = '#dbeafe';
 
-                    if (cell) {
+                    if (cells.length > 0) {
+                        const uniqueCodes = [...new Set(cells.map(c => c.course_code))];
+                        const isPaired = uniqueCodes.length > 1;
+                        const hasMultiple = cells.length > 1;
+
                         const deptBadge = isMasterView
-                            ? `<span style="font-size:8px;padding:0 4px;border-radius:4px;margin:4px auto 0;background-color:#e5e7eb;font-family:Arial,sans-serif;display:inline-block;">${cell.department_code || ''}</span>`
+                            ? `<span style="font-size:8px;padding:0 4px;border-radius:4px;margin:4px auto 0;background-color:#e5e7eb;font-family:Arial,sans-serif;display:inline-block;">${primaryCell.department_code || ''}</span>`
                             : '';
-                        const venueBadge = cell.venue_name
-                            ? `<span style="font-size:8.5px;padding:0 4px;border-radius:4px;margin:2px auto 0;background-color:#e0e7ff;color:#3730a3;font-family:Arial,sans-serif;display:inline-block;font-weight:bold;border:1px solid #c7d2fe;">${cell.venue_name}</span>`
-                            : '';
+
+                        let cellContentStr = '';
+                        // Render completely differently: vertically slice distinct courses
+                        const groupBlocks = uniqueCodes.map((code, idx) => {
+                            const groupEntries = cells.filter(c => c.course_code === code);
+                            const groupName = groupEntries[0]?.course_name || '';
+                            const isMiniProject = groupName.toLowerCase().includes('mini project');
+
+                            const codeHTML = showCourseCode ? `<span style="font-weight:bold;font-size:11px;font-family:Arial,sans-serif;letter-spacing:-0.025em;">${code}</span>` : '';
+                            const badgeHTML = getCourseBadge(code, true);
+
+                            let detailsHTML = '';
+                            if (!isMiniProject) {
+                                if (groupEntries.length > 1 && !isPaired) {
+                                    // Multiple sections of the same exact code
+                                    detailsHTML = `<div style="border-top:1px solid #e5e7eb;margin-top:3px;padding-top:2px;">` + groupEntries.map((c, sIdx) => {
+                                        const facHTML = showFaculty ? `<span style="font-size:8px;display:block;font-style:italic;color:#4b5563;white-space:nowrap;"><span style="font-weight:600;">S${c.section_number || sIdx + 1}:</span> ${c.faculty_name || ''}</span>` : '';
+                                        const venHTML = (showVenues && c.venue_name) ? `<span style="font-size:7.5px;padding:0 4px;border-radius:3px;margin:1px auto 0;background-color:#e0e7ff;color:#3730a3;font-family:Arial,sans-serif;display:inline-block;font-weight:bold;border:1px solid #c7d2fe;white-space:nowrap;">${c.venue_name}</span>` : '';
+                                        return `<div style="margin-top:2px;">${facHTML}${venHTML}</div>`;
+                                    }).join('') + `</div>`;
+                                } else {
+                                    // Single section
+                                    const c = groupEntries[0];
+                                    const facHTML = showFaculty ? `<span style="font-size:9px;display:block;font-style:italic;color:#4b5563;white-space:nowrap;">${c.faculty_name || ''}</span>` : '';
+                                    const venHTML = (showVenues && c.venue_name) ? `<span style="font-size:8.5px;padding:0 4px;border-radius:4px;margin:2px auto 0;background-color:#e0e7ff;color:#3730a3;font-family:Arial,sans-serif;display:inline-block;font-weight:bold;border:1px solid #c7d2fe;white-space:nowrap;">${c.venue_name}</span>` : '';
+                                    detailsHTML = `${facHTML}${venHTML}`;
+                                }
+                            }
+
+                            return `
+                                <div style="display:flex;flex-direction:column;justify-content:center;padding:2px 0;${idx > 0 ? 'border-top:1px solid #d1d5db;margin-top:2px;' : ''}">
+                                    <div style="display:flex;justify-content:center;align-items:center;">
+                                        ${codeHTML} ${badgeHTML}
+                                    </div>
+                                    <span style="font-size:10px;font-weight:600;line-height:1.25;display:block;padding:0 4px;">${groupName}</span>
+                                    ${detailsHTML}
+                                </div>
+                            `;
+                        });
+
+                        cellContentStr = groupBlocks.join('');
+
                         return `<td style="border:1px solid black;padding:4px;text-align:center;vertical-align:middle;background-color:${bg};">
                             <div style="display:flex;flex-direction:column;gap:2px;justify-content:center;height:100%;">
-                                <span style="font-weight:bold;font-size:11px;display:block;font-family:Arial,sans-serif;letter-spacing:-0.025em;">${cell.course_code || ''}</span>
-                                <span style="font-size:10px;font-weight:600;line-height:1.25;display:block;padding:0 4px;">${cell.course_name || ''}</span>
-                                <span style="font-size:9px;display:block;font-style:italic;color:#4b5563;">${cell.faculty_name || ''}</span>
-                                ${venueBadge}
+                                ${cellContentStr}
                                 ${deptBadge}
                             </div>
                         </td>`;
@@ -214,7 +276,7 @@ body { background: white; color: black; font-family: 'Times New Roman', serif; }
         } finally {
             setDownloading(false);
         }
-    }, [timetableData, department, semester, isMasterView, deptName, semNum, getCellData]);
+    }, [timetableData, department, semester, isMasterView, deptName, semNum, getCellsData, getCourseBadge]);
 
     // --- SAFETY CHECK ---
     if (!timetableData || timetableData.length === 0) {
@@ -255,14 +317,36 @@ body { background: white; color: black; font-family: 'Times New Roman', serif; }
                 }
             `}</style>
 
-            <div className="flex justify-end gap-4 mb-4 dont-print no-print">
-                <button onClick={handleDownloadPDF} disabled={downloading} className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded shadow hover:bg-emerald-700 font-sans transition-all disabled:opacity-50">
-                    {downloading ? <Loader2 className="animate-spin" size={20} /> : <Download size={20} />}
-                    Download PDF
-                </button>
-                <button onClick={handlePrint} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded shadow hover:bg-blue-700 font-sans transition-all">
-                    <Printer size={20} /> Print View
-                </button>
+            <div className="flex flex-col sm:flex-row justify-between gap-4 mb-4 dont-print no-print">
+                <div className="flex flex-wrap gap-3 bg-white p-2 border border-gray-200 rounded-lg shadow-sm text-xs">
+                    <span className="font-semibold text-gray-600 flex items-center pr-2 border-r border-gray-200">View Options:</span>
+                    <label className="flex items-center gap-1.5 cursor-pointer hover:text-blue-600 transition-colors">
+                        <input type="checkbox" checked={showLabels} onChange={(e) => setShowLabels(e.target.checked)} className="rounded text-blue-600 focus:ring-blue-500 cursor-pointer" />
+                        Labels
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer hover:text-blue-600 transition-colors">
+                        <input type="checkbox" checked={showCourseCode} onChange={(e) => setShowCourseCode(e.target.checked)} className="rounded text-blue-600 focus:ring-blue-500 cursor-pointer" />
+                        Codes
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer hover:text-blue-600 transition-colors">
+                        <input type="checkbox" checked={showFaculty} onChange={(e) => setShowFaculty(e.target.checked)} className="rounded text-blue-600 focus:ring-blue-500 cursor-pointer" />
+                        Faculty
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer hover:text-blue-600 transition-colors">
+                        <input type="checkbox" checked={showVenues} onChange={(e) => setShowVenues(e.target.checked)} className="rounded text-blue-600 focus:ring-blue-500 cursor-pointer" />
+                        Venues
+                    </label>
+                </div>
+
+                <div className="flex gap-4">
+                    <button onClick={handleDownloadPDF} disabled={downloading} className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded shadow hover:bg-emerald-700 font-sans transition-all disabled:opacity-50">
+                        {downloading ? <Loader2 className="animate-spin" size={20} /> : <Download size={20} />}
+                        Download PDF
+                    </button>
+                    <button onClick={handlePrint} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded shadow hover:bg-blue-700 font-sans transition-all">
+                        <Printer size={20} /> Print View
+                    </button>
+                </div>
             </div>
 
             <div className="mx-auto shadow-lg max-w-[1400px] mb-8 bg-white print:shadow-none print:w-full print:max-w-none">
@@ -324,23 +408,59 @@ body { background: white; color: black; font-family: 'Times New Roman', serif; }
                                 <tr key={day} className="h-24">
                                     <td className="font-bold text-center text-lg font-serif tracking-widest" style={{ border: '1px solid #000000', backgroundColor: '#f9fafb', color: '#000000' }}>{day}</td>
                                     {PERIODS.map((p, i) => {
-                                        const cell = getCellData(day, i);
-                                        const isLab = cell && (cell.session_type === 'LAB' || cell.session_type === 'Lab');
-                                        const isMentor = cell && (cell.session_type === 'MENTOR' || cell.session_type === 'Mentor');
+                                        const cells = getCellsData(day, i);
+                                        const primaryCell = cells[0];
+                                        const isLab = primaryCell && (primaryCell.session_type === 'LAB' || primaryCell.session_type === 'Lab');
+                                        const isMentor = primaryCell && (primaryCell.session_type === 'MENTOR' || primaryCell.session_type === 'Mentor');
 
                                         let bgStyle = { backgroundColor: '#ffffff' };
                                         if (isLab) bgStyle = { backgroundColor: '#fefce8' };
                                         if (isMentor) bgStyle = { backgroundColor: '#dbeafe' };
 
+                                        const uniqueCodes = [...new Set(cells.map(c => c.course_code))];
+                                        const isPaired = uniqueCodes.length > 1;
+                                        const hasMultiple = cells.length > 1;
+
                                         return (
                                             <td key={i} className="p-1 text-center align-middle" style={{ border: '1px solid #000000', WebkitPrintColorAdjust: 'exact', ...bgStyle }}>
-                                                {cell ? (
+                                                {cells.length > 0 ? (
                                                     <div className="flex flex-col gap-0.5 justify-center h-full">
-                                                        <span className="font-bold text-[11px] block font-sans tracking-tight" style={{ color: '#000000' }}>{cell.course_code}</span>
-                                                        <span className="text-[10px] font-semibold leading-tight block px-1 font-serif" style={{ color: '#000000' }}>{cell.course_name}</span>
-                                                        <span className="text-[9px] block italic font-serif" style={{ color: '#4b5563' }}>{cell.faculty_name}</span>
-                                                        {cell.venue_name && <span className="text-[8.5px] px-1 rounded mx-auto mt-0.5 font-sans font-bold shadow-sm" style={{ backgroundColor: '#e0e7ff', color: '#3730a3', border: '1px solid #c7d2fe' }}>{cell.venue_name}</span>}
-                                                        {isMasterView && <span className="text-[8px] px-1 rounded mx-auto mt-1 font-sans" style={{ backgroundColor: '#e5e7eb', color: '#000000' }}>{cell.department_code}</span>}
+                                                        <div className="font-bold text-[11px] font-sans tracking-tight flex justify-center items-center flex-wrap gap-1 leading-tight" style={{ color: '#000000' }}>
+                                                            {uniqueCodes.map((code, idx) => {
+                                                                const groupEntries = cells.filter(e => e.course_code === code);
+                                                                const groupName = groupEntries[0]?.course_name || '';
+                                                                const isMiniProject = groupName.toLowerCase().includes('mini project');
+
+                                                                return (
+                                                                    <div key={idx} className={`flex flex-col justify-center flex-grow py-1 ${idx > 0 ? 'border-t border-gray-300 mt-1' : ''}`}>
+                                                                        <div className="font-bold text-[11px] font-sans tracking-tight flex justify-center items-center gap-1 leading-tight" style={{ color: '#000000' }}>
+                                                                            {showCourseCode && <span>{code}</span>}
+                                                                            {getCourseBadge(code, false)}
+                                                                        </div>
+                                                                        <span className="text-[10.5px] font-semibold leading-tight block px-1 font-serif my-0.5" style={{ color: '#000000' }}>{groupName}</span>
+
+                                                                        {!isMiniProject && (
+                                                                            groupEntries.length > 1 && !isPaired ? (
+                                                                                <div className="flex flex-col gap-0.5 border-t border-gray-200/50 pt-1 mt-0.5">
+                                                                                    {groupEntries.map((e, sIdx) => (
+                                                                                        <div key={sIdx} className="flex flex-col items-center">
+                                                                                            {showFaculty && <span className="text-[8.5px] font-semibold italic font-serif opacity-80 whitespace-nowrap" style={{ color: '#4b5563' }}><span style={{ color: '#000000' }}>S{e.section_number || sIdx + 1}:</span> {e.faculty_name}</span>}
+                                                                                            {showVenues && e.venue_name && <span className="text-[7.5px] px-1 rounded mt-0.5 font-sans font-bold shadow-sm whitespace-nowrap" style={{ backgroundColor: '#e0e7ff', color: '#3730a3', border: '1px solid #c7d2fe' }}>{e.venue_name}</span>}
+                                                                                        </div>
+                                                                                    ))}
+                                                                                </div>
+                                                                            ) : (
+                                                                                <>
+                                                                                    {showFaculty && <span className="text-[9px] block italic font-serif mt-0.5 whitespace-nowrap" style={{ color: '#4b5563' }}>{groupEntries[0]?.faculty_name || ''}</span>}
+                                                                                    {showVenues && groupEntries[0]?.venue_name && <span className="text-[8.5px] px-1 rounded mx-auto mt-0.5 font-sans font-bold shadow-sm w-fit whitespace-nowrap" style={{ backgroundColor: '#e0e7ff', color: '#3730a3', border: '1px solid #c7d2fe' }}>{groupEntries[0].venue_name}</span>}
+                                                                                </>
+                                                                            )
+                                                                        )}
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                        {isMasterView && <span className="text-[8px] px-1 rounded mx-auto mt-1 font-sans" style={{ backgroundColor: '#e5e7eb', color: '#000000' }}>{primaryCell.department_code}</span>}
                                                     </div>
                                                 ) : (
                                                     <span style={{ color: '#e5e7eb' }}>-</span>

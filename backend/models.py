@@ -100,6 +100,7 @@ class TimetableEntry(Base):
     day_of_week = Column(String)
     period_number = Column(Integer)
     venue_name = Column(String, nullable=True) # Override venue specifically for this class
+    section_number = Column(Integer, default=1, nullable=True) # For multi-section classes
     
     created_at = Column(String)
 

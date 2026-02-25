@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     LayoutDashboard,
     BookOpen,
@@ -79,6 +79,12 @@ function App() {
     // Timetable Data
     const [timetableEntries, setTimetableEntries] = useState([]);
     const [loading, setLoading] = useState(false);
+
+    // Display Toggles
+    const [showLabels, setShowLabels] = useState(true);
+    const [showCourseCode, setShowCourseCode] = useState(true);
+    const [showFaculty, setShowFaculty] = useState(true);
+    const [showVenues, setShowVenues] = useState(true);
 
     useEffect(() => { fetchMasterData(); }, []);
 
@@ -198,6 +204,7 @@ function App() {
             const t_res = await api.getTimetable(selectedDept, parseInt(selectedSem));
             setTimetableEntries(t_res.data);
             const c_res = await api.getCourses(selectedDept, parseInt(selectedSem));
+            setAllCourses(c_res.data); // IMPORTANT: sets allCourses for badge checks
             const c_map = {}; c_res.data.forEach(c => c_map[c.course_code] = c.course_name); setCoursesMap(c_map);
             const f_res = await api.getFaculty(selectedDept);
             const f_map = {}; f_res.data.forEach(f => f_map[f.faculty_id] = f.faculty_name); setFacultyMap(f_map);
@@ -237,6 +244,15 @@ function App() {
             const s = sem || '';
             const res = await api.getTimetableEntries(d, s);
             setTimetableEntries(res.data);
+            if (d && s) {
+                const c_res = await api.getCourses(d, parseInt(s));
+                setAllCourses(c_res.data);
+            } else {
+                const dep_res = await api.getDepartments();
+                // To support master view accurately, we could fetch all courses. For now just fetch a simple list.
+                const all_c = await api.getCourses('', ''); // assuming backend supports empty GET params or just skips
+                if (all_c && all_c.data) setAllCourses(all_c.data);
+            }
             setEditorDept(d);
             setEditorSem(s);
             setActiveTab('print');
@@ -263,25 +279,65 @@ function App() {
         if (slots.some(s => s.day_of_week === 'Saturday')) days.push('Saturday');
         const maxPeriod = Math.max(...slots.map(s => s.period_number), 0);
         const periods = Array.from({ length: maxPeriod }, (_, i) => i + 1);
+
+        const getEntriesForSlot = (day, p) => timetableEntries.filter(t => t.day_of_week === day && t.period_number === p);
+
         const isLabStart = (day, p) => {
-            const e1 = timetableEntries.find(t => t.day_of_week === day && t.period_number === p && t.session_type === 'LAB');
-            const e2 = timetableEntries.find(t => t.day_of_week === day && t.period_number === p + 1 && t.session_type === 'LAB');
-            return e1 && e2 && e1.course_code === e2.course_code;
+            const currentEntries = getEntriesForSlot(day, p);
+            const nextEntries = getEntriesForSlot(day, p + 1);
+            if (!currentEntries.length || !nextEntries.length) return false;
+            // Check if any current lab entry continues into the next period
+            return currentEntries.some(curr => curr.session_type === 'LAB' && nextEntries.some(next => next.course_code === curr.course_code && next.session_type === 'LAB'));
         };
         const isLabEnd = (day, p) => {
-            const e1 = timetableEntries.find(t => t.day_of_week === day && t.period_number === p - 1 && t.session_type === 'LAB');
-            const e2 = timetableEntries.find(t => t.day_of_week === day && t.period_number === p && t.session_type === 'LAB');
-            return e1 && e2 && e1.course_code === e2.course_code;
+            const prevEntries = getEntriesForSlot(day, p - 1);
+            const currentEntries = getEntriesForSlot(day, p);
+            if (!prevEntries.length || !currentEntries.length) return false;
+            return currentEntries.some(curr => curr.session_type === 'LAB' && prevEntries.some(prev => prev.course_code === curr.course_code && prev.session_type === 'LAB'));
         };
+
+        const getCourseBadge = (courseCode) => {
+            const course = allCourses.find(c => c.course_code === courseCode);
+            if (!course) return null;
+            if (course.is_honours) return <span className="text-[8px] bg-purple-100 text-purple-700 px-1 rounded shadow-sm font-semibold border border-purple-200 uppercase tracking-wider">Honours</span>;
+            if (course.is_minor) return <span className="text-[8px] bg-indigo-100 text-indigo-700 px-1 rounded shadow-sm font-semibold border border-indigo-200 uppercase tracking-wider">Minor</span>;
+            if (course.is_elective) return <span className="text-[8px] bg-green-100 text-green-700 px-1 rounded shadow-sm font-semibold border border-green-200 uppercase tracking-wider">Elective</span>;
+            return null;
+        };
+
         return (
             <div>
-                <div className="flex gap-4 mb-3 text-xs">
-                    <span className="flex items-center gap-1"><span className="w-4 h-4 rounded" style={{ backgroundColor: '#FEF9C3' }}></span> Lab (2 periods)</span>
-                    <span className="flex items-center gap-1"><span className="w-4 h-4 rounded" style={{ backgroundColor: '#BFDBFE' }}></span> Mentor Hour</span>
-                    <span className="flex items-center gap-1"><span className="w-4 h-4 rounded" style={{ backgroundColor: '#F3F4F6' }}></span> Open Elective</span>
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+                    <div className="flex gap-4 text-xs">
+                        <span className="flex items-center gap-1"><span className="w-4 h-4 rounded" style={{ backgroundColor: '#FEF9C3' }}></span> Lab (2 periods)</span>
+                        <span className="flex items-center gap-1"><span className="w-4 h-4 rounded" style={{ backgroundColor: '#BFDBFE' }}></span> Mentor Hour</span>
+                        <span className="flex items-center gap-1"><span className="w-4 h-4 rounded" style={{ backgroundColor: '#F3F4F6' }}></span> Open Elective</span>
+                    </div>
+
+                    {/* Display Options Toggles */}
+                    <div className="flex flex-wrap gap-3 bg-white p-2 border border-gray-200 rounded-lg shadow-sm text-xs">
+                        <span className="font-semibold text-gray-600 flex items-center pr-2 border-r border-gray-200">View Options:</span>
+                        <label className="flex items-center gap-1.5 cursor-pointer hover:text-blue-600 transition-colors">
+                            <input type="checkbox" checked={showLabels} onChange={(e) => setShowLabels(e.target.checked)} className="rounded text-blue-600 focus:ring-blue-500 cursor-pointer" />
+                            Labels
+                        </label>
+                        <label className="flex items-center gap-1.5 cursor-pointer hover:text-blue-600 transition-colors">
+                            <input type="checkbox" checked={showCourseCode} onChange={(e) => setShowCourseCode(e.target.checked)} className="rounded text-blue-600 focus:ring-blue-500 cursor-pointer" />
+                            Codes
+                        </label>
+                        <label className="flex items-center gap-1.5 cursor-pointer hover:text-blue-600 transition-colors">
+                            <input type="checkbox" checked={showFaculty} onChange={(e) => setShowFaculty(e.target.checked)} className="rounded text-blue-600 focus:ring-blue-500 cursor-pointer" />
+                            Faculty
+                        </label>
+                        <label className="flex items-center gap-1.5 cursor-pointer hover:text-blue-600 transition-colors">
+                            <input type="checkbox" checked={showVenues} onChange={(e) => setShowVenues(e.target.checked)} className="rounded text-blue-600 focus:ring-blue-500 cursor-pointer" />
+                            Venues
+                        </label>
+                    </div>
                 </div>
+
                 <div className="overflow-x-auto">
-                    <table className="min-w-full bg-white border-collapse border border-gray-300 text-xs">
+                    <table className="min-w-full bg-white border-collapse border border-gray-300 text-xs shadow-sm rounded-lg overflow-hidden">
                         <thead>
                             <tr className="bg-gray-100">
                                 <th className="p-2 border border-gray-300 text-left font-bold w-24 sticky left-0 bg-gray-100 z-10">Day</th>
@@ -298,23 +354,109 @@ function App() {
                                     if (skipNext) { skipNext = false; return; }
                                     const isValidSlot = slots.some(s => s.day_of_week === day && s.period_number === p);
                                     if (!isValidSlot) { cells.push(<td key={p} className="p-2 border border-gray-300 bg-gray-200"></td>); return; }
-                                    const entry = timetableEntries.find(t => t.day_of_week === day && t.period_number === p);
+
+                                    const cellEntries = getEntriesForSlot(day, p);
+
                                     if (isLabStart(day, p)) {
                                         skipNext = true;
-                                        cells.push(<td key={p} colSpan={2} className="p-2 border border-gray-300 text-center align-middle h-20" style={{ backgroundColor: '#FEF9C3' }}><div className="flex flex-col justify-center h-full"><div className="font-bold text-amber-900 text-xs">{entry.course_code}</div><div className="text-[10px] text-amber-800 mt-0.5 font-medium">{entry.course_name || ''}</div><div className="text-[10px] text-amber-700 mt-0.5 italic">{entry.faculty_name || ''}</div>{entry.venue_name && <div className="text-[8.5px] px-1 rounded border border-amber-300 bg-amber-100 font-bold text-amber-900 mt-0.5 mx-auto">{entry.venue_name}</div>}</div></td>);
+                                        const labEntries = cellEntries.filter(e => e.session_type === 'LAB');
+                                        const uniqueLabCodes = [...new Set(labEntries.map(e => e.course_code))];
+                                        cells.push(
+                                            <td key={p} colSpan={2} className="p-0 border border-gray-300 text-center align-middle hover:bg-amber-100 transition-colors" style={{ backgroundColor: '#FEF9C3' }}>
+                                                <div className="flex flex-col h-full h-auto min-h-[80px]">
+                                                    {uniqueLabCodes.map((code, idx) => {
+                                                        const groupEntries = labEntries.filter(e => e.course_code === code);
+                                                        const groupName = groupEntries[0]?.course_name || '';
+
+                                                        return (
+                                                            <div key={idx} className={`p-2 flex flex-col justify-center flex-grow ${idx > 0 ? 'border-t border-amber-300' : ''}`}>
+                                                                <div className="font-bold text-amber-900 text-[11px] leading-tight flex justify-center items-center gap-1 flex-wrap">
+                                                                    {showCourseCode && <span>{code}</span>}
+                                                                    {showLabels && getCourseBadge(code)}
+                                                                </div>
+                                                                <div className="text-[10px] text-amber-800 font-medium leading-tight my-0.5">{groupName}</div>
+
+                                                                {groupEntries.length > 1 ? (
+                                                                    <div className="mt-1 flex flex-col gap-0.5 pt-1">
+                                                                        {groupEntries.map((e, sIdx) => (
+                                                                            <div key={sIdx} className="text-[9px] text-amber-700 italic leading-tight whitespace-nowrap">
+                                                                                {showFaculty && <><span className="font-semibold text-amber-800">S{e.section_number || (sIdx + 1)}:</span> {e.faculty_name}</>}
+                                                                                {showVenues && e.venue_name && <span className="ml-1 px-1 rounded bg-amber-200 border border-amber-300 font-bold text-amber-900 whitespace-nowrap">{e.venue_name}</span>}
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                ) : (
+                                                                    <>
+                                                                        {showFaculty && <div className="text-[10px] text-amber-700 mt-0.5 italic whitespace-nowrap">{groupEntries[0]?.faculty_name || ''}</div>}
+                                                                        {showVenues && groupEntries[0]?.venue_name && <div className="text-[8.5px] px-1 rounded border border-amber-300 bg-amber-200 font-bold text-amber-900 mt-0.5 mx-auto w-fit whitespace-nowrap">{groupEntries[0].venue_name}</div>}
+                                                                    </>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </td>
+                                        );
                                         return;
                                     }
+
                                     if (isLabEnd(day, p)) return;
-                                    if (!entry) { cells.push(<td key={p} className="p-2 border border-gray-300 text-center text-gray-300">-</td>); return; }
-                                    if (entry.session_type === 'MENTOR') {
+                                    if (!cellEntries.length) { cells.push(<td key={p} className="p-2 border border-gray-300 text-center text-gray-300">-</td>); return; }
+
+                                    const primaryEntry = cellEntries[0];
+
+                                    if (primaryEntry.session_type === 'MENTOR') {
                                         cells.push(<td key={p} className="p-2 border border-gray-300 text-center align-middle h-20" style={{ backgroundColor: '#BFDBFE' }}><div className="flex flex-col justify-center h-full"><div className="font-bold text-blue-900 text-sm">MENTOR</div><div className="text-xs text-blue-700 mt-1">INTERACTION</div></div></td>);
                                         return;
                                     }
-                                    if (entry.session_type === 'OPEN_ELECTIVE') {
+                                    if (primaryEntry.session_type === 'OPEN_ELECTIVE') {
                                         cells.push(<td key={p} className="p-2 border border-gray-300 text-center align-middle h-20 bg-gray-100"><div className="flex flex-col justify-center h-full"><div className="font-bold text-gray-600 text-xs">OPEN</div><div className="text-xs text-gray-500">ELECTIVE</div></div></td>);
                                         return;
                                     }
-                                    cells.push(<td key={p} className="p-2 border border-gray-300 text-center align-middle h-20 hover:bg-blue-50 transition-colors"><div className="flex flex-col justify-center h-full"><div className="font-bold text-blue-800 text-xs">{entry.course_code}</div><div className="text-[10px] text-blue-600 mt-0.5 line-clamp-2">{entry.course_name || ''}</div><div className="text-[10px] text-gray-500 mt-0.5 italic">{entry.faculty_name || ''}</div>{entry.venue_name && <div className="text-[8.5px] px-1 rounded border border-indigo-200 bg-indigo-50 font-bold text-indigo-700 mt-0.5 mx-auto">{entry.venue_name}</div>}</div></td>);
+
+                                    const uniqueCodes = [...new Set(cellEntries.map(e => e.course_code))];
+                                    const isPaired = uniqueCodes.length > 1;
+                                    const hasMultiple = cellEntries.length > 1;
+
+                                    cells.push(
+                                        <td key={p} className="p-0 border border-gray-300 text-center align-middle hover:bg-blue-50 transition-colors">
+                                            <div className="flex flex-col h-full h-auto min-h-[80px]">
+                                                {uniqueCodes.map((code, idx) => {
+                                                    const groupEntries = cellEntries.filter(e => e.course_code === code);
+                                                    const groupName = groupEntries[0]?.course_name || '';
+                                                    const isMiniProject = groupName.toLowerCase().includes('mini project');
+
+                                                    return (
+                                                        <div key={idx} className={`p-2 flex flex-col justify-center flex-grow ${idx > 0 ? 'border-t border-gray-200 bg-gray-50 hover:bg-blue-50' : ''}`}>
+                                                            <div className="font-bold text-blue-800 text-[11px] leading-tight flex justify-center items-center gap-1 flex-wrap">
+                                                                {showCourseCode && <span>{code}</span>}
+                                                                {showLabels && getCourseBadge(code)}
+                                                            </div>
+                                                            <div className="text-[9.5px] text-blue-600 font-medium leading-tight my-0.5">{groupName}</div>
+
+                                                            {!isMiniProject && (
+                                                                groupEntries.length > 1 && !isPaired ? (
+                                                                    <div className="mt-1 flex flex-col gap-0.5 pt-1 border-t border-blue-50/50">
+                                                                        {groupEntries.map((e, sIdx) => (
+                                                                            <div key={sIdx} className="text-[8.5px] text-gray-600 italic leading-tight whitespace-nowrap">
+                                                                                {showFaculty && <><span className="font-semibold text-gray-800">S{e.section_number || (sIdx + 1)}:</span> {e.faculty_name}</>}
+                                                                                {showVenues && e.venue_name && <span className="ml-1 px-1 rounded bg-indigo-50 border border-indigo-100 font-bold text-indigo-600 whitespace-nowrap">{e.venue_name}</span>}
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                ) : (
+                                                                    <>
+                                                                        {showFaculty && <div className="text-[9px] text-gray-500 italic mt-0.5 whitespace-nowrap">{groupEntries[0]?.faculty_name || ''}</div>}
+                                                                        {showVenues && groupEntries[0]?.venue_name && <div className="text-[8.5px] px-1 rounded border border-indigo-200 bg-indigo-50 font-bold text-indigo-700 mt-0.5 mx-auto w-fit whitespace-nowrap">{groupEntries[0].venue_name}</div>}
+                                                                    </>
+                                                                )
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </td>
+                                    );
                                 });
                                 return (<tr key={day}><td className="p-2 border border-gray-300 font-bold text-gray-700 bg-gray-50 sticky left-0 z-10 text-xs">{day.substring(0, 3).toUpperCase()}</td>{cells}</tr>);
                             })}

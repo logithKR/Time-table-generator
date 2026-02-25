@@ -130,6 +130,7 @@ class TimetableEntry(BaseModel):
     day_of_week: str
     period_number: int
     venue_name: Optional[str] = None
+    section_number: Optional[int] = 1
     
     class Config:
         orm_mode = True
@@ -147,6 +148,7 @@ class TimetableEntryCreate(BaseModel):
     day_of_week: str
     period_number: int
     venue_name: Optional[str] = None
+    section_number: Optional[int] = 1
 
 class TimetableSaveRequest(BaseModel):
     department_code: str

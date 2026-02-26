@@ -232,31 +232,9 @@ class CourseRegistrationResponse(CourseRegistrationBase):
         orm_mode = True
 
 
-# --- Students & Registrations ---
-
-class StudentBase(BaseModel):
-    student_id: str
-    name: str
-    email: Optional[str] = None
-    department_code: str
-
-class StudentCreate(StudentBase):
-    pass
-
-class StudentResponse(StudentBase):
-    class Config:
-        orm_mode = True
-
-class CourseRegistrationBase(BaseModel):
-    student_id: str
-    course_code: str
-    semester: int
-
-class CourseRegistrationCreate(CourseRegistrationBase):
-    pass
-
-class CourseRegistrationResponse(CourseRegistrationBase):
-    id: int
+class PersonalTimetableResponse(BaseModel):
+    conflicts: List[str]
+    timetable: List[TimetableEntry]
     
     class Config:
         orm_mode = True

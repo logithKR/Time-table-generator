@@ -129,14 +129,18 @@ const BITTimetable = ({ timetableData, department, semester, courses, onRefresh 
                                 if (groupEntries.length > 1 && !isPaired) {
                                     // Multiple sections of the same exact code
                                     detailsHTML = `<div style="border-top:1px solid #e5e7eb;margin-top:3px;padding-top:2px;">` + groupEntries.map((c, sIdx) => {
-                                        const facHTML = showFaculty ? `<span style="font-size:8px;display:block;font-style:italic;color:#4b5563;white-space:nowrap;"><span style="font-weight:600;">S${c.section_number || sIdx + 1}:</span> ${c.faculty_name || ''}</span>` : '';
+                                        const facHTML = (showFaculty && c.faculty_name && c.faculty_name !== 'Unassigned')
+                                            ? `<span style="font-size:8px;display:block;font-style:italic;color:#4b5563;white-space:nowrap;">${c.faculty_name}</span>`
+                                            : '';
                                         const venHTML = (showVenues && c.venue_name) ? `<span style="font-size:7.5px;padding:0 4px;border-radius:3px;margin:1px auto 0;background-color:#e0e7ff;color:#3730a3;font-family:Arial,sans-serif;display:inline-block;font-weight:bold;border:1px solid #c7d2fe;white-space:nowrap;">${c.venue_name}</span>` : '';
                                         return `<div style="margin-top:2px;">${facHTML}${venHTML}</div>`;
                                     }).join('') + `</div>`;
                                 } else {
                                     // Single section
                                     const c = groupEntries[0];
-                                    const facHTML = showFaculty ? `<span style="font-size:9px;display:block;font-style:italic;color:#4b5563;white-space:nowrap;">${c.faculty_name || ''}</span>` : '';
+                                    const facHTML = (showFaculty && c.faculty_name && c.faculty_name !== 'Unassigned')
+                                        ? `<span style="font-size:9px;display:block;font-style:italic;color:#4b5563;white-space:nowrap;">${c.faculty_name}</span>`
+                                        : '';
                                     const venHTML = (showVenues && c.venue_name) ? `<span style="font-size:8.5px;padding:0 4px;border-radius:4px;margin:2px auto 0;background-color:#e0e7ff;color:#3730a3;font-family:Arial,sans-serif;display:inline-block;font-weight:bold;border:1px solid #c7d2fe;white-space:nowrap;">${c.venue_name}</span>` : '';
                                     detailsHTML = `${facHTML}${venHTML}`;
                                 }
@@ -444,14 +448,14 @@ body { background: white; color: black; font-family: 'Times New Roman', serif; }
                                                                                 <div className="flex flex-col gap-0.5 border-t border-gray-200/50 pt-1 mt-0.5">
                                                                                     {groupEntries.map((e, sIdx) => (
                                                                                         <div key={sIdx} className="flex flex-col items-center">
-                                                                                            {showFaculty && <span className="text-[8.5px] font-semibold italic font-serif opacity-80 whitespace-nowrap" style={{ color: '#4b5563' }}><span style={{ color: '#000000' }}>S{e.section_number || sIdx + 1}:</span> {e.faculty_name}</span>}
+                                                                                            {showFaculty && e.faculty_name && e.faculty_name !== 'Unassigned' && <span className="text-[8.5px] font-semibold italic font-serif opacity-80 whitespace-nowrap" style={{ color: '#4b5563' }}>{e.faculty_name}</span>}
                                                                                             {showVenues && e.venue_name && <span className="text-[7.5px] px-1 rounded mt-0.5 font-sans font-bold shadow-sm whitespace-nowrap" style={{ backgroundColor: '#e0e7ff', color: '#3730a3', border: '1px solid #c7d2fe' }}>{e.venue_name}</span>}
                                                                                         </div>
                                                                                     ))}
                                                                                 </div>
                                                                             ) : (
                                                                                 <>
-                                                                                    {showFaculty && <span className="text-[9px] block italic font-serif mt-0.5 whitespace-nowrap" style={{ color: '#4b5563' }}>{groupEntries[0]?.faculty_name || ''}</span>}
+                                                                                    {showFaculty && groupEntries[0]?.faculty_name && groupEntries[0]?.faculty_name !== 'Unassigned' && <span className="text-[9px] block italic font-serif mt-0.5 whitespace-nowrap" style={{ color: '#4b5563' }}>{groupEntries[0].faculty_name}</span>}
                                                                                     {showVenues && groupEntries[0]?.venue_name && <span className="text-[8.5px] px-1 rounded mx-auto mt-0.5 font-sans font-bold shadow-sm w-fit whitespace-nowrap" style={{ backgroundColor: '#e0e7ff', color: '#3730a3', border: '1px solid #c7d2fe' }}>{groupEntries[0].venue_name}</span>}
                                                                                 </>
                                                                             )

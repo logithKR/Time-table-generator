@@ -49,9 +49,13 @@ const StudentRegistrations = () => {
     };
 
     const fetchStudents = async () => {
+        if (!selectedDept) {
+            setStudents([]);
+            return;
+        }
         setLoading(true);
         try {
-            const res = await getStudents(selectedDept || null);
+            const res = await getStudents(selectedDept);
             setStudents(res.data);
         } catch (err) {
             console.error(err);
@@ -60,9 +64,13 @@ const StudentRegistrations = () => {
     };
 
     const fetchRegistrations = async () => {
+        if (!selectedCourse) {
+            setRegistrations([]);
+            return;
+        }
         setLoading(true);
         try {
-            const res = await getRegistrations(selectedCourse || null, null);
+            const res = await getRegistrations(selectedCourse, null);
             setRegistrations(res.data);
         } catch (err) {
             console.error(err);
@@ -241,7 +249,7 @@ const StudentRegistrations = () => {
                                             </tr>
                                         ))
                                     ) : (
-                                        <tr><td colSpan="5" className="py-8 text-center text-gray-500">No students found.</td></tr>
+                                        <tr><td colSpan="5" className="py-8 text-center text-gray-500">{selectedDept ? 'No students found.' : 'Please select a Department from the dropdown to view students.'}</td></tr>
                                     )
                                 ) : (
                                     filteredRegistrations.length > 0 ? (
@@ -259,7 +267,7 @@ const StudentRegistrations = () => {
                                             </tr>
                                         ))
                                     ) : (
-                                        <tr><td colSpan="5" className="py-8 text-center text-gray-500">No registrations found.</td></tr>
+                                        <tr><td colSpan="5" className="py-8 text-center text-gray-500">{selectedCourse ? 'No registrations found.' : 'Please select a Course from the dropdown to view registrations.'}</td></tr>
                                     )
                                 )}
                             </tbody>

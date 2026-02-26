@@ -98,5 +98,10 @@ export const getRegistrations = (courseCode, semester) => {
     if (params.length) url += `?${params.join('&')}`;
     return axios.get(url);
 };
+
 export const createRegistration = (data) => axios.post(`${API_URL}/registrations`, data);
 export const deleteRegistration = (id) => axios.delete(`${API_URL}/registrations/${id}`);
+
+// --- Personalized Timetables ---
+export const getFacultyTimetable = (facultyId) => axios.get(`${API_URL}/timetable/faculty/${facultyId}`);
+export const getStudentTimetable = (studentId) => axios.get(`${API_URL}/timetable/student/${studentId}`);

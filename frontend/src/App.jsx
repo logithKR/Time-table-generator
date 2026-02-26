@@ -32,6 +32,8 @@ import Venues from './components/Venues';
 import VenueMapping from './components/VenueMapping';
 import DepartmentsManager from './components/DepartmentsManager';
 import StudentRegistrations from './components/StudentRegistrations';
+import FacultyTimetable from './components/FacultyTimetable';
+import StudentTimetable from './components/StudentTimetable';
 import BITTimetable from './components/BITTimetable';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -1205,7 +1207,7 @@ function App() {
         </div>
     );
 
-    const pageTitle = { dashboard: 'Timetable Generator', editor: 'Timetable Editor', print: 'Print View', timeslots: 'Time Slots', departments: 'Departments Setup', subjects: 'Course / Subject Details', faculty: 'Faculty Details', mappings: 'Course-Faculty Mappings', venues: 'Venues & Classrooms', venue_mappings: 'Department Venues', students: 'Students & Registrations' };
+    const pageTitle = { dashboard: 'Timetable Generator', editor: 'Timetable Editor', print: 'Print View', timeslots: 'Time Slots', departments: 'Departments Setup', subjects: 'Course / Subject Details', faculty: 'Faculty Details', mappings: 'Course-Faculty Mappings', venues: 'Venues & Classrooms', venue_mappings: 'Department Venues', students: 'Students & Registrations', faculty_timetable: 'Faculty Personal Timetable', student_timetable: 'Student Personal Timetable' };
 
     const switchTab = (tab) => {
         setActiveTab(tab);
@@ -1252,6 +1254,8 @@ function App() {
                         { id: 'subjects', icon: BookOpen, label: 'Subjects' },
                         { id: 'faculty', icon: Users, label: 'Faculty' },
                         { id: 'students', icon: Users, label: 'Students & Reg.' },
+                        { id: 'faculty_timetable', icon: BookOpen, label: 'Faculty Timetable' },
+                        { id: 'student_timetable', icon: GraduationCap, label: 'Student Timetable' },
                         { id: 'mappings', icon: GraduationCap, label: 'Course-Faculty' },
                         { id: 'timeslots', icon: Clock, label: 'Time Slots' },
                         { id: 'venues', icon: MapPin, label: 'Venues' },
@@ -1295,6 +1299,8 @@ function App() {
                         {activeTab === 'subjects' && renderSubjectsPage()}
                         {activeTab === 'faculty' && renderFacultyPage()}
                         {activeTab === 'students' && <StudentRegistrations />}
+                        {activeTab === 'faculty_timetable' && <FacultyTimetable />}
+                        {activeTab === 'student_timetable' && <StudentTimetable />}
                         {activeTab === 'mappings' && renderMappingsPage()}
                         {activeTab === 'timeslots' && renderSlotsPage()}
                         {activeTab === 'venues' && <Venues />}

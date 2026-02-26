@@ -155,7 +155,9 @@ const CellContent = ({ entry, sections, cellId, isLabStart, isSwapMode, isSelect
                                     {isPaired && (
                                         <span className="font-bold opacity-60 shrink-0">{sec.course_code.slice(-3)}:</span>
                                     )}
-                                    <span className="font-semibold truncate flex-1 opacity-80">{sec.faculty_name || ''}</span>
+                                    {sec.faculty_name && sec.faculty_name !== 'Unassigned' && (
+                                        <span className="font-semibold truncate flex-1 opacity-80">{sec.faculty_name}</span>
+                                    )}
                                     {sec.venue_name && (
                                         <span className="font-bold text-indigo-600 bg-indigo-50/80 px-1 rounded border border-indigo-200 shrink-0 truncate max-w-[60px]" title={sec.venue_name}>
                                             {sec.venue_name}

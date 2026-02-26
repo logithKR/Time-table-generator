@@ -12,7 +12,11 @@ models.Base.metadata.create_all(bind=engine)
 app = FastAPI(title="BIT Scheduler Pro (Simplified)")
 
 # CORS
-origins = ["http://localhost:5173", "http://127.0.0.1:5173"]
+origins = [
+    "http://localhost:5173", "http://127.0.0.1:5173",
+    "http://localhost:5174", "http://127.0.0.1:5174",
+    "http://localhost:5175", "http://127.0.0.1:5175",
+]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -694,3 +698,85 @@ def delete_student(student_id: str, db: Session = Depends(get_db)):
     db.delete(student)
     db.commit()
     return {"status": "success", "student_id": student_id}
+
+# ============================================
+# PERSONALIZED TIMETABLES
+# ============================================
+
+@app.get("/timetable/faculty/{faculty_id}", response_model=schemas.PersonalTimetableResponse)
+def get_faculty_timetable(faculty_id: str, db: Session = Depends(get_db)):
+    entries = db.query(models.TimetableEntry).filter_by(faculty_id=faculty_id).all()
+    
+    slot_map = {}
+    conflicts = set()
+    for e in entries:
+        key = (e.day_of_week, e.period_number)
+        if key not in slot_map:
+            slot_map[key] = [e]
+        else:
+            slot_map[key].append(e)
+
+    for key, items in slot_map.items():
+        if len(items) > 1:
+            venues = set(i.venue_name for i in items if i.venue_name)
+            if len(venues) > 1:
+                courses_str = " & ".join([f"{i.course_code} ({i.venue_name})" for i in items])
+                conflicts.add(f"Conflict on {key[0]} Period {key[1]}: Scheduled simultaneously in different venues across {courses_str}")
+
+    return {"conflicts": list(conflicts), "timetable": entries}
+
+
+@app.get("/timetable/student/{student_id}", response_model=schemas.PersonalTimetableResponse)
+def get_student_timetable(student_id: str, db: Session = Depends(get_db)):
+    student = db.query(models.StudentMaster).filter_by(student_id=student_id).first()
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+        
+    regs = db.query(models.CourseRegistration).filter_by(student_id=student_id).all()
+    
+    valid_entries = {}
+    student_semester = None
+    for r in regs:
+        if student_semester is None:
+            student_semester = r.semester
+        c_entries = db.query(models.TimetableEntry).filter_by(course_code=r.course_code, semester=r.semester).all()
+        for e in c_entries:
+            # Display section 1 as the default schedule for students
+            if e.section_number == 1 or e.section_number is None:
+                k = (e.course_code, e.day_of_week, e.period_number)
+                if k not in valid_entries:
+                    valid_entries[k] = e
+                    
+    # Also fetch common courses that are natively meant for this student's department/semester
+    # but don't explicitly require personal registration (e.g. Mentor Hour, Mini Project)
+    if student_semester is not None:
+        common_courses = ['mentor', 'mini']
+        for e in db.query(models.TimetableEntry).filter_by(
+            department_code=student.department_code, 
+            semester=student_semester
+        ).all():
+            if e.course_name and e.course_code and any(c in e.course_name.lower() or c in e.course_code.lower() for c in common_courses):
+                if e.section_number == 1 or e.section_number is None:
+                    k = (e.course_code, e.day_of_week, e.period_number)
+                    if k not in valid_entries:
+                        valid_entries[k] = e
+
+    entries = list(valid_entries.values())
+    
+    slot_map = {}
+    conflicts = set()
+    for e in entries:
+        key = (e.day_of_week, e.period_number)
+        if key not in slot_map:
+            slot_map[key] = [e]
+        else:
+            slot_map[key].append(e)
+            
+    for key, items in slot_map.items():
+        if len(items) > 1:
+            course_codes = set(i.course_code for i in items)
+            if len(course_codes) > 1:
+                courses_str = " & ".join(course_codes)
+                conflicts.add(f"Conflict on {key[0]} Period {key[1]}: Student is registered for colliding courses: {courses_str}")
+
+    return {"conflicts": list(conflicts), "timetable": entries}

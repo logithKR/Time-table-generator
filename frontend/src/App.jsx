@@ -31,6 +31,7 @@ import TimetableEditor from './components/TimetableEditor';
 import Venues from './components/Venues';
 import VenueMapping from './components/VenueMapping';
 import DepartmentsManager from './components/DepartmentsManager';
+import StudentRegistrations from './components/StudentRegistrations';
 import BITTimetable from './components/BITTimetable';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -1204,7 +1205,7 @@ function App() {
         </div>
     );
 
-    const pageTitle = { dashboard: 'Timetable Generator', editor: 'Timetable Editor', print: 'Print View', timeslots: 'Time Slots', departments: 'Departments Setup', subjects: 'Course / Subject Details', faculty: 'Faculty Details', mappings: 'Course-Faculty Mappings', venues: 'Venues & Classrooms', venue_mappings: 'Department Venues' };
+    const pageTitle = { dashboard: 'Timetable Generator', editor: 'Timetable Editor', print: 'Print View', timeslots: 'Time Slots', departments: 'Departments Setup', subjects: 'Course / Subject Details', faculty: 'Faculty Details', mappings: 'Course-Faculty Mappings', venues: 'Venues & Classrooms', venue_mappings: 'Department Venues', students: 'Students & Registrations' };
 
     const switchTab = (tab) => {
         setActiveTab(tab);
@@ -1250,6 +1251,7 @@ function App() {
                         { id: 'departments', icon: Building2, label: 'Departments' },
                         { id: 'subjects', icon: BookOpen, label: 'Subjects' },
                         { id: 'faculty', icon: Users, label: 'Faculty' },
+                        { id: 'students', icon: Users, label: 'Students & Reg.' },
                         { id: 'mappings', icon: GraduationCap, label: 'Course-Faculty' },
                         { id: 'timeslots', icon: Clock, label: 'Time Slots' },
                         { id: 'venues', icon: MapPin, label: 'Venues' },
@@ -1292,6 +1294,7 @@ function App() {
                         {activeTab === 'departments' && <DepartmentsManager />}
                         {activeTab === 'subjects' && renderSubjectsPage()}
                         {activeTab === 'faculty' && renderFacultyPage()}
+                        {activeTab === 'students' && <StudentRegistrations />}
                         {activeTab === 'mappings' && renderMappingsPage()}
                         {activeTab === 'timeslots' && renderSlotsPage()}
                         {activeTab === 'venues' && <Venues />}

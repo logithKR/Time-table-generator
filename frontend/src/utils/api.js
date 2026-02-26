@@ -81,3 +81,22 @@ export const getDepartmentCapacities = (deptCode) => axios.get(`${API_URL}/depar
 export const upsertDepartmentCapacity = (deptCode, semester, data) =>
     axios.post(`${API_URL}/departments/${deptCode}/capacities?semester=${semester}`, data);
 
+// --- Students & Registrations ---
+export const getStudents = (deptCode) => {
+    let url = `${API_URL}/students`;
+    if (deptCode) url += `?department_code=${deptCode}`;
+    return axios.get(url);
+};
+export const createStudent = (data) => axios.post(`${API_URL}/students`, data);
+export const deleteStudent = (id) => axios.delete(`${API_URL}/students/${id}`);
+
+export const getRegistrations = (courseCode, semester) => {
+    let url = `${API_URL}/registrations`;
+    const params = [];
+    if (courseCode) params.push(`course_code=${courseCode}`);
+    if (semester) params.push(`semester=${semester}`);
+    if (params.length) url += `?${params.join('&')}`;
+    return axios.get(url);
+};
+export const createRegistration = (data) => axios.post(`${API_URL}/registrations`, data);
+export const deleteRegistration = (id) => axios.delete(`${API_URL}/registrations/${id}`);

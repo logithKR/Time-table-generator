@@ -125,19 +125,21 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
     max_classroom_cap = max((c[1] for c in classroom_venues_info), default=60)
     max_lab_cap = max((c[1] for c in lab_venues_info), default=60)
 
-    # Compute theory sections needed
-    theory_sections = math.ceil(student_count / max_classroom_cap) if max_classroom_cap > 0 else 1
-    if student_count % max_classroom_cap > 0 and student_count % max_classroom_cap < 30:
-        theory_sections = max(theory_sections - 1, 1)
+    # Helper to calculate sections dynamically per course based on accurate enrollment counts
+    def get_course_sections(course_code, is_lab_req):
+        course_obj = next((c for c in courses if c.course_code == course_code), None)
+        enrolled = course_obj.enrolled_students if course_obj and course_obj.enrolled_students else 0
+        base_count = enrolled if enrolled > 0 else student_count
+        cap = max_lab_cap if is_lab_req else max_classroom_cap
+        sections = math.ceil(base_count / cap) if cap > 0 else 1
+        if base_count % cap > 0 and base_count % cap < 30:
+            if enrolled > 0 and base_count < 30:
+                sections = max(sections, 1) # Course with 1-29 students still gets 1 section
+            else:
+                sections = max(sections - 1, 1)
+        return sections
 
-    # Compute lab sections needed
-    lab_sections = math.ceil(student_count / max_lab_cap) if max_lab_cap > 0 else 1
-    if student_count % max_lab_cap > 0 and student_count % max_lab_cap < 30:
-        lab_sections = max(lab_sections - 1, 1)
-
-    print(f"  👥 Student count: {student_count}")
-    print(f"  🏫 Theory sections: {theory_sections} (classrooms: {len(classroom_venues_info)}, max cap: {max_classroom_cap})")
-    print(f"  🔬 Lab sections: {lab_sections} (labs: {len(lab_venues_info)}, max cap: {max_lab_cap})")
+    print(f"  👥 Fallback Dept Student count: {student_count}")
 
     # Faculty priority helpers
     def get_theory_faculty(course_code):
@@ -585,7 +587,7 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                         gc_name = course_names.get(gc.course_code, gc.course_code)
                         
                         assigned_sections = 0
-                        for sec in range(theory_sections):
+                        for sec in range(get_course_sections(gc.course_code, False)):
                             # Find available faculty for this course
                             fac_assigned = None
                             for fid, fname, dtype in gc_fac:
@@ -598,7 +600,7 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                                 generation_warnings.append(
                                     f"\u26a0\ufe0f  {gc.course_code} (THEORY) {day} P{period} Sec {sec+1}: "
                                     f"Reusing faculty {fac_assigned[1]} \u2014 not enough unique theory faculty. "
-                                    f"Need {theory_sections}, have {len(gc_fac)} mapped."
+                                    f"Need {get_course_sections(gc.course_code, False)}, have {len(gc_fac)} mapped."
                                 )
                             elif not fac_assigned:
                                 fac_assigned = (None, 'Unassigned')
@@ -641,7 +643,7 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                         gc_fac = get_lab_faculty(gc.course_code)
                         gc_name = course_names.get(gc.course_code, gc.course_code)
                         
-                        for sec in range(lab_sections):
+                        for sec in range(get_course_sections(gc.course_code, True)):
                             fac_assigned = None
                             for fid, fname, dtype in gc_fac:
                                 if is_faculty_free(fid, day, bs) and is_faculty_free(fid, day, bs + 1):
@@ -653,7 +655,7 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                                 generation_warnings.append(
                                     f"\u26a0\ufe0f  {gc.course_code} (LAB) {day} P{bs}-P{bs+1} Sec {sec+1}: "
                                     f"Reusing faculty {fac_assigned[1]} \u2014 not enough unique lab faculty. "
-                                    f"Need {lab_sections}, have {len(gc_fac)} mapped."
+                                    f"Need {get_course_sections(gc.course_code, True)}, have {len(gc_fac)} mapped."
                                 )
                             elif not fac_assigned:
                                 fac_assigned = (None, 'Unassigned')
@@ -811,7 +813,7 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
             day, p1, p2 = free_blocks_2.pop(0)
 
             gc_fac = get_lab_faculty(mp.course_code)
-            for sec in range(lab_sections):
+            for sec in range(get_course_sections(mp.course_code, True)):
                 fac_assigned = None
                 for fid, fname, dtype in gc_fac:
                     if is_faculty_free(fid, day, p1) and is_faculty_free(fid, day, p2):
@@ -867,7 +869,7 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                 consecutive_failures = 0
                 
                 gc_fac = get_lab_faculty(c.course_code)
-                for sec in range(lab_sections):
+                for sec in range(get_course_sections(c.course_code, True)):
                     fac_assigned = None
                     for fid, fname, dtype in gc_fac:
                         if is_faculty_free(fid, day, p1) and is_faculty_free(fid, day, p2):
@@ -922,7 +924,7 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                 consecutive_failures = 0
                 
                 gc_fac = get_theory_faculty(c.course_code)
-                for sec in range(theory_sections):
+                for sec in range(get_course_sections(c.course_code, False)):
                     fac_assigned = None
                     for fid, fname, dtype in gc_fac:
                         if is_faculty_free(fid, day, p):
@@ -1011,7 +1013,7 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
             for day, p in single_frees:
                 c = fallback_courses[idx % len(fallback_courses)]
                 gc_fac = get_theory_faculty(c.course_code)
-                for sec in range(theory_sections):
+                for sec in range(get_course_sections(c.course_code, False)):
                     fac_assigned = None
                     for fid, fname, dtype in gc_fac:
                         if is_faculty_free(fid, day, p):

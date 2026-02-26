@@ -616,3 +616,81 @@ def delete_course_venue(map_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"status": "success", "id": map_id}
 
+# ============================================
+# STUDENTS & REGISTRATIONS
+# ============================================
+
+@app.get("/students", response_model=List[schemas.StudentResponse])
+def get_students(department_code: Optional[str] = None, db: Session = Depends(get_db)):
+    query = db.query(models.StudentMaster)
+    if department_code:
+        query = query.filter_by(department_code=department_code)
+    return query.all()
+
+@app.get("/registrations", response_model=List[schemas.CourseRegistrationResponse])
+def get_registrations(course_code: Optional[str] = None, semester: Optional[int] = None, db: Session = Depends(get_db)):
+    query = db.query(models.CourseRegistration)
+    if course_code:
+        query = query.filter_by(course_code=course_code)
+    if semester:
+        query = query.filter_by(semester=semester)
+    return query.all()
+
+@app.post("/registrations", response_model=schemas.CourseRegistrationResponse)
+def create_registration(req: schemas.CourseRegistrationCreate, db: Session = Depends(get_db)):
+    course = db.query(models.CourseMaster).filter_by(course_code=req.course_code, semester=req.semester).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+        
+    existing = db.query(models.CourseRegistration).filter_by(student_id=req.student_id, course_code=req.course_code, semester=req.semester).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Student already registered for this course")
+        
+    reg = models.CourseRegistration(**req.dict())
+    db.add(reg)
+    course.enrolled_students = (course.enrolled_students or 0) + 1
+    db.commit()
+    db.refresh(reg)
+    return reg
+
+@app.delete("/registrations/{reg_id}")
+def delete_registration(reg_id: int, db: Session = Depends(get_db)):
+    reg = db.query(models.CourseRegistration).filter_by(id=reg_id).first()
+    if not reg:
+        raise HTTPException(status_code=404, detail="Registration not found")
+        
+    course = db.query(models.CourseMaster).filter_by(course_code=reg.course_code, semester=reg.semester).first()
+    if course and course.enrolled_students and course.enrolled_students > 0:
+        course.enrolled_students -= 1
+        
+    db.delete(reg)
+    db.commit()
+    return {"status": "success", "id": reg_id}
+
+@app.post("/students", response_model=schemas.StudentResponse)
+def create_student(req: schemas.StudentCreate, db: Session = Depends(get_db)):
+    student = db.query(models.StudentMaster).filter_by(student_id=req.student_id).first()
+    if student:
+        raise HTTPException(status_code=400, detail="Student ID already exists")
+    student = models.StudentMaster(**req.dict())
+    db.add(student)
+    db.commit()
+    db.refresh(student)
+    return student
+
+@app.delete("/students/{student_id}")
+def delete_student(student_id: str, db: Session = Depends(get_db)):
+    student = db.query(models.StudentMaster).filter_by(student_id=student_id).first()
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+        
+    regs = db.query(models.CourseRegistration).filter_by(student_id=student_id).all()
+    for r in regs:
+        course = db.query(models.CourseMaster).filter_by(course_code=r.course_code, semester=r.semester).first()
+        if course and course.enrolled_students and course.enrolled_students > 0:
+            course.enrolled_students -= 1
+        db.delete(r)
+        
+    db.delete(student)
+    db.commit()
+    return {"status": "success", "student_id": student_id}

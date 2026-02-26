@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Index
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Index, UniqueConstraint, UniqueConstraint
 from database import Base
 
 class DepartmentMaster(Base):
@@ -47,6 +47,28 @@ class CourseMaster(Base):
     is_honours = Column(Boolean, default=False)
     is_minor = Column(Boolean, default=False)
     is_add_course = Column(Boolean, default=False)
+    enrolled_students = Column(Integer, default=0)
+
+
+class StudentMaster(Base):
+    __tablename__ = "student_master"
+    
+    student_id = Column(String, primary_key=True)
+    name = Column(String, nullable=False)
+    email = Column(String, nullable=True)
+    department_code = Column(String, ForeignKey('department_master.department_code'), nullable=False)
+
+class CourseRegistration(Base):
+    __tablename__ = "course_registrations"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    student_id = Column(String, ForeignKey('student_master.student_id'), nullable=False)
+    course_code = Column(String, ForeignKey('course_master.course_code'), nullable=False)
+    semester = Column(Integer, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint('student_id', 'course_code', 'semester', name='uix_student_course_sem'),
+    )
 
 
 # Index for faster queries

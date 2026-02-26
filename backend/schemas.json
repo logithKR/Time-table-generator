@@ -1,0 +1,54 @@
+{
+  "S4_Sample": [
+    {
+      "Course Code": "22AG040-TECHNOLOGY OF SEED PROCESSING",
+      "Student ID": "7376242AG101",
+      "Enrollment Number": "2024UAG1016",
+      "Name": "BALAMANIGANDAN S V",
+      "Email": "balamanigandansv.ag24@bitsathy.ac.in",
+      "Department": "AGRI"
+    },
+    {
+      "Course Code": "22AG040-TECHNOLOGY OF SEED PROCESSING",
+      "Student ID": "7376242AG102",
+      "Enrollment Number": "2024UAG1010",
+      "Name": "BAVATHARINI P",
+      "Email": "bavatharinip.ag24@bitsathy.ac.in",
+      "Department": "AGRI"
+    },
+    {
+      "Course Code": "22AG040-TECHNOLOGY OF SEED PROCESSING",
+      "Student ID": "7376242AG103",
+      "Enrollment Number": "2024UAG1003",
+      "Name": "DEEPIKA G",
+      "Email": "deepikag.ag24@bitsathy.ac.in",
+      "Department": "AGRI"
+    }
+  ],
+  "S6_Sample": [
+    {
+      "Course Title": "22AG601 - FARM IMPLEMENTS AND EQUIPMENT",
+      "Student ID": "7376232AG102",
+      "Enrollment Number": "2023UAG1045",
+      "Name": "ANISH M",
+      "Email": "anish.ag23@bitsathy.ac.in",
+      "Department": "AGRI"
+    },
+    {
+      "Course Title": "22AG601 - FARM IMPLEMENTS AND EQUIPMENT",
+      "Student ID": "7376232AG103",
+      "Enrollment Number": "2023UAG1044",
+      "Name": "ARULSANKARAN N",
+      "Email": "arulsankaran.ag23@bitsathy.ac.in",
+      "Department": "AGRI"
+    },
+    {
+      "Course Title": "22AG601 - FARM IMPLEMENTS AND EQUIPMENT",
+      "Student ID": "7376232AG104",
+      "Enrollment Number": "2023UAG1017",
+      "Name": "ASHOK KUMAR R",
+      "Email": "ashokkumar.ag23@bitsathy.ac.in",
+      "Department": "AGRI"
+    }
+  ]
+}

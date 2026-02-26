@@ -92,6 +92,7 @@ class Course(BaseModel):
     is_elective: Optional[bool] = False
     is_open_elective: Optional[bool] = False
     is_add_course: Optional[bool] = False
+    enrolled_students: Optional[int] = 0
     class Config:
         orm_mode = True
 
@@ -201,3 +202,61 @@ class DepartmentSemesterCountResponse(BaseModel):
     class Config:
         orm_mode = True
 
+# --- Students & Registrations ---
+
+class StudentBase(BaseModel):
+    student_id: str
+    name: str
+    email: Optional[str] = None
+    department_code: str
+
+class StudentCreate(StudentBase):
+    pass
+
+class StudentResponse(StudentBase):
+    class Config:
+        orm_mode = True
+
+class CourseRegistrationBase(BaseModel):
+    student_id: str
+    course_code: str
+    semester: int
+
+class CourseRegistrationCreate(CourseRegistrationBase):
+    pass
+
+class CourseRegistrationResponse(CourseRegistrationBase):
+    id: int
+    
+    class Config:
+        orm_mode = True
+
+
+# --- Students & Registrations ---
+
+class StudentBase(BaseModel):
+    student_id: str
+    name: str
+    email: Optional[str] = None
+    department_code: str
+
+class StudentCreate(StudentBase):
+    pass
+
+class StudentResponse(StudentBase):
+    class Config:
+        orm_mode = True
+
+class CourseRegistrationBase(BaseModel):
+    student_id: str
+    course_code: str
+    semester: int
+
+class CourseRegistrationCreate(CourseRegistrationBase):
+    pass
+
+class CourseRegistrationResponse(CourseRegistrationBase):
+    id: int
+    
+    class Config:
+        orm_mode = True

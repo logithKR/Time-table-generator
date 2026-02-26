@@ -400,6 +400,99 @@ def save_timetable(request: schemas.TimetableSaveRequest, db: Session = Depends(
         
     return {"status": "success", "count": len(new_entries)}
 
+# ============================================
+# AVAILABILITY QUERIES (for Smart Editor)
+# ============================================
+
+@app.get("/available-faculty")
+def get_available_faculty(
+    department_code: str,
+    day: str,
+    period: int,
+    db: Session = Depends(get_db)
+):
+    """Return faculty from the given department who are NOT busy at this day+period across all depts/sems."""
+    # All faculty in the department
+    all_faculty = db.query(models.FacultyMaster).filter(
+        models.FacultyMaster.department_code == department_code
+    ).all()
+
+    # All faculty_names busy at this exact slot (across ALL departments and semesters)
+    busy_names = set()
+    busy_entries = db.query(models.TimetableEntry.faculty_name).filter(
+        models.TimetableEntry.day_of_week == day,
+        models.TimetableEntry.period_number == period,
+        models.TimetableEntry.faculty_name.isnot(None),
+        models.TimetableEntry.faculty_name != '',
+        models.TimetableEntry.faculty_name != 'Unassigned'
+    ).all()
+    for (name,) in busy_entries:
+        busy_names.add(name)
+
+    result = []
+    for f in all_faculty:
+        result.append({
+            "faculty_id": f.faculty_id,
+            "faculty_name": f.faculty_name,
+            "department_code": f.department_code,
+            "is_available": f.faculty_name not in busy_names
+        })
+    # Sort: available first, then by name
+    result.sort(key=lambda x: (not x["is_available"], x["faculty_name"]))
+    return result
+
+
+@app.get("/available-venues")
+def get_available_venues(
+    department_code: str,
+    semester: int,
+    day: str,
+    period: int,
+    db: Session = Depends(get_db)
+):
+    """Return venues mapped to this dept+semester that are NOT used at this day+period across all depts/sems."""
+    # Get venue IDs mapped to this department + semester
+    dept_venue_ids = [
+        dv.venue_id for dv in
+        db.query(models.DepartmentVenueMap).filter(
+            models.DepartmentVenueMap.department_code == department_code,
+            models.DepartmentVenueMap.semester == semester
+        ).all()
+    ]
+
+    if not dept_venue_ids:
+        return []
+
+    # Get the actual venue objects
+    venues = db.query(models.VenueMaster).filter(
+        models.VenueMaster.venue_id.in_(dept_venue_ids)
+    ).all()
+
+    # All venue_names busy at this exact slot (across ALL departments and semesters)
+    busy_venue_names = set()
+    busy_entries = db.query(models.TimetableEntry.venue_name).filter(
+        models.TimetableEntry.day_of_week == day,
+        models.TimetableEntry.period_number == period,
+        models.TimetableEntry.venue_name.isnot(None),
+        models.TimetableEntry.venue_name != ''
+    ).all()
+    for (name,) in busy_entries:
+        busy_venue_names.add(name)
+
+    result = []
+    for v in venues:
+        result.append({
+            "venue_id": v.venue_id,
+            "venue_name": v.venue_name,
+            "block": v.block,
+            "is_lab": v.is_lab,
+            "capacity": v.capacity,
+            "is_available": v.venue_name not in busy_venue_names
+        })
+    # Sort: available first, then by name
+    result.sort(key=lambda x: (not x["is_available"], x["venue_name"]))
+    return result
+
 
 # ============================================
 # VENUES

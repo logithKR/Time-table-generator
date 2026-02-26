@@ -105,3 +105,9 @@ export const deleteRegistration = (id) => axios.delete(`${API_URL}/registrations
 // --- Personalized Timetables ---
 export const getFacultyTimetable = (facultyId) => axios.get(`${API_URL}/timetable/faculty/${facultyId}`);
 export const getStudentTimetable = (studentId) => axios.get(`${API_URL}/timetable/student/${studentId}`);
+
+// --- Availability Queries (Smart Editor) ---
+export const getAvailableFaculty = (deptCode, day, period) =>
+    axios.get(`${API_URL}/available-faculty?department_code=${deptCode}&day=${day}&period=${period}`);
+export const getAvailableVenues = (deptCode, semester, day, period) =>
+    axios.get(`${API_URL}/available-venues?department_code=${deptCode}&semester=${semester}&day=${day}&period=${period}`);

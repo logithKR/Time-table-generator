@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { DndContext, useDroppable, useDraggable, DragOverlay, MouseSensor, TouchSensor, useSensor, useSensors, pointerWithin } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import * as api from '../utils/api';
-import { Search, Save, Trash2, Download, Undo2, Coffee, X, BookOpen, FlaskConical, Users2, LayoutTemplate, Palette, ArrowLeftRight } from 'lucide-react';
+import { Search, Save, Trash2, Download, Undo2, Coffee, X, BookOpen, FlaskConical, Users2, LayoutTemplate, Palette, ArrowLeftRight, Plus, ChevronDown, Pencil, Type } from 'lucide-react';
 
 // ─── Simplified Color Palette (Preserved) ───
 const THEORY_STYLE = {
@@ -80,7 +80,7 @@ const CourseChip = ({ course, colorStyle, facultyName, venueName }) => {
     );
 };
 
-// ─── Draggable Grid Cell Content ───
+// ─── Draggable Grid Cell Content (Dashboard-style layout) ───
 const CellContent = ({ entry, sections, cellId, isLabStart, isSwapMode, isSelected, onClick }) => {
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
         id: cellId,
@@ -106,17 +106,24 @@ const CellContent = ({ entry, sections, cellId, isLabStart, isSwapMode, isSelect
 
     const isMentor = entry.session_type === 'MENTOR';
     const isOE = entry.session_type === 'OPEN_ELECTIVE' || entry.course_code === 'OPEN_ELEC';
-    const hasMultipleSections = sections && sections.length > 1;
+    const allSections = sections && sections.length > 0 ? sections : [entry];
 
-    // Compute pairing info before render
-    const uniqueCodes = hasMultipleSections
-        ? [...new Set(sections.map(s => s.course_code))]
-        : [entry.course_code];
+    // Helper: check if a faculty name is a real displayable name
+    const isValidFaculty = (name) => {
+        if (!name || name.trim() === '') return false;
+        const lower = name.trim().toLowerCase();
+        if (lower === 'unassigned') return false;
+        if (lower.includes('select')) return false;
+        return true;
+    };
+
+    // Group sections by course code (like dashboard does)
+    const uniqueCodes = [...new Set(allSections.map(s => s.course_code))];
     const isPaired = uniqueCodes.length > 1;
 
     return (
         <div ref={setNodeRef} style={style} {...listeners} {...attributes} onClick={onClick}
-            className={`w-full h-full rounded-xl border-[1.5px] ${bg} ${border} ${text} ${isSwapMode ? 'cursor-pointer hover:ring-2 hover:ring-violet-400' : 'cursor-pointer hover:ring-2 hover:ring-violet-200'} ${isSelected ? 'ring-4 ring-fuchsia-500 shadow-xl scale-105 z-50' : ''} transition-all hover:shadow-md group relative overflow-hidden flex flex-col justify-center p-2 shadow-sm min-h-[80px]`}>
+            className={`w-full h-full rounded-xl border-[1.5px] ${bg} ${border} ${text} ${isSwapMode ? 'cursor-pointer hover:ring-2 hover:ring-violet-400' : 'cursor-pointer hover:ring-2 hover:ring-violet-200'} ${isSelected ? 'ring-4 ring-fuchsia-500 shadow-xl scale-105 z-50' : ''} transition-all hover:shadow-md group relative flex flex-col justify-center p-2.5 shadow-sm min-h-[80px] overflow-hidden`}>
             {isMentor ? (
                 <div className="text-center">
                     <div className="font-bold text-[10px] uppercase tracking-wider opacity-90">MENTOR</div>
@@ -128,60 +135,58 @@ const CellContent = ({ entry, sections, cellId, isLabStart, isSwapMode, isSelect
                     <div className="text-[9px] font-medium opacity-60 mt-0.5">Elective</div>
                 </div>
             ) : (
-                <>
-                    <div className="flex justify-between items-start w-full mb-0.5">
-                        <div className="font-bold text-xs leading-tight tracking-tight truncate" title={uniqueCodes.join(' / ')}>
-                            {uniqueCodes.join(' / ')}
-                        </div>
-                        {entry.session_type === 'LAB' && isLabStart && (
-                            <FlaskConical className="w-3 h-3 opacity-40 shrink-0 ml-1 fill-current" />
-                        )}
-                    </div>
+                <div className="flex flex-col gap-0.5 justify-center h-full w-full">
+                    {uniqueCodes.map((code, idx) => {
+                        const groupEntries = allSections.filter(s => s.course_code === code);
+                        const groupName = groupEntries[0]?.course_name || '';
 
-                    {isPaired ? (
-                        <div className="text-[9px] leading-tight opacity-70 font-medium w-full">
-                            {[...new Set(sections.map(s => s.course_name))].map((name, i) => (
-                                <div key={i} className="truncate" title={name}>{name || ''}</div>
-                            ))}
-                        </div>
-                    ) : (
-                        <div className="text-[10px] leading-tight opacity-70 font-medium w-full truncate" title={entry.course_name}>{entry.course_name || ''}</div>
-                    )}
+                        return (
+                            <div key={idx} className={`flex flex-col justify-center py-0.5 ${idx > 0 ? 'border-t border-current/15 mt-1 pt-1' : ''}`}>
+                                {/* Course code + lab icon */}
+                                <div className="flex justify-center items-center gap-1">
+                                    <span className="font-bold text-[11px] tracking-tight leading-tight">{code}</span>
+                                    {entry.session_type === 'LAB' && isLabStart && idx === 0 && (
+                                        <FlaskConical className="w-3 h-3 opacity-40 shrink-0 fill-current" />
+                                    )}
+                                </div>
 
-                    {hasMultipleSections ? (
-                        <div className="mt-auto pt-1 flex flex-col gap-0.5 w-full border-t border-current/10">
-                            {sections.map((sec, idx) => (
-                                <div key={idx} className="flex items-center gap-1 text-[8px] leading-tight">
-                                    {isPaired && (
-                                        <span className="font-bold opacity-60 shrink-0">{sec.course_code.slice(-3)}:</span>
-                                    )}
-                                    {sec.faculty_name && sec.faculty_name !== 'Unassigned' && (
-                                        <span className="font-semibold truncate flex-1 opacity-80">{sec.faculty_name}</span>
-                                    )}
-                                    {sec.venue_name && (
-                                        <span className="font-bold text-indigo-600 bg-indigo-50/80 px-1 rounded border border-indigo-200 shrink-0 truncate max-w-[60px]" title={sec.venue_name}>
-                                            {sec.venue_name}
-                                        </span>
-                                    )}
+                                {/* Course name */}
+                                <div className="text-[9.5px] font-semibold leading-tight text-center px-0.5 my-0.5 opacity-80 break-words">
+                                    {groupName}
                                 </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <div className="mt-auto pt-1.5 flex flex-col gap-1 w-full border-t border-current/10">
-                            {entry.venue_name && (
-                                <div className="text-[8.5px] flex items-center gap-1 font-bold text-indigo-700 bg-indigo-50/80 px-1 py-0.5 rounded border border-indigo-200 w-fit">
-                                    <span className="truncate">{entry.venue_name}</span>
-                                </div>
-                            )}
-                            {entry.faculty_name && entry.faculty_name !== 'Unassigned' && (
-                                <div className="text-[9px] flex items-center gap-1 opacity-70 font-semibold w-full">
-                                    <Users2 className="w-2.5 h-2.5 opacity-80" />
-                                    <span className="truncate">{entry.faculty_name}</span>
-                                </div>
-                            )}
-                        </div>
-                    )}
-                </>
+
+                                {/* Faculty & Venue per section */}
+                                {groupEntries.length > 1 && !isPaired ? (
+                                    /* Multiple sections of same course — show each faculty/venue */
+                                    <div className="flex flex-col gap-0.5 border-t border-current/10 pt-0.5 mt-0.5">
+                                        {groupEntries.map((sec, sIdx) => (
+                                            <div key={sIdx} className="flex flex-col items-center w-full">
+                                                {isValidFaculty(sec.faculty_name) && (
+                                                    <span className="text-[8.5px] font-semibold italic opacity-80 text-center break-words w-full">{sec.faculty_name}</span>
+                                                )}
+                                                {sec.venue_name && (
+                                                    <span className="text-[7.5px] font-bold text-indigo-700 bg-indigo-50/80 px-1.5 rounded border border-indigo-200 mt-0.5 text-center break-words">{sec.venue_name}</span>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    /* Single section or paired — show first entry's faculty/venue */
+                                    <>
+                                        {isValidFaculty(groupEntries[0]?.faculty_name) && (
+                                            <div className="text-[9px] italic font-semibold text-center mt-0.5 opacity-80 break-words">{groupEntries[0].faculty_name}</div>
+                                        )}
+                                        {groupEntries[0]?.venue_name && (
+                                            <div className="flex justify-center mt-0.5">
+                                                <span className="text-[8px] font-bold text-indigo-700 bg-indigo-50/80 px-1.5 py-0.5 rounded border border-indigo-200 text-center break-words">{groupEntries[0].venue_name}</span>
+                                            </div>
+                                        )}
+                                    </>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
             )}
         </div>
     );
@@ -205,7 +210,7 @@ const GridCell = ({ id, children, isEmpty, isBreak, isLunch, onCellClick }) => {
 
     return (
         <td ref={setNodeRef} onClick={isEmpty ? onCellClick : undefined}
-            className={`border-r border-b border-gray-100 relative min-w-[120px] transition-colors duration-200 ${isOver ? (isEmpty ? 'bg-emerald-50/50' : 'bg-amber-50/50') : (isEmpty ? 'bg-white hover:bg-purple-50/10 cursor-pointer' : '')}`}
+            className={`border-r border-b border-gray-100 relative min-w-[160px] transition-colors duration-200 ${isOver ? (isEmpty ? 'bg-emerald-50/50' : 'bg-amber-50/50') : (isEmpty ? 'bg-white hover:bg-purple-50/10 cursor-pointer' : '')}`}
             style={{ minHeight: 80, height: 'auto', padding: 4 }}>
             {/* Adding specific ring indicator for drops */}
             {isOver && (
@@ -225,7 +230,7 @@ const DroppableGridCellSpan = ({ id, colSpan, entry, sections, isLabStart, onDel
             colSpan={colSpan}
             onClick={!entry ? onCellClick : undefined}
             className={`border-r border-b border-gray-100 relative transition-colors duration-200 ${isOver ? (entry ? 'bg-amber-50/50' : 'bg-emerald-50/50') : (entry ? '' : 'bg-white hover:bg-purple-50/10 cursor-pointer')}`}
-            style={{ minHeight: 80, height: 'auto', padding: 4, minWidth: colSpan > 1 ? 240 : 120 }}>
+            style={{ minHeight: 80, height: 'auto', padding: 4, minWidth: colSpan > 1 ? 320 : 160 }}>
             {isOver && (
                 <div className={`absolute inset-1 rounded-xl border-2 border-dashed pointer-events-none z-10 ${entry ? 'border-amber-400/50 bg-amber-50/20' : 'border-emerald-400/50 bg-emerald-50/20'}`} />
             )}
@@ -250,42 +255,236 @@ const DroppableGridCellSpan = ({ id, colSpan, entry, sections, isLabStart, onDel
     );
 };
 
-const ManualEntryModal = ({ isOpen, onClose, onSave, initialData }) => {
+const ManualEntryModal = ({ isOpen, onClose, onSave, initialData, allSections, department, semester, day, period }) => {
     if (!isOpen) return null;
     const [formData, setFormData] = useState(initialData || { course_code: '', course_name: '', faculty_name: '', venue_name: '' });
+    const [sectionEdits, setSectionEdits] = useState([]);
+    const [availableFaculty, setAvailableFaculty] = useState([]);
+    const [availableVenues, setAvailableVenues] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const [manualMode, setManualMode] = useState({}); // { 'faculty-0': true, 'venue-1': true }
+
+    // Initialize section edits
+    React.useEffect(() => {
+        if (allSections && allSections.length >= 1) {
+            setSectionEdits(allSections.map(s => ({
+                faculty_name: s.faculty_name || '',
+                venue_name: s.venue_name || '',
+                course_code: s.course_code,
+                course_name: s.course_name,
+                section_number: s.section_number,
+                session_type: s.session_type,
+                _original: s,
+                _deleted: false
+            })));
+        } else {
+            setSectionEdits([]);
+        }
+    }, [allSections]);
+
+    // Fetch availability data on mount
+    React.useEffect(() => {
+        if (!department || !day || !period) return;
+        setLoading(true);
+        Promise.all([
+            api.getAvailableFaculty(department, day, period).catch(() => ({ data: [] })),
+            api.getAvailableVenues(department, semester, day, period).catch(() => ({ data: [] }))
+        ]).then(([facRes, venRes]) => {
+            setAvailableFaculty(facRes.data || []);
+            setAvailableVenues(venRes.data || []);
+        }).finally(() => setLoading(false));
+    }, [department, semester, day, period]);
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        onSave(formData);
+        // Filter out deleted sections
+        const activeSections = sectionEdits.filter(s => !s._deleted);
+        onSave(formData, activeSections);
         onClose();
+    };
+
+    const updateSection = (idx, field, value) => {
+        setSectionEdits(prev => prev.map((s, i) => i === idx ? { ...s, [field]: value } : s));
+    };
+
+    const addSection = () => {
+        const base = sectionEdits[0] || {};
+        setSectionEdits(prev => [...prev, {
+            faculty_name: '',
+            venue_name: '',
+            course_code: base.course_code || formData.course_code,
+            course_name: base.course_name || formData.course_name,
+            section_number: prev.length + 1,
+            session_type: base.session_type || 'THEORY',
+            _original: null,
+            _deleted: false,
+            _isNew: true
+        }]);
+    };
+
+    const deleteSection = (idx) => {
+        setSectionEdits(prev => prev.map((s, i) => i === idx ? { ...s, _deleted: true } : s));
+    };
+
+    const toggleManual = (key) => {
+        setManualMode(prev => ({ ...prev, [key]: !prev[key] }));
+    };
+
+    const activeSections = sectionEdits.filter(s => !s._deleted);
+    const hasSections = activeSections.length > 0;
+
+    // Helper: render faculty selector for a section
+    const renderFacultyField = (sec, idx, actualIdx) => {
+        const manualKey = `faculty-${idx}`;
+        const isManual = manualMode[manualKey];
+
+        return (
+            <div>
+                <div className="flex items-center justify-between mb-0.5">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase">Faculty</label>
+                    <button type="button" onClick={() => toggleManual(manualKey)}
+                        className="text-[9px] text-violet-500 hover:text-violet-700 flex items-center gap-0.5 font-semibold">
+                        {isManual ? <><ChevronDown className="w-2.5 h-2.5" /> Dropdown</> : <><Type className="w-2.5 h-2.5" /> Type</>}
+                    </button>
+                </div>
+                {isManual ? (
+                    <input type="text" className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-violet-400 outline-none"
+                        value={sec.faculty_name} onChange={e => updateSection(actualIdx, 'faculty_name', e.target.value)} placeholder="Type faculty name..." />
+                ) : (
+                    <select className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-violet-400 outline-none bg-white cursor-pointer"
+                        value={sec.faculty_name} onChange={e => updateSection(actualIdx, 'faculty_name', e.target.value)}>
+                        <option value="">-- Select Faculty --</option>
+                        {availableFaculty.map(f => (
+                            <option key={f.faculty_id} value={f.faculty_name} disabled={!f.is_available}
+                                style={{ color: f.is_available ? '#059669' : '#dc2626' }}>
+                                {f.is_available ? '✓ ' : '✗ '}{f.faculty_name}{!f.is_available ? ' (Busy)' : ''}
+                            </option>
+                        ))}
+                    </select>
+                )}
+            </div>
+        );
+    };
+
+    // Helper: render venue selector for a section
+    const renderVenueField = (sec, idx, actualIdx) => {
+        const manualKey = `venue-${idx}`;
+        const isManual = manualMode[manualKey];
+
+        return (
+            <div>
+                <div className="flex items-center justify-between mb-0.5">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase">Venue</label>
+                    <button type="button" onClick={() => toggleManual(manualKey)}
+                        className="text-[9px] text-violet-500 hover:text-violet-700 flex items-center gap-0.5 font-semibold">
+                        {isManual ? <><ChevronDown className="w-2.5 h-2.5" /> Dropdown</> : <><Type className="w-2.5 h-2.5" /> Type</>}
+                    </button>
+                </div>
+                {isManual ? (
+                    <input type="text" className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-violet-400 outline-none"
+                        value={sec.venue_name} onChange={e => updateSection(actualIdx, 'venue_name', e.target.value)} placeholder="Type venue name..." />
+                ) : (
+                    <select className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-violet-400 outline-none bg-white cursor-pointer"
+                        value={sec.venue_name} onChange={e => updateSection(actualIdx, 'venue_name', e.target.value)}>
+                        <option value="">-- Select Venue --</option>
+                        {availableVenues.map(v => (
+                            <option key={v.venue_id} value={v.venue_name} disabled={!v.is_available}
+                                style={{ color: v.is_available ? '#059669' : '#dc2626' }}>
+                                {v.is_available ? '✓ ' : '✗ '}{v.venue_name}{v.capacity ? ` (${v.capacity})` : ''}{v.is_lab ? ' [Lab]' : ''}{!v.is_available ? ' (In Use)' : ''}
+                            </option>
+                        ))}
+                    </select>
+                )}
+            </div>
+        );
     };
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
-            <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md border border-gray-100" onClick={e => e.stopPropagation()}>
-                <h3 className="text-lg font-bold text-gray-800 mb-4">{initialData ? 'Edit Entry' : 'Add Manual Entry'}</h3>
+            <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-lg border border-gray-100 max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+                <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-bold text-gray-800">{initialData ? 'Edit Entry' : 'Add Manual Entry'}</h3>
+                    {loading && <span className="text-xs text-violet-500 animate-pulse font-semibold">Loading availability...</span>}
+                </div>
                 <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-                    <div>
-                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Title / Code</label>
-                        <input type="text" autoFocus className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-bold focus:ring-2 focus:ring-violet-400 outline-none"
-                            value={formData.course_code} onChange={e => setFormData({ ...formData, course_code: e.target.value })} placeholder="e.g. Meeting / CS101" />
+                    {/* Course Code & Name */}
+                    <div className="grid grid-cols-2 gap-3">
+                        <div>
+                            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Code</label>
+                            <input type="text" autoFocus className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-bold focus:ring-2 focus:ring-violet-400 outline-none"
+                                value={formData.course_code} onChange={e => setFormData({ ...formData, course_code: e.target.value })} placeholder="e.g. CS101" />
+                        </div>
+                        <div>
+                            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Name</label>
+                            <input type="text" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-violet-400 outline-none"
+                                value={formData.course_name} onChange={e => setFormData({ ...formData, course_name: e.target.value })} placeholder="Course name" />
+                        </div>
                     </div>
-                    <div>
-                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Description / Name</label>
-                        <textarea className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-violet-400 outline-none resize-none h-24"
-                            value={formData.course_name} onChange={e => setFormData({ ...formData, course_name: e.target.value })} placeholder="Enter details..." />
+
+                    {/* Sections */}
+                    <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-violet-600 uppercase tracking-wider">Sections ({activeSections.length})</span>
+                            <div className="flex-1 h-px bg-violet-100"></div>
+                            <button type="button" onClick={addSection}
+                                className="flex items-center gap-1 text-[10px] font-bold text-green-600 hover:text-green-700 bg-green-50 hover:bg-green-100 px-2 py-1 rounded-lg border border-green-200 transition-all">
+                                <Plus className="w-3 h-3" /> Add Section
+                            </button>
+                        </div>
+
+                        {sectionEdits.map((sec, idx) => {
+                            if (sec._deleted) return null;
+                            const displayIdx = sectionEdits.slice(0, idx + 1).filter(s => !s._deleted).length;
+                            return (
+                                <div key={idx} className="bg-gray-50 rounded-xl p-3 border border-gray-200 space-y-2 relative group">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <span className="bg-violet-100 text-violet-700 px-2 py-0.5 rounded-full text-[10px] font-bold">
+                                                Section {displayIdx}
+                                            </span>
+                                            {sec._isNew && <span className="text-[9px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-bold">NEW</span>}
+                                        </div>
+                                        {activeSections.length > 1 && (
+                                            <button type="button" onClick={() => deleteSection(idx)}
+                                                className="text-red-400 hover:text-red-600 hover:bg-red-50 p-1 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                                                title="Remove section">
+                                                <Trash2 className="w-3.5 h-3.5" />
+                                            </button>
+                                        )}
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {renderFacultyField(sec, displayIdx - 1, idx)}
+                                        {renderVenueField(sec, displayIdx - 1, idx)}
+                                    </div>
+                                </div>
+                            );
+                        })}
+
+                        {/* If no sections at all (new manual entry), show simple fields */}
+                        {activeSections.length === 0 && (
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Faculty</label>
+                                    <input type="text" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-violet-400 outline-none"
+                                        value={formData.faculty_name || ''} onChange={e => setFormData({ ...formData, faculty_name: e.target.value })} placeholder="Optional" />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Venue</label>
+                                    <input type="text" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-violet-400 outline-none"
+                                        value={formData.venue_name || ''} onChange={e => setFormData({ ...formData, venue_name: e.target.value })} placeholder="e.g. CS 203" />
+                                </div>
+                            </div>
+                        )}
                     </div>
-                    <div>
-                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Faculty / Note</label>
-                        <input type="text" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-violet-400 outline-none"
-                            value={formData.faculty_name || ''} onChange={e => setFormData({ ...formData, faculty_name: e.target.value })} placeholder="Optional" />
+
+                    {/* Slot Info Badge */}
+                    <div className="flex items-center gap-2 text-[10px] text-gray-400 font-medium">
+                        <span className="bg-gray-100 px-2 py-0.5 rounded">{day}</span>
+                        <span className="bg-gray-100 px-2 py-0.5 rounded">Period {period}</span>
+                        <span className="bg-gray-100 px-2 py-0.5 rounded">{department} - Sem {semester}</span>
                     </div>
-                    <div>
-                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Venue / Room</label>
-                        <input type="text" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-violet-400 outline-none"
-                            value={formData.venue_name || ''} onChange={e => setFormData({ ...formData, venue_name: e.target.value })} placeholder="e.g. CS 203" />
-                    </div>
-                    <div className="flex justify-end gap-2 mt-2">
+
+                    <div className="flex justify-end gap-2">
                         <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-bold text-gray-500 hover:bg-gray-100 rounded-lg">Cancel</button>
                         <button type="submit" className="px-4 py-2 text-sm font-bold text-white bg-violet-600 hover:bg-violet-700 rounded-lg shadow-lg hover:shadow-violet-200">Save</button>
                     </div>
@@ -787,11 +986,14 @@ export default function TimetableEditor({ department, semester, onSave, onExport
             handleSwapClick(day, period, entry);
             return;
         }
+        const key = `${day}-${period}`;
+        const allSectionsForSlot = sectionsMap[key] || [];
         setEditModalData({
             isOpen: true,
             day,
             period,
             entry,
+            allSections: allSectionsForSlot,
             initialData: entry ? {
                 course_code: entry.course_code,
                 course_name: entry.course_name,
@@ -801,41 +1003,95 @@ export default function TimetableEditor({ department, semester, onSave, onExport
         });
     };
 
-    const handleManualSave = (formData) => {
-        const { day, period, entry } = editModalData;
+    const handleManualSave = (formData, sectionEdits = []) => {
+        const { day, period, entry, allSections } = editModalData;
         pushHistory();
 
-        const isLab = entry?.session_type === 'LAB';
-
-        const newEntry = {
-            department_code: department, semester: parseInt(semester),
-            course_code: formData.course_code || 'CUSTOM',
-            course_name: formData.course_name,
-            session_type: isLab ? 'LAB' : 'THEORY',
-            faculty_id: null,
-            faculty_name: formData.faculty_name || 'Unassigned',
-            venue_name: formData.venue_name || '',
-            slot_id: 0,
-            day_of_week: day,
-            period_number: period
+        // Sanitize faculty names: strip out placeholder/dropdown values
+        const cleanFaculty = (name) => {
+            if (!name || name.trim() === '') return '';
+            const lower = name.trim().toLowerCase();
+            if (lower === 'unassigned' || lower.includes('select')) return '';
+            return name.trim();
         };
 
         let currentEntries = [...entries];
 
-        if (entry) {
-            // Edit existing
-            currentEntries = currentEntries.map(e => {
-                if (e === entry) return { ...e, ...newEntry };
-                // Update pair if Lab
-                if (isLab && e.day_of_week === day && e.course_code === entry.course_code && e.session_type === 'LAB' && Math.abs(e.period_number - period) === 1) {
-                    return { ...e, ...newEntry, period_number: e.period_number };
-                }
-                return e;
-            });
+        if (sectionEdits.length > 0) {
+            // Clean faculty names in section edits
+            sectionEdits = sectionEdits.map(s => ({ ...s, faculty_name: cleanFaculty(s.faculty_name) }));
+            // Handle deletions: remove entries whose originals are no longer in active sections
+            if (allSections && allSections.length >= 1) {
+                // Find originals that were deleted
+                const survivingOriginals = new Set(sectionEdits.filter(s => s._original).map(s => s._original));
+                currentEntries = currentEntries.filter(e => {
+                    // If this entry is one of the slot's original sections, check if it survived
+                    const isSlotEntry = allSections.includes(e);
+                    if (isSlotEntry && !survivingOriginals.has(e)) return false; // deleted
+                    return true;
+                });
+
+                // Handle updates: update surviving originals
+                currentEntries = currentEntries.map(e => {
+                    const editMatch = sectionEdits.find(s => s._original === e);
+                    if (editMatch) {
+                        return {
+                            ...e,
+                            course_code: formData.course_code || e.course_code,
+                            course_name: formData.course_name || e.course_name,
+                            faculty_name: editMatch.faculty_name,
+                            venue_name: editMatch.venue_name
+                        };
+                    }
+                    return e;
+                });
+
+                // Handle additions: add new sections
+                sectionEdits.filter(s => s._isNew).forEach(s => {
+                    currentEntries.push({
+                        department_code: department,
+                        semester: parseInt(semester),
+                        course_code: formData.course_code || s.course_code || 'CUSTOM',
+                        course_name: formData.course_name || s.course_name || '',
+                        session_type: s.session_type || 'THEORY',
+                        faculty_id: null,
+                        faculty_name: s.faculty_name || '',
+                        venue_name: s.venue_name || '',
+                        slot_id: 0,
+                        day_of_week: day,
+                        period_number: period,
+                        section_number: s.section_number
+                    });
+                });
+            }
         } else {
-            // New Entry
-            currentEntries = currentEntries.filter(e => !(e.day_of_week === day && e.period_number === period));
-            currentEntries.push(newEntry);
+            // Single-section edit / new entry (original logic)
+            const isLab = entry?.session_type === 'LAB';
+            const newEntry = {
+                department_code: department, semester: parseInt(semester),
+                course_code: formData.course_code || 'CUSTOM',
+                course_name: formData.course_name,
+                session_type: isLab ? 'LAB' : 'THEORY',
+                faculty_id: null,
+                faculty_name: cleanFaculty(formData.faculty_name),
+                venue_name: formData.venue_name || '',
+                slot_id: 0,
+                day_of_week: day,
+                period_number: period
+            };
+
+            if (entry) {
+                currentEntries = currentEntries.map(e => {
+                    if (e === entry) return { ...e, ...newEntry };
+                    if (isLab && e.day_of_week === day && e.course_code === entry.course_code && e.session_type === 'LAB' && Math.abs(e.period_number - period) === 1) {
+                        return { ...e, ...newEntry, period_number: e.period_number };
+                    }
+                    return e;
+                });
+            } else {
+                currentEntries = currentEntries.filter(e => !(e.day_of_week === day && e.period_number === period));
+                currentEntries.push(newEntry);
+            }
         }
 
         setEntries(currentEntries);
@@ -945,7 +1201,7 @@ export default function TimetableEditor({ department, semester, onSave, onExport
                                     <th className="py-5 px-6 text-left text-xs font-bold uppercase tracking-widest border-r border-gray-100 w-32">Day</th>
                                     {periodColumns.map((col, i) => (
                                         col.type === 'PERIOD' ? (
-                                            <th key={`h-${col.period}`} className="py-4 px-3 text-center border-r border-gray-100 last:border-r-0 min-w-[145px]">
+                                            <th key={`h-${col.period}`} className="py-4 px-3 text-center border-r border-gray-100 last:border-r-0 min-w-[165px]">
                                                 <div className="text-[10px] font-black text-gray-400 tracking-widest mb-1 uppercase">Period {col.period}</div>
                                                 <div className="text-[11px] font-medium text-gray-600 font-mono tracking-tight bg-gray-50 rounded-full px-2 py-0.5 inline-block border border-gray-200">{col.start} – {col.end}</div>
                                             </th>
@@ -1051,6 +1307,11 @@ export default function TimetableEditor({ department, semester, onSave, onExport
                 onClose={() => setEditModalData(null)}
                 onSave={handleManualSave}
                 initialData={editModalData?.initialData}
+                allSections={editModalData?.allSections}
+                department={department}
+                semester={semester}
+                day={editModalData?.day}
+                period={editModalData?.period}
             />
         </DndContext >
     );

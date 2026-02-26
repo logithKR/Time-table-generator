@@ -123,7 +123,7 @@ const CellContent = ({ entry, sections, cellId, isLabStart, isSwapMode, isSelect
 
     return (
         <div ref={setNodeRef} style={style} {...listeners} {...attributes} onClick={onClick}
-            className={`w-full h-full rounded-xl border-[1.5px] ${bg} ${border} ${text} ${isSwapMode ? 'cursor-pointer hover:ring-2 hover:ring-violet-400' : 'cursor-pointer hover:ring-2 hover:ring-violet-200'} ${isSelected ? 'ring-4 ring-fuchsia-500 shadow-xl scale-105 z-50' : ''} transition-all hover:shadow-md group relative flex flex-col justify-center p-2.5 shadow-sm min-h-[80px] overflow-hidden`}>
+            className={`w-full h-full rounded-xl border-[1.5px] ${bg} ${border} ${text} ${isSwapMode ? 'cursor-pointer hover:ring-2 hover:ring-violet-400' : 'cursor-pointer hover:ring-2 hover:ring-violet-200'} ${isSelected ? 'ring-4 ring-fuchsia-500 shadow-xl scale-105 z-50' : ''} transition-all hover:shadow-md group relative flex flex-col justify-center p-2.5 shadow-sm min-h-[80px]`}>
             {isMentor ? (
                 <div className="text-center">
                     <div className="font-bold text-[10px] uppercase tracking-wider opacity-90">MENTOR</div>
@@ -151,37 +151,37 @@ const CellContent = ({ entry, sections, cellId, isLabStart, isSwapMode, isSelect
                                 </div>
 
                                 {/* Course name */}
-                                <div className="text-[9.5px] font-semibold leading-tight text-center px-0.5 my-0.5 opacity-80 break-words">
+                                <div className="text-[9.5px] font-semibold leading-tight text-center px-0.5 my-0.5 opacity-80">
                                     {groupName}
                                 </div>
 
-                                {/* Faculty & Venue per section */}
+                                {/* Faculty & Venue inline */}
                                 {groupEntries.length > 1 && !isPaired ? (
-                                    /* Multiple sections of same course — show each faculty/venue */
+                                    /* Multiple sections of same course — each faculty + venue on same line */
                                     <div className="flex flex-col gap-0.5 border-t border-current/10 pt-0.5 mt-0.5">
                                         {groupEntries.map((sec, sIdx) => (
-                                            <div key={sIdx} className="flex flex-col items-center w-full">
+                                            <div key={sIdx} className="flex items-center justify-center gap-1.5 w-full">
                                                 {isValidFaculty(sec.faculty_name) && (
-                                                    <span className="text-[8.5px] font-semibold italic opacity-80 text-center break-words w-full">{sec.faculty_name}</span>
+                                                    <span className="text-[8.5px] font-semibold italic opacity-80 whitespace-nowrap">{sec.faculty_name}</span>
                                                 )}
                                                 {sec.venue_name && (
-                                                    <span className="text-[7.5px] font-bold text-indigo-700 bg-indigo-50/80 px-1.5 rounded border border-indigo-200 mt-0.5 text-center break-words">{sec.venue_name}</span>
+                                                    <span className="text-[7.5px] font-bold text-indigo-700 bg-indigo-50/80 px-1.5 rounded border border-indigo-200 shrink-0 whitespace-nowrap">{sec.venue_name}</span>
                                                 )}
                                             </div>
                                         ))}
                                     </div>
                                 ) : (
-                                    /* Single section or paired — show first entry's faculty/venue */
-                                    <>
-                                        {isValidFaculty(groupEntries[0]?.faculty_name) && (
-                                            <div className="text-[9px] italic font-semibold text-center mt-0.5 opacity-80 break-words">{groupEntries[0].faculty_name}</div>
-                                        )}
-                                        {groupEntries[0]?.venue_name && (
-                                            <div className="flex justify-center mt-0.5">
-                                                <span className="text-[8px] font-bold text-indigo-700 bg-indigo-50/80 px-1.5 py-0.5 rounded border border-indigo-200 text-center break-words">{groupEntries[0].venue_name}</span>
-                                            </div>
-                                        )}
-                                    </>
+                                    /* Single section or paired — faculty + venue on same line */
+                                    (isValidFaculty(groupEntries[0]?.faculty_name) || groupEntries[0]?.venue_name) && (
+                                        <div className="flex items-center justify-center gap-1.5 mt-0.5 w-full">
+                                            {isValidFaculty(groupEntries[0]?.faculty_name) && (
+                                                <span className="text-[9px] italic font-semibold opacity-80 whitespace-nowrap">{groupEntries[0].faculty_name}</span>
+                                            )}
+                                            {groupEntries[0]?.venue_name && (
+                                                <span className="text-[8px] font-bold text-indigo-700 bg-indigo-50/80 px-1.5 py-0.5 rounded border border-indigo-200 shrink-0 whitespace-nowrap">{groupEntries[0].venue_name}</span>
+                                            )}
+                                        </div>
+                                    )
                                 )}
                             </div>
                         );
@@ -210,7 +210,7 @@ const GridCell = ({ id, children, isEmpty, isBreak, isLunch, onCellClick }) => {
 
     return (
         <td ref={setNodeRef} onClick={isEmpty ? onCellClick : undefined}
-            className={`border-r border-b border-gray-100 relative min-w-[160px] transition-colors duration-200 ${isOver ? (isEmpty ? 'bg-emerald-50/50' : 'bg-amber-50/50') : (isEmpty ? 'bg-white hover:bg-purple-50/10 cursor-pointer' : '')}`}
+            className={`border-r border-b border-gray-100 relative min-w-[220px] transition-colors duration-200 ${isOver ? (isEmpty ? 'bg-emerald-50/50' : 'bg-amber-50/50') : (isEmpty ? 'bg-white hover:bg-purple-50/10 cursor-pointer' : '')}`}
             style={{ minHeight: 80, height: 'auto', padding: 4 }}>
             {/* Adding specific ring indicator for drops */}
             {isOver && (
@@ -230,7 +230,7 @@ const DroppableGridCellSpan = ({ id, colSpan, entry, sections, isLabStart, onDel
             colSpan={colSpan}
             onClick={!entry ? onCellClick : undefined}
             className={`border-r border-b border-gray-100 relative transition-colors duration-200 ${isOver ? (entry ? 'bg-amber-50/50' : 'bg-emerald-50/50') : (entry ? '' : 'bg-white hover:bg-purple-50/10 cursor-pointer')}`}
-            style={{ minHeight: 80, height: 'auto', padding: 4, minWidth: colSpan > 1 ? 320 : 160 }}>
+            style={{ minHeight: 80, height: 'auto', padding: 4, minWidth: colSpan > 1 ? 440 : 220 }}>
             {isOver && (
                 <div className={`absolute inset-1 rounded-xl border-2 border-dashed pointer-events-none z-10 ${entry ? 'border-amber-400/50 bg-amber-50/20' : 'border-emerald-400/50 bg-emerald-50/20'}`} />
             )}
@@ -1194,24 +1194,16 @@ export default function TimetableEditor({ department, semester, onSave, onExport
 
                 {/* ─── TIMETABLE GRID (SMOOTH) ─── */}
                 <div className="flex-1 overflow-auto p-10 bg-gray-50/50">
-                    <div className="bg-white rounded-2xl shadow-xl shadow-gray-200/50 border border-gray-100 overflow-hidden ring-1 ring-gray-50 mx-auto max-w-[1400px]">
-                        <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
+                    <div className="bg-white rounded-2xl shadow-xl shadow-gray-200/50 border border-gray-100 overflow-auto ring-1 ring-gray-50 mx-auto">
+                        <table className="w-full border-collapse">
                             <thead>
                                 <tr className="bg-white border-b border-gray-200 text-gray-900">
                                     <th className="py-5 px-6 text-left text-xs font-bold uppercase tracking-widest border-r border-gray-100 w-32">Day</th>
-                                    {periodColumns.map((col, i) => (
-                                        col.type === 'PERIOD' ? (
-                                            <th key={`h-${col.period}`} className="py-4 px-3 text-center border-r border-gray-100 last:border-r-0 min-w-[165px]">
-                                                <div className="text-[10px] font-black text-gray-400 tracking-widest mb-1 uppercase">Period {col.period}</div>
-                                                <div className="text-[11px] font-medium text-gray-600 font-mono tracking-tight bg-gray-50 rounded-full px-2 py-0.5 inline-block border border-gray-200">{col.start} – {col.end}</div>
-                                            </th>
-                                        ) : (
-                                            <th key={`break-${i}`} className={`py-3 px-1 text-center border-r border-gray-100 w-16 ${col.type === 'LUNCH' ? 'bg-orange-50' : 'bg-gray-50'}`}>
-                                                <div className="flex flex-col items-center justify-center h-full opacity-60">
-                                                    <Coffee className="w-4 h-4 mb-1 text-gray-400" />
-                                                </div>
-                                            </th>
-                                        )
+                                    {periodColumns.filter(col => col.type === 'PERIOD').map((col) => (
+                                        <th key={`h-${col.period}`} className="py-4 px-3 text-center border-r border-gray-100 last:border-r-0 min-w-[220px]">
+                                            <div className="text-[10px] font-black text-gray-400 tracking-widest mb-1 uppercase">Period {col.period}</div>
+                                            <div className="text-[11px] font-medium text-gray-600 font-mono tracking-tight bg-gray-50 rounded-full px-2 py-0.5 inline-block border border-gray-200">{col.start} – {col.end}</div>
+                                        </th>
                                     ))}
                                 </tr>
                             </thead>
@@ -1222,22 +1214,17 @@ export default function TimetableEditor({ department, semester, onSave, onExport
                                     return (
                                         <tr key={day} className={`border-b border-gray-50 last:border-b-0 hover:bg-slate-50/50 transition-colors duration-300 ${dayIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'}`}>
                                             <td className="py-6 px-6 font-bold text-xs text-gray-500 border-r border-gray-100 bg-gray-50/50 uppercase tracking-widest">{day.slice(0, 3)}</td>
-                                            {periodColumns.map((col, colIdx) => {
+                                            {periodColumns.filter(col => col.type === 'PERIOD').map((col, colIdx) => {
                                                 if (skipNext) { skipNext = false; return null; }
-
-                                                if (col.type !== 'PERIOD') {
-                                                    return (
-                                                        <GridCell key={`${day}-${col.type}-${colIdx}`} id={`${day}-${col.type}-${colIdx}`} isBreak={true} isLunch={col.type === 'LUNCH'} />
-                                                    );
-                                                }
 
                                                 const p = col.period;
                                                 const key = `${day}-${p}`;
                                                 const entry = gridMap[key];
 
                                                 const labStart = isLabBlockStart(day, p);
-                                                const nextCol = periodColumns[colIdx + 1];
-                                                const spanTwo = labStart && nextCol && nextCol.type === 'PERIOD';
+                                                const periodCols = periodColumns.filter(c => c.type === 'PERIOD');
+                                                const nextPeriodCol = periodCols[colIdx + 1];
+                                                const spanTwo = labStart && nextPeriodCol && nextPeriodCol.type === 'PERIOD';
 
                                                 if (spanTwo) skipNext = true;
 

@@ -384,14 +384,14 @@ function App() {
                                                                     <div className="mt-1 flex flex-col gap-0.5 pt-1">
                                                                         {groupEntries.map((e, sIdx) => (
                                                                             <div key={sIdx} className="text-[9px] text-amber-700 italic leading-tight whitespace-nowrap">
-                                                                                {showFaculty && <><span className="font-semibold text-amber-800">S{e.section_number || (sIdx + 1)}:</span> {e.faculty_name}</>}
+                                                                                {showFaculty && e.faculty_name && e.faculty_name !== 'Unassigned' && <>{e.faculty_name}</>}
                                                                                 {showVenues && e.venue_name && <span className="ml-1 px-1 rounded bg-amber-200 border border-amber-300 font-bold text-amber-900 whitespace-nowrap">{e.venue_name}</span>}
                                                                             </div>
                                                                         ))}
                                                                     </div>
                                                                 ) : (
                                                                     <>
-                                                                        {showFaculty && <div className="text-[10px] text-amber-700 mt-0.5 italic whitespace-nowrap">{groupEntries[0]?.faculty_name || ''}</div>}
+                                                                        {showFaculty && groupEntries[0]?.faculty_name && groupEntries[0]?.faculty_name !== 'Unassigned' && <div className="text-[10px] text-amber-700 mt-0.5 italic whitespace-nowrap">{groupEntries[0].faculty_name}</div>}
                                                                         {showVenues && groupEntries[0]?.venue_name && <div className="text-[8.5px] px-1 rounded border border-amber-300 bg-amber-200 font-bold text-amber-900 mt-0.5 mx-auto w-fit whitespace-nowrap">{groupEntries[0].venue_name}</div>}
                                                                     </>
                                                                 )}
@@ -443,14 +443,14 @@ function App() {
                                                                     <div className="mt-1 flex flex-col gap-0.5 pt-1 border-t border-blue-50/50">
                                                                         {groupEntries.map((e, sIdx) => (
                                                                             <div key={sIdx} className="text-[8.5px] text-gray-600 italic leading-tight whitespace-nowrap">
-                                                                                {showFaculty && <><span className="font-semibold text-gray-800">S{e.section_number || (sIdx + 1)}:</span> {e.faculty_name}</>}
+                                                                                {showFaculty && e.faculty_name && e.faculty_name !== 'Unassigned' && <>{e.faculty_name}</>}
                                                                                 {showVenues && e.venue_name && <span className="ml-1 px-1 rounded bg-indigo-50 border border-indigo-100 font-bold text-indigo-600 whitespace-nowrap">{e.venue_name}</span>}
                                                                             </div>
                                                                         ))}
                                                                     </div>
                                                                 ) : (
                                                                     <>
-                                                                        {showFaculty && <div className="text-[9px] text-gray-500 italic mt-0.5 whitespace-nowrap">{groupEntries[0]?.faculty_name || ''}</div>}
+                                                                        {showFaculty && groupEntries[0]?.faculty_name && groupEntries[0]?.faculty_name !== 'Unassigned' && <div className="text-[9px] text-gray-500 italic mt-0.5 whitespace-nowrap">{groupEntries[0].faculty_name}</div>}
                                                                         {showVenues && groupEntries[0]?.venue_name && <div className="text-[8.5px] px-1 rounded border border-indigo-200 bg-indigo-50 font-bold text-indigo-700 mt-0.5 mx-auto w-fit whitespace-nowrap">{groupEntries[0].venue_name}</div>}
                                                                     </>
                                                                 )

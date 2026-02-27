@@ -297,16 +297,44 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
     
     batch_rotation_needed = False
     merged_batch_count = 0
+    faculty_deficient_labs = []  # Only labs that ACTUALLY lack faculty
+    faculty_sufficient_labs = []  # Labs with enough faculty (schedule independently)
+    
     if core_lab_courses:
-        merged_batch_count = max(get_course_sections(c.course_code, True) for c in core_lab_courses)
         for c in core_lab_courses:
+            needed_sections = get_course_sections(c.course_code, True)
             valid_facs = [f for f in get_lab_faculty(c.course_code) if f[2] in ('LAB', 'THEORY WITH LAB')]
-            if len(valid_facs) < get_course_sections(c.course_code, True):
+            print(f"    🔬 {c.course_code}: needs {needed_sections} sections, has {len(valid_facs)} valid lab faculty: {[f[1] for f in valid_facs]}")
+            if len(valid_facs) < needed_sections:
+                faculty_deficient_labs.append(c)
+            else:
+                faculty_sufficient_labs.append(c)
+        
+        if len(faculty_deficient_labs) >= 2:
+            # Only merge if 2+ labs are deficient — otherwise no point in rotation
+            core_lab_courses_to_merge = faculty_deficient_labs
+            batch_rotation_needed = True
+            merged_batch_count = max(get_course_sections(c.course_code, True) for c in core_lab_courses_to_merge)
+        elif len(faculty_deficient_labs) == 1:
+            # Only 1 deficient lab — still needs rotation if there are sufficient labs to pair with
+            if faculty_sufficient_labs:
+                core_lab_courses_to_merge = faculty_deficient_labs + faculty_sufficient_labs[:1]  # Pair with 1 sufficient lab
                 batch_rotation_needed = True
-                break
+                merged_batch_count = max(get_course_sections(c.course_code, True) for c in core_lab_courses_to_merge)
+            else:
+                core_lab_courses_to_merge = []
+        else:
+            core_lab_courses_to_merge = []
+    else:
+        core_lab_courses_to_merge = []
+
+    # Replace core_lab_courses with only the ones being merged
+    core_lab_courses = core_lab_courses_to_merge if batch_rotation_needed else []
 
     if batch_rotation_needed:
-        print(f"  🔄 Lab Batch Rotation TRIGGERED: Lacking adequate unique faculty. Merging {len(core_lab_courses)} core labs into {merged_batch_count} batches.")
+        print(f"  🔄 Lab Batch Rotation TRIGGERED: Merging {len(core_lab_courses)} labs into {merged_batch_count} batches.")
+        print(f"     Merged labs: {[c.course_code for c in core_lab_courses]}")
+        print(f"     Independent labs (enough faculty): {[c.course_code for c in faculty_sufficient_labs if c not in core_lab_courses]}")
     else:
         print("  ✅ Sufficient faculty available. Lab Batch Rotation not needed.")
 

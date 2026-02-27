@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { DndContext, useDroppable, useDraggable, DragOverlay, MouseSensor, TouchSensor, useSensor, useSensors, pointerWithin } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import * as api from '../utils/api';
-import { Search, Save, Trash2, Download, Undo2, Coffee, X, BookOpen, FlaskConical, Users2, LayoutTemplate, Palette, ArrowLeftRight, Plus, ChevronDown, Pencil, Type, AlertTriangle, Eye } from 'lucide-react';
+import { Search, Save, Trash2, Download, Undo2, Coffee, X, BookOpen, FlaskConical, Users2, LayoutTemplate, Palette, ArrowLeftRight, Plus, ChevronDown, Pencil, Type, AlertTriangle, Eye, Merge } from 'lucide-react';
 
 // ─── Simplified Color Palette (Preserved) ───
 const THEORY_STYLE = {
@@ -160,7 +160,7 @@ const CellContent = ({ entry, sections, cellId, isLabStart, isSwapMode, isSelect
                                 )}
 
                                 {/* Faculty & Venue inline */}
-                                {(showFaculty || showVenues) && groupEntries.length > 1 && !isPaired ? (
+                                {(showFaculty || showVenues) && groupEntries.length > 1 ? (
                                     <div className="flex flex-col gap-0.5 border-t border-current/10 pt-0.5 mt-0.5">
                                         {groupEntries.map((sec, sIdx) => (
                                             <div key={sIdx} className="flex items-center justify-center gap-1.5 w-full">
@@ -597,6 +597,7 @@ export default function TimetableEditor({ department, semester, onSave, onExport
     const [allCourses, setAllCourses] = useState([]);
     const [entries, setEntries] = useState([]);
     const [history, setHistory] = useState([]);
+    const [redoStack, setRedoStack] = useState([]);
     const [slots, setSlots] = useState([]);
     const [departments, setDepartments] = useState([]);
     const [facultyMap, setFacultyMap] = useState({});
@@ -605,6 +606,10 @@ export default function TimetableEditor({ department, semester, onSave, onExport
     const [isSwapMode, setIsSwapMode] = useState(false);
     const [swapSource, setSwapSource] = useState(null);
     const [editModalData, setEditModalData] = useState(null);
+
+    // Merge Mode
+    const [isMergeMode, setIsMergeMode] = useState(false);
+    const [mergeSource, setMergeSource] = useState(null);
 
     // View Toggles (Fix 6)
     const [showCourseCode, setShowCourseCode] = useState(true);
@@ -770,14 +775,40 @@ export default function TimetableEditor({ department, semester, onSave, onExport
 
     const pushHistory = useCallback(() => {
         setHistory(prev => [...prev.slice(-20), JSON.parse(JSON.stringify(entries))]);
+        setRedoStack([]); // clear redo on new action
     }, [entries]);
 
     const undo = useCallback(() => {
         if (history.length === 0) return;
+        setRedoStack(prev => [...prev, JSON.parse(JSON.stringify(entries))]);
         const prev = history[history.length - 1];
         setEntries(prev);
         setHistory(h => h.slice(0, -1));
-    }, [history]);
+    }, [history, entries]);
+
+    const redo = useCallback(() => {
+        if (redoStack.length === 0) return;
+        setHistory(prev => [...prev, JSON.parse(JSON.stringify(entries))]);
+        const next = redoStack[redoStack.length - 1];
+        setEntries(next);
+        setRedoStack(r => r.slice(0, -1));
+    }, [redoStack, entries]);
+
+    // Keyboard shortcuts: Ctrl+Z / Ctrl+Y
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+                e.preventDefault();
+                undo();
+            }
+            if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+                e.preventDefault();
+                redo();
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [undo, redo]);
 
     // ─── Drag Logic ───
     const handleDragStart = ({ active }) => setDraggedItem(active.data.current);
@@ -1075,6 +1106,10 @@ export default function TimetableEditor({ department, semester, onSave, onExport
             handleSwapClick(day, period, entry);
             return;
         }
+        if (isMergeMode) {
+            handleMergeClick(day, period);
+            return;
+        }
         const key = `${day}-${period}`;
         const allSectionsForSlot = sectionsMap[key] || [];
         setEditModalData({
@@ -1090,6 +1125,80 @@ export default function TimetableEditor({ department, semester, onSave, onExport
                 venue_name: entry.venue_name || ''
             } : null
         });
+    };
+
+    // ─── Merge Mode Logic ───
+    const handleMergeClick = (day, period) => {
+        const key = `${day}-${period}`;
+        const slotEntries = sectionsMap[key] || [];
+
+        if (!mergeSource) {
+            // First click: select source
+            if (slotEntries.length === 0) {
+                alert('Source slot is empty. Select a slot with entries to merge.');
+                return;
+            }
+            setMergeSource({ day, period });
+            return;
+        }
+
+        // Clicking the same slot deselects
+        if (mergeSource.day === day && mergeSource.period === period) {
+            setMergeSource(null);
+            return;
+        }
+
+        // Second click: execute merge into target
+        executeMerge(mergeSource, { day, period });
+        setMergeSource(null);
+    };
+
+    const executeMerge = (source, target) => {
+        const sourceKey = `${source.day}-${source.period}`;
+        const sourceEntries = sectionsMap[sourceKey] || [];
+        const targetKey = `${target.day}-${target.period}`;
+        const targetEntries = sectionsMap[targetKey] || [];
+
+        // Collect full source group (including lab adjacent periods)
+        let fullSourceEntries = [...sourceEntries];
+        sourceEntries.forEach(se => {
+            if (se.session_type === 'LAB') {
+                const adjP = isLabBlockStart(source.day, source.period)
+                    ? source.period + 1 : source.period - 1;
+                const adjKey = `${source.day}-${adjP}`;
+                const adjEntries = sectionsMap[adjKey] || [];
+                adjEntries.forEach(e => {
+                    if (e.course_code === se.course_code && e.session_type === 'LAB' && !fullSourceEntries.includes(e)) {
+                        fullSourceEntries.push(e);
+                    }
+                });
+            }
+        });
+
+        // Guard: max 15 merged entries
+        if (targetEntries.length + fullSourceEntries.length > 15) {
+            alert(`Cannot merge: would result in ${targetEntries.length + fullSourceEntries.length} entries (max 15).`);
+            return;
+        }
+
+        pushHistory();
+
+        // Remove source entries from their original position
+        let newEntries = entries.filter(e => !fullSourceEntries.includes(e));
+
+        // Move source entries to the target slot
+        const movedEntries = fullSourceEntries.map(e => ({
+            ...e,
+            day_of_week: target.day,
+            period_number: target.period + (e.period_number - source.period)
+        }));
+
+        const finalEntries = [...newEntries, ...movedEntries];
+        const prevEntries = [...entries];
+        setEntries(finalEntries);
+
+        // Conflict check globally
+        checkConflictsForEntries(movedEntries, () => { }, prevEntries);
     };
 
     const handleManualSave = (formData, sectionEdits = []) => {
@@ -1220,9 +1329,14 @@ export default function TimetableEditor({ department, semester, onSave, onExport
                         <Undo2 className="w-5 h-5" />
                     </button>
 
-                    <button onClick={() => { setIsSwapMode(!isSwapMode); setSwapSource(null); }} title={isSwapMode ? "Exit Swap Mode" : "Swap Slots"}
+                    <button onClick={() => { setIsSwapMode(!isSwapMode); setSwapSource(null); setIsMergeMode(false); setMergeSource(null); }} title={isSwapMode ? "Exit Swap Mode" : "Swap Slots"}
                         className={`p-3 rounded-full shadow-lg transition-all transform hover:scale-110 ${isSwapMode ? 'bg-fuchsia-600 text-white ring-4 ring-fuchsia-200' : 'bg-white text-fuchsia-600 border border-gray-200 hover:bg-fuchsia-50'}`}>
                         <ArrowLeftRight className="w-5 h-5" />
+                    </button>
+
+                    <button onClick={() => { setIsMergeMode(!isMergeMode); setMergeSource(null); setIsSwapMode(false); setSwapSource(null); }} title={isMergeMode ? "Exit Merge Mode" : "Merge Slots"}
+                        className={`p-3 rounded-full shadow-lg transition-all transform hover:scale-110 ${isMergeMode ? 'bg-teal-600 text-white ring-4 ring-teal-200' : 'bg-white text-teal-600 border border-gray-200 hover:bg-teal-50'}`}>
+                        <Merge className="w-5 h-5" />
                     </button>
 
                     <button onClick={() => { pushHistory(); setEntries([]); }} title="Clear Timetable"
@@ -1285,6 +1399,18 @@ export default function TimetableEditor({ department, semester, onSave, onExport
                     </div>
                 </div>
 
+                {/* ─── MODE BANNERS ─── */}
+                {isSwapMode && (
+                    <div className="px-8 py-3 bg-fuchsia-50 border-b border-fuchsia-200 flex items-center gap-2 text-sm font-bold text-fuchsia-700">
+                        <ArrowLeftRight className="w-4 h-4" /> SWAP MODE — {swapSource ? `Source: ${swapSource.day} P${swapSource.period}. Click target slot to swap.` : 'Click the first slot to swap.'}
+                    </div>
+                )}
+                {isMergeMode && (
+                    <div className="px-8 py-3 bg-teal-50 border-b border-teal-200 flex items-center gap-2 text-sm font-bold text-teal-700">
+                        <Merge className="w-4 h-4" /> MERGE MODE — {mergeSource ? `Source: ${mergeSource.day} P${mergeSource.period}. Click target slot to merge into.` : 'Click the first slot to merge from.'}
+                    </div>
+                )}
+
                 {/* ─── TIMETABLE GRID (SMOOTH) ─── */}
                 <div className="flex-1 overflow-auto p-10 bg-gray-50/50">
                     <div className="bg-white rounded-2xl shadow-xl shadow-gray-200/50 border border-gray-100 overflow-auto ring-1 ring-gray-50 mx-auto">
@@ -1330,8 +1456,11 @@ export default function TimetableEditor({ department, semester, onSave, onExport
                                                         sections={sectionsMap[key]}
                                                         isLabStart={labStart}
                                                         onDelete={() => handleDeleteEntry(day, p)}
-                                                        isSwapMode={isSwapMode}
-                                                        isSelected={swapSource?.day === day && Math.abs(swapSource?.period - p) < (entry?.session_type === 'LAB' ? 2 : 1)}
+                                                        isSwapMode={isSwapMode || isMergeMode}
+                                                        isSelected={
+                                                            (swapSource?.day === day && Math.abs(swapSource?.period - p) < (entry?.session_type === 'LAB' ? 2 : 1)) ||
+                                                            (mergeSource?.day === day && mergeSource?.period === p)
+                                                        }
                                                         onCellClick={() => handleCellClick(day, p, entry)}
                                                         showCourseCode={showCourseCode}
                                                         showFaculty={showFaculty}

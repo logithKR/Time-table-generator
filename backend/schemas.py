@@ -238,3 +238,18 @@ class PersonalTimetableResponse(BaseModel):
     
     class Config:
         orm_mode = True
+
+
+# --- Conflict Check ---
+
+class ConflictCheckEntry(BaseModel):
+    faculty_name: Optional[str] = None
+    venue_name: Optional[str] = None
+    day_of_week: str
+    period_number: int
+    course_code: Optional[str] = None
+
+class ConflictCheckRequest(BaseModel):
+    department_code: str
+    semester: int
+    entries: List[ConflictCheckEntry]

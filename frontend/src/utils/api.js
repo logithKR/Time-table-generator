@@ -111,3 +111,6 @@ export const getAvailableFaculty = (deptCode, day, period) =>
     axios.get(`${API_URL}/available-faculty?department_code=${deptCode}&day=${day}&period=${period}`);
 export const getAvailableVenues = (deptCode, semester, day, period) =>
     axios.get(`${API_URL}/available-venues?department_code=${deptCode}&semester=${semester}&day=${day}&period=${period}`);
+
+// --- Conflict Check (Cross-Department) ---
+export const checkConflicts = (data) => axios.post(`${API_URL}/check-conflicts`, data);

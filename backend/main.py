@@ -873,3 +873,81 @@ def get_student_timetable(student_id: str, db: Session = Depends(get_db)):
                 conflicts.add(f"Conflict on {key[0]} Period {key[1]}: Student is registered for colliding courses: {courses_str}")
 
     return {"conflicts": list(conflicts), "timetable": entries}
+
+
+# ============================================
+# CONFLICT CHECK (Cross-Department)
+# ============================================
+
+@app.post("/check-conflicts")
+def check_conflicts(request: schemas.ConflictCheckRequest, db: Session = Depends(get_db)):
+    """
+    Check if any faculty or venue in the given entries is already occupied
+    by another department/semester at the same day+period.
+    Returns a list of conflict details.
+    """
+    faculty_conflicts = []
+    venue_conflicts = []
+    
+    for entry in request.entries:
+        day = entry.day_of_week
+        period = entry.period_number
+        
+        # Check faculty conflicts
+        if entry.faculty_name and entry.faculty_name.strip() and entry.faculty_name not in ('', 'Unassigned'):
+            busy = db.query(models.TimetableEntry).filter(
+                models.TimetableEntry.day_of_week == day,
+                models.TimetableEntry.period_number == period,
+                models.TimetableEntry.faculty_name == entry.faculty_name,
+                # Exclude entries from the SAME dept+sem (those are being replaced)
+                ~(
+                    (models.TimetableEntry.department_code == request.department_code) &
+                    (models.TimetableEntry.semester == request.semester)
+                )
+            ).all()
+            
+            for b in busy:
+                conflict_msg = f"{entry.faculty_name} is occupied by {b.department_code} Sem {b.semester} ({b.course_code}) at {day} Period {period}"
+                if conflict_msg not in [c['message'] for c in faculty_conflicts]:
+                    faculty_conflicts.append({
+                        "type": "faculty",
+                        "name": entry.faculty_name,
+                        "day": day,
+                        "period": period,
+                        "occupied_by_dept": b.department_code,
+                        "occupied_by_sem": b.semester,
+                        "occupied_by_course": b.course_code,
+                        "message": conflict_msg
+                    })
+        
+        # Check venue conflicts
+        if entry.venue_name and entry.venue_name.strip():
+            busy = db.query(models.TimetableEntry).filter(
+                models.TimetableEntry.day_of_week == day,
+                models.TimetableEntry.period_number == period,
+                models.TimetableEntry.venue_name == entry.venue_name,
+                ~(
+                    (models.TimetableEntry.department_code == request.department_code) &
+                    (models.TimetableEntry.semester == request.semester)
+                )
+            ).all()
+            
+            for b in busy:
+                conflict_msg = f"{entry.venue_name} is occupied by {b.department_code} Sem {b.semester} ({b.course_code}) at {day} Period {period}"
+                if conflict_msg not in [c['message'] for c in venue_conflicts]:
+                    venue_conflicts.append({
+                        "type": "venue",
+                        "name": entry.venue_name,
+                        "day": day,
+                        "period": period,
+                        "occupied_by_dept": b.department_code,
+                        "occupied_by_sem": b.semester,
+                        "occupied_by_course": b.course_code,
+                        "message": conflict_msg
+                    })
+    
+    return {
+        "has_conflicts": len(faculty_conflicts) > 0 or len(venue_conflicts) > 0,
+        "faculty_conflicts": faculty_conflicts,
+        "venue_conflicts": venue_conflicts
+    }

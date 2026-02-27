@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { DndContext, useDroppable, useDraggable, DragOverlay, MouseSensor, TouchSensor, useSensor, useSensors, pointerWithin } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import * as api from '../utils/api';
-import { Search, Save, Trash2, Download, Undo2, Coffee, X, BookOpen, FlaskConical, Users2, LayoutTemplate, Palette, ArrowLeftRight, Plus, ChevronDown, Pencil, Type } from 'lucide-react';
+import { Search, Save, Trash2, Download, Undo2, Coffee, X, BookOpen, FlaskConical, Users2, LayoutTemplate, Palette, ArrowLeftRight, Plus, ChevronDown, Pencil, Type, AlertTriangle, Eye } from 'lucide-react';
 
 // ─── Simplified Color Palette (Preserved) ───
 const THEORY_STYLE = {
@@ -81,7 +81,7 @@ const CourseChip = ({ course, colorStyle, facultyName, venueName }) => {
 };
 
 // ─── Draggable Grid Cell Content (Dashboard-style layout) ───
-const CellContent = ({ entry, sections, cellId, isLabStart, isSwapMode, isSelected, onClick }) => {
+const CellContent = ({ entry, sections, cellId, isLabStart, isSwapMode, isSelected, onClick, showCourseCode = true, showFaculty = true, showVenues = true, showLabels = true }) => {
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
         id: cellId,
         data: { type: 'placed', entry },
@@ -123,7 +123,7 @@ const CellContent = ({ entry, sections, cellId, isLabStart, isSwapMode, isSelect
 
     return (
         <div ref={setNodeRef} style={style} {...listeners} {...attributes} onClick={onClick}
-            className={`w-full h-full rounded-xl border-[1.5px] ${bg} ${border} ${text} ${isSwapMode ? 'cursor-pointer hover:ring-2 hover:ring-violet-400' : 'cursor-pointer hover:ring-2 hover:ring-violet-200'} ${isSelected ? 'ring-4 ring-fuchsia-500 shadow-xl scale-105 z-50' : ''} transition-all hover:shadow-md group relative flex flex-col justify-center p-2.5 shadow-sm min-h-[80px]`}>
+            className={`w-full h-full rounded-xl border-[1.5px] ${bg} ${border} ${text} ${isSwapMode ? 'cursor-pointer hover:ring-2 hover:ring-violet-400' : 'cursor-pointer hover:ring-2 hover:ring-violet-200'} ${isSelected ? 'ring-4 ring-fuchsia-500 shadow-xl scale-105 z-50' : ''} transition-all hover:shadow-md group relative flex flex-col justify-center p-2 shadow-sm min-h-[64px]`}>
             {isMentor ? (
                 <div className="text-center">
                     <div className="font-bold text-[10px] uppercase tracking-wider opacity-90">MENTOR</div>
@@ -143,46 +143,48 @@ const CellContent = ({ entry, sections, cellId, isLabStart, isSwapMode, isSelect
                         return (
                             <div key={idx} className={`flex flex-col justify-center py-0.5 ${idx > 0 ? 'border-t border-current/15 mt-1 pt-1' : ''}`}>
                                 {/* Course code + lab icon */}
-                                <div className="flex justify-center items-center gap-1">
-                                    <span className="font-bold text-[11px] tracking-tight leading-tight">{code}</span>
-                                    {entry.session_type === 'LAB' && isLabStart && idx === 0 && (
-                                        <FlaskConical className="w-3 h-3 opacity-40 shrink-0 fill-current" />
-                                    )}
-                                </div>
+                                {showCourseCode && (
+                                    <div className="flex justify-center items-center gap-1">
+                                        <span className="font-bold text-[11px] tracking-tight leading-tight">{code}</span>
+                                        {entry.session_type === 'LAB' && isLabStart && idx === 0 && (
+                                            <FlaskConical className="w-3 h-3 opacity-40 shrink-0 fill-current" />
+                                        )}
+                                    </div>
+                                )}
 
                                 {/* Course name */}
-                                <div className="text-[9.5px] font-semibold leading-tight text-center px-0.5 my-0.5 opacity-80">
-                                    {groupName}
-                                </div>
+                                {showLabels && (
+                                    <div className="text-[9.5px] font-semibold leading-tight text-center px-0.5 my-0.5 opacity-80">
+                                        {groupName}
+                                    </div>
+                                )}
 
                                 {/* Faculty & Venue inline */}
-                                {groupEntries.length > 1 && !isPaired ? (
-                                    /* Multiple sections of same course — each faculty + venue on same line */
+                                {(showFaculty || showVenues) && groupEntries.length > 1 && !isPaired ? (
                                     <div className="flex flex-col gap-0.5 border-t border-current/10 pt-0.5 mt-0.5">
                                         {groupEntries.map((sec, sIdx) => (
                                             <div key={sIdx} className="flex items-center justify-center gap-1.5 w-full">
-                                                {isValidFaculty(sec.faculty_name) && (
+                                                {showFaculty && isValidFaculty(sec.faculty_name) && (
                                                     <span className="text-[8.5px] font-semibold italic opacity-80 whitespace-nowrap">{sec.faculty_name}</span>
                                                 )}
-                                                {sec.venue_name && (
+                                                {showVenues && sec.venue_name && (
                                                     <span className="text-[7.5px] font-bold text-indigo-700 bg-indigo-50/80 px-1.5 rounded border border-indigo-200 shrink-0 whitespace-nowrap">{sec.venue_name}</span>
                                                 )}
                                             </div>
                                         ))}
                                     </div>
-                                ) : (
-                                    /* Single section or paired — faculty + venue on same line */
-                                    (isValidFaculty(groupEntries[0]?.faculty_name) || groupEntries[0]?.venue_name) && (
+                                ) : (showFaculty || showVenues) ? (
+                                    (showFaculty && isValidFaculty(groupEntries[0]?.faculty_name) || showVenues && groupEntries[0]?.venue_name) && (
                                         <div className="flex items-center justify-center gap-1.5 mt-0.5 w-full">
-                                            {isValidFaculty(groupEntries[0]?.faculty_name) && (
+                                            {showFaculty && isValidFaculty(groupEntries[0]?.faculty_name) && (
                                                 <span className="text-[9px] italic font-semibold opacity-80 whitespace-nowrap">{groupEntries[0].faculty_name}</span>
                                             )}
-                                            {groupEntries[0]?.venue_name && (
+                                            {showVenues && groupEntries[0]?.venue_name && (
                                                 <span className="text-[8px] font-bold text-indigo-700 bg-indigo-50/80 px-1.5 py-0.5 rounded border border-indigo-200 shrink-0 whitespace-nowrap">{groupEntries[0].venue_name}</span>
                                             )}
                                         </div>
                                     )
-                                )}
+                                ) : null}
                             </div>
                         );
                     })}
@@ -222,7 +224,7 @@ const GridCell = ({ id, children, isEmpty, isBreak, isLunch, onCellClick }) => {
 };
 
 // ─── Droppable Grid Cell Span (Preserved Logic) ───
-const DroppableGridCellSpan = ({ id, colSpan, entry, sections, isLabStart, onDelete, isSwapMode, isSelected, onCellClick }) => {
+const DroppableGridCellSpan = ({ id, colSpan, entry, sections, isLabStart, onDelete, isSwapMode, isSelected, onCellClick, showCourseCode, showFaculty, showVenues, showLabels }) => {
     const { setNodeRef, isOver } = useDroppable({ id });
 
     return (
@@ -230,7 +232,7 @@ const DroppableGridCellSpan = ({ id, colSpan, entry, sections, isLabStart, onDel
             colSpan={colSpan}
             onClick={!entry ? onCellClick : undefined}
             className={`border-r border-b border-gray-100 relative transition-colors duration-200 ${isOver ? (entry ? 'bg-amber-50/50' : 'bg-emerald-50/50') : (entry ? '' : 'bg-white hover:bg-purple-50/10 cursor-pointer')}`}
-            style={{ minHeight: 80, height: 'auto', padding: 4, minWidth: colSpan > 1 ? 440 : 220 }}>
+            style={{ minHeight: 64, height: 'auto', padding: 4, minWidth: colSpan > 1 ? 440 : 220 }}>
             {isOver && (
                 <div className={`absolute inset-1 rounded-xl border-2 border-dashed pointer-events-none z-10 ${entry ? 'border-amber-400/50 bg-amber-50/20' : 'border-emerald-400/50 bg-emerald-50/20'}`} />
             )}
@@ -244,6 +246,10 @@ const DroppableGridCellSpan = ({ id, colSpan, entry, sections, isLabStart, onDel
                         isSwapMode={isSwapMode}
                         isSelected={isSelected}
                         onClick={onCellClick}
+                        showCourseCode={showCourseCode}
+                        showFaculty={showFaculty}
+                        showVenues={showVenues}
+                        showLabels={showLabels}
                     />
                     <button onClick={onDelete}
                         className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-rose-500 hover:bg-rose-600 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shadow-lg z-20 scale-75 group-hover:scale-100 cursor-pointer ring-2 ring-white">
@@ -262,9 +268,31 @@ const ManualEntryModal = ({ isOpen, onClose, onSave, initialData, allSections, d
     const [availableFaculty, setAvailableFaculty] = useState([]);
     const [availableVenues, setAvailableVenues] = useState([]);
     const [loading, setLoading] = useState(false);
-    const [manualMode, setManualMode] = useState({}); // { 'faculty-0': true, 'venue-1': true }
+    const [manualMode, setManualMode] = useState({});
+    const [activeTab, setActiveTab] = useState(0);
 
-    // Initialize section edits
+    // Group sections by course_code for multi-course editing (Fix 3)
+    const courseGroups = React.useMemo(() => {
+        if (!allSections || allSections.length === 0) return [];
+        const groups = {};
+        allSections.forEach(s => {
+            const code = s.course_code || 'UNKNOWN';
+            if (!groups[code]) groups[code] = { code, name: s.course_name || '', entries: [] };
+            groups[code].entries.push(s);
+        });
+        return Object.values(groups);
+    }, [allSections]);
+
+    // Current faculty/venue names for "Current" label (Fix 4)
+    const currentFacultyNames = React.useMemo(() => {
+        if (!allSections) return new Set();
+        return new Set(allSections.filter(s => s.faculty_name && s.faculty_name.trim()).map(s => s.faculty_name));
+    }, [allSections]);
+    const currentVenueNames = React.useMemo(() => {
+        if (!allSections) return new Set();
+        return new Set(allSections.filter(s => s.venue_name && s.venue_name.trim()).map(s => s.venue_name));
+    }, [allSections]);
+
     React.useEffect(() => {
         if (allSections && allSections.length >= 1) {
             setSectionEdits(allSections.map(s => ({
@@ -280,9 +308,9 @@ const ManualEntryModal = ({ isOpen, onClose, onSave, initialData, allSections, d
         } else {
             setSectionEdits([]);
         }
+        setActiveTab(0);
     }, [allSections]);
 
-    // Fetch availability data on mount
     React.useEffect(() => {
         if (!department || !day || !period) return;
         setLoading(true);
@@ -297,7 +325,6 @@ const ManualEntryModal = ({ isOpen, onClose, onSave, initialData, allSections, d
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        // Filter out deleted sections
         const activeSections = sectionEdits.filter(s => !s._deleted);
         onSave(formData, activeSections);
         onClose();
@@ -307,18 +334,14 @@ const ManualEntryModal = ({ isOpen, onClose, onSave, initialData, allSections, d
         setSectionEdits(prev => prev.map((s, i) => i === idx ? { ...s, [field]: value } : s));
     };
 
-    const addSection = () => {
-        const base = sectionEdits[0] || {};
+    const addSection = (courseCode, courseName) => {
         setSectionEdits(prev => [...prev, {
-            faculty_name: '',
-            venue_name: '',
-            course_code: base.course_code || formData.course_code,
-            course_name: base.course_name || formData.course_name,
+            faculty_name: '', venue_name: '',
+            course_code: courseCode || formData.course_code,
+            course_name: courseName || formData.course_name,
             section_number: prev.length + 1,
-            session_type: base.session_type || 'THEORY',
-            _original: null,
-            _deleted: false,
-            _isNew: true
+            session_type: prev[0]?.session_type || 'THEORY',
+            _original: null, _deleted: false, _isNew: true
         }]);
     };
 
@@ -326,18 +349,12 @@ const ManualEntryModal = ({ isOpen, onClose, onSave, initialData, allSections, d
         setSectionEdits(prev => prev.map((s, i) => i === idx ? { ...s, _deleted: true } : s));
     };
 
-    const toggleManual = (key) => {
-        setManualMode(prev => ({ ...prev, [key]: !prev[key] }));
-    };
+    const toggleManual = (key) => setManualMode(prev => ({ ...prev, [key]: !prev[key] }));
 
-    const activeSections = sectionEdits.filter(s => !s._deleted);
-    const hasSections = activeSections.length > 0;
-
-    // Helper: render faculty selector for a section
-    const renderFacultyField = (sec, idx, actualIdx) => {
-        const manualKey = `faculty-${idx}`;
+    // Faculty dropdown with Current vs In Use (Fix 4)
+    const renderFacultyField = (sec, actualIdx) => {
+        const manualKey = `faculty-${actualIdx}`;
         const isManual = manualMode[manualKey];
-
         return (
             <div>
                 <div className="flex items-center justify-between mb-0.5">
@@ -354,23 +371,26 @@ const ManualEntryModal = ({ isOpen, onClose, onSave, initialData, allSections, d
                     <select className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-violet-400 outline-none bg-white cursor-pointer"
                         value={sec.faculty_name} onChange={e => updateSection(actualIdx, 'faculty_name', e.target.value)}>
                         <option value="">-- Select Faculty --</option>
-                        {availableFaculty.map(f => (
-                            <option key={f.faculty_id} value={f.faculty_name} disabled={!f.is_available}
-                                style={{ color: f.is_available ? '#059669' : '#dc2626' }}>
-                                {f.is_available ? '✓ ' : '✗ '}{f.faculty_name}{!f.is_available ? ' (Busy)' : ''}
-                            </option>
-                        ))}
+                        {availableFaculty.map(f => {
+                            const isCurrent = currentFacultyNames.has(f.faculty_name);
+                            const selectable = f.is_available || isCurrent;
+                            return (
+                                <option key={f.faculty_id} value={f.faculty_name} disabled={!selectable}
+                                    style={{ color: isCurrent ? '#7c3aed' : selectable ? '#059669' : '#dc2626' }}>
+                                    {isCurrent ? '★ ' : selectable ? '✓ ' : '✗ '}{f.faculty_name}{isCurrent ? ' (Current)' : !f.is_available ? ' (In Use)' : ''}
+                                </option>
+                            );
+                        })}
                     </select>
                 )}
             </div>
         );
     };
 
-    // Helper: render venue selector for a section
-    const renderVenueField = (sec, idx, actualIdx) => {
-        const manualKey = `venue-${idx}`;
+    // Venue dropdown with Current vs In Use (Fix 4)
+    const renderVenueField = (sec, actualIdx) => {
+        const manualKey = `venue-${actualIdx}`;
         const isManual = manualMode[manualKey];
-
         return (
             <div>
                 <div className="flex items-center justify-between mb-0.5">
@@ -387,14 +407,65 @@ const ManualEntryModal = ({ isOpen, onClose, onSave, initialData, allSections, d
                     <select className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-violet-400 outline-none bg-white cursor-pointer"
                         value={sec.venue_name} onChange={e => updateSection(actualIdx, 'venue_name', e.target.value)}>
                         <option value="">-- Select Venue --</option>
-                        {availableVenues.map(v => (
-                            <option key={v.venue_id} value={v.venue_name} disabled={!v.is_available}
-                                style={{ color: v.is_available ? '#059669' : '#dc2626' }}>
-                                {v.is_available ? '✓ ' : '✗ '}{v.venue_name}{v.capacity ? ` (${v.capacity})` : ''}{v.is_lab ? ' [Lab]' : ''}{!v.is_available ? ' (In Use)' : ''}
-                            </option>
-                        ))}
+                        {availableVenues.map(v => {
+                            const isCurrent = currentVenueNames.has(v.venue_name);
+                            const selectable = v.is_available || isCurrent;
+                            return (
+                                <option key={v.venue_id} value={v.venue_name} disabled={!selectable}
+                                    style={{ color: isCurrent ? '#7c3aed' : selectable ? '#059669' : '#dc2626' }}>
+                                    {isCurrent ? '★ ' : selectable ? '✓ ' : '✗ '}{v.venue_name}{v.capacity ? ` (${v.capacity})` : ''}{v.is_lab ? ' [Lab]' : ''}{isCurrent ? ' (Current)' : !v.is_available ? ' (In Use)' : ''}
+                                </option>
+                            );
+                        })}
                     </select>
                 )}
+            </div>
+        );
+    };
+
+    // Render sections for a specific course group
+    const renderCourseGroup = (courseCode, courseName) => {
+        const groupSections = sectionEdits.map((s, i) => ({ ...s, _globalIdx: i })).filter(s => s.course_code === courseCode && !s._deleted);
+        return (
+            <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-3">
+                    <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Code</label>
+                        <input type="text" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-bold focus:ring-2 focus:ring-violet-400 outline-none bg-gray-50" value={courseCode} readOnly />
+                    </div>
+                    <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Name</label>
+                        <input type="text" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-violet-400 outline-none bg-gray-50" value={courseName} readOnly />
+                    </div>
+                </div>
+                <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-violet-600 uppercase tracking-wider">Sections ({groupSections.length})</span>
+                    <div className="flex-1 h-px bg-violet-100"></div>
+                    <button type="button" onClick={() => addSection(courseCode, courseName)}
+                        className="flex items-center gap-1 text-[10px] font-bold text-green-600 hover:text-green-700 bg-green-50 hover:bg-green-100 px-2 py-1 rounded-lg border border-green-200 transition-all">
+                        <Plus className="w-3 h-3" /> Add Section
+                    </button>
+                </div>
+                {groupSections.map((sec, sIdx) => (
+                    <div key={sec._globalIdx} className="bg-gray-50 rounded-xl p-3 border border-gray-200 space-y-2 relative group">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <span className="bg-violet-100 text-violet-700 px-2 py-0.5 rounded-full text-[10px] font-bold">Section {sIdx + 1}</span>
+                                {sec._isNew && <span className="text-[9px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-bold">NEW</span>}
+                            </div>
+                            {groupSections.length > 1 && (
+                                <button type="button" onClick={() => deleteSection(sec._globalIdx)}
+                                    className="text-red-400 hover:text-red-600 hover:bg-red-50 p-1 rounded-lg transition-all opacity-0 group-hover:opacity-100" title="Remove section">
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                            )}
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                            {renderFacultyField(sec, sec._globalIdx)}
+                            {renderVenueField(sec, sec._globalIdx)}
+                        </div>
+                    </div>
+                ))}
             </div>
         );
     };
@@ -407,61 +478,35 @@ const ManualEntryModal = ({ isOpen, onClose, onSave, initialData, allSections, d
                     {loading && <span className="text-xs text-violet-500 animate-pulse font-semibold">Loading availability...</span>}
                 </div>
                 <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-                    {/* Course Code & Name */}
-                    <div className="grid grid-cols-2 gap-3">
-                        <div>
-                            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Code</label>
-                            <input type="text" autoFocus className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-bold focus:ring-2 focus:ring-violet-400 outline-none"
-                                value={formData.course_code} onChange={e => setFormData({ ...formData, course_code: e.target.value })} placeholder="e.g. CS101" />
-                        </div>
-                        <div>
-                            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Name</label>
-                            <input type="text" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-violet-400 outline-none"
-                                value={formData.course_name} onChange={e => setFormData({ ...formData, course_name: e.target.value })} placeholder="Course name" />
-                        </div>
-                    </div>
-
-                    {/* Sections */}
-                    <div className="space-y-3">
-                        <div className="flex items-center gap-2">
-                            <span className="text-xs font-bold text-violet-600 uppercase tracking-wider">Sections ({activeSections.length})</span>
-                            <div className="flex-1 h-px bg-violet-100"></div>
-                            <button type="button" onClick={addSection}
-                                className="flex items-center gap-1 text-[10px] font-bold text-green-600 hover:text-green-700 bg-green-50 hover:bg-green-100 px-2 py-1 rounded-lg border border-green-200 transition-all">
-                                <Plus className="w-3 h-3" /> Add Section
-                            </button>
-                        </div>
-
-                        {sectionEdits.map((sec, idx) => {
-                            if (sec._deleted) return null;
-                            const displayIdx = sectionEdits.slice(0, idx + 1).filter(s => !s._deleted).length;
-                            return (
-                                <div key={idx} className="bg-gray-50 rounded-xl p-3 border border-gray-200 space-y-2 relative group">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2">
-                                            <span className="bg-violet-100 text-violet-700 px-2 py-0.5 rounded-full text-[10px] font-bold">
-                                                Section {displayIdx}
-                                            </span>
-                                            {sec._isNew && <span className="text-[9px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-bold">NEW</span>}
-                                        </div>
-                                        {activeSections.length > 1 && (
-                                            <button type="button" onClick={() => deleteSection(idx)}
-                                                className="text-red-400 hover:text-red-600 hover:bg-red-50 p-1 rounded-lg transition-all opacity-0 group-hover:opacity-100"
-                                                title="Remove section">
-                                                <Trash2 className="w-3.5 h-3.5" />
-                                            </button>
-                                        )}
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-2">
-                                        {renderFacultyField(sec, displayIdx - 1, idx)}
-                                        {renderVenueField(sec, displayIdx - 1, idx)}
-                                    </div>
+                    {/* Multi-course tabs (Fix 3) */}
+                    {courseGroups.length > 1 ? (
+                        <>
+                            <div className="flex gap-1 bg-gray-100 p-1 rounded-xl">
+                                {courseGroups.map((g, idx) => (
+                                    <button key={idx} type="button" onClick={() => setActiveTab(idx)}
+                                        className={`flex-1 text-xs font-bold px-3 py-1.5 rounded-lg transition-all ${activeTab === idx ? 'bg-white text-violet-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+                                        {g.code}
+                                    </button>
+                                ))}
+                            </div>
+                            {renderCourseGroup(courseGroups[activeTab].code, courseGroups[activeTab].name)}
+                        </>
+                    ) : courseGroups.length === 1 ? (
+                        renderCourseGroup(courseGroups[0].code, courseGroups[0].name)
+                    ) : (
+                        <>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Code</label>
+                                    <input type="text" autoFocus className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-bold focus:ring-2 focus:ring-violet-400 outline-none"
+                                        value={formData.course_code} onChange={e => setFormData({ ...formData, course_code: e.target.value })} placeholder="e.g. CS101" />
                                 </div>
-                            );
-                        })}
-
-                        {/* If no sections at all (new manual entry), show simple fields */}
-                        {activeSections.length === 0 && (
+                                <div>
+                                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Name</label>
+                                    <input type="text" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-violet-400 outline-none"
+                                        value={formData.course_name} onChange={e => setFormData({ ...formData, course_name: e.target.value })} placeholder="Course name" />
+                                </div>
+                            </div>
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
                                     <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Faculty</label>
@@ -474,10 +519,9 @@ const ManualEntryModal = ({ isOpen, onClose, onSave, initialData, allSections, d
                                         value={formData.venue_name || ''} onChange={e => setFormData({ ...formData, venue_name: e.target.value })} placeholder="e.g. CS 203" />
                                 </div>
                             </div>
-                        )}
-                    </div>
+                        </>
+                    )}
 
-                    {/* Slot Info Badge */}
                     <div className="flex items-center gap-2 text-[10px] text-gray-400 font-medium">
                         <span className="bg-gray-100 px-2 py-0.5 rounded">{day}</span>
                         <span className="bg-gray-100 px-2 py-0.5 rounded">Period {period}</span>
@@ -509,6 +553,15 @@ export default function TimetableEditor({ department, semester, onSave, onExport
     const [isSwapMode, setIsSwapMode] = useState(false);
     const [swapSource, setSwapSource] = useState(null);
     const [editModalData, setEditModalData] = useState(null);
+
+    // View Toggles (Fix 6)
+    const [showCourseCode, setShowCourseCode] = useState(true);
+    const [showFaculty, setShowFaculty] = useState(true);
+    const [showVenues, setShowVenues] = useState(true);
+    const [showLabels, setShowLabels] = useState(true);
+
+    // Conflict Modal (Fix 7 & 8)
+    const [conflictModal, setConflictModal] = useState(null); // { conflicts, onProceed, onCancel }
 
     // Filters
     const [paletteDept, setPaletteDept] = useState(department || '');
@@ -677,12 +730,40 @@ export default function TimetableEditor({ department, semester, onSave, onExport
     // ─── Drag Logic ───
     const handleDragStart = ({ active }) => setDraggedItem(active.data.current);
 
+    // Conflict check helper (Fix 7)
+    const checkConflictsForEntries = async (entriesToCheck, onSuccess, rollbackEntries) => {
+        try {
+            const checkData = {
+                department_code: department,
+                semester: parseInt(semester),
+                entries: entriesToCheck.map(e => ({
+                    faculty_name: e.faculty_name || '',
+                    venue_name: e.venue_name || '',
+                    day_of_week: e.day_of_week,
+                    period_number: e.period_number,
+                    course_code: e.course_code || ''
+                }))
+            };
+            const res = await api.checkConflicts(checkData);
+            if (res.data.has_conflicts) {
+                const allConflicts = [...(res.data.faculty_conflicts || []), ...(res.data.venue_conflicts || [])];
+                const msgs = allConflicts.map(c => c.message);
+                alert('⚠️ Conflict Detected!\n\n' + msgs.join('\n') + '\n\nChanges have been undone.');
+                if (rollbackEntries) setEntries(rollbackEntries);
+                return;
+            }
+            onSuccess();
+        } catch (err) {
+            console.warn('Conflict check failed, proceeding anyway:', err);
+            onSuccess();
+        }
+    };
+
     const handleDragEnd = ({ active, over }) => {
         setDraggedItem(null);
         if (!over) return;
 
         const overId = over.id;
-        // Strict Visual Safety: Breaks are not targets
         if (overId.includes('BREAK') || overId.includes('LUNCH')) return;
 
         const activeData = active.data.current;
@@ -717,9 +798,19 @@ export default function TimetableEditor({ department, semester, onSave, onExport
             day_of_week: day, period_number: period
         };
 
-        smartInsert(newEntry, isLab ? 2 : 1);
+        // Simple insert: delete what's at target, place new (Fix 2)
+        const newEntries = simpleInsert(newEntry, isLab ? 2 : 1, entries);
+
+        // Conflict check (Fix 7)
+        const insertedEntries = isLab
+            ? [{ ...newEntry }, { ...newEntry, period_number: period + 1 }]
+            : [newEntry];
+        const prevEntries = [...entries];
+        setEntries(newEntries);
+        checkConflictsForEntries(insertedEntries, () => { }, prevEntries);
     };
 
+    // Fix 1: moveEntry moves ALL entries at the source slot
     const moveEntry = (entry, newDay, newPeriod) => {
         const isLab = entry.session_type === 'LAB';
         if (isLab) {
@@ -729,21 +820,46 @@ export default function TimetableEditor({ department, semester, onSave, onExport
             if (!isValidPeriod(newDay, newPeriod)) return;
         }
 
-        let tempEntries = entries.filter(e => {
-            if (isLab) {
-                return !(e.day_of_week === entry.day_of_week &&
-                    e.course_code === entry.course_code &&
-                    e.session_type === 'LAB' &&
-                    Math.abs(e.period_number - entry.period_number) <= 1);
-            } else {
-                return !(e.day_of_week === entry.day_of_week &&
-                    e.period_number === entry.period_number &&
-                    e.course_code === entry.course_code);
-            }
-        });
+        // Collect ALL entries at the source slot (not just the primary)
+        const sourceKey = `${entry.day_of_week}-${entry.period_number}`;
+        const allSourceEntries = sectionsMap[sourceKey] || [entry];
 
-        const newEntry = { ...entry, day_of_week: newDay, period_number: newPeriod };
-        smartInsert(newEntry, isLab ? 2 : 1, tempEntries);
+        // For labs, also get entries at period+1 or period-1
+        let fullSource = [...allSourceEntries];
+        if (isLab) {
+            const adjacentPeriod = isLabBlockStart(entry.day_of_week, entry.period_number)
+                ? entry.period_number + 1
+                : entry.period_number - 1;
+            const adjKey = `${entry.day_of_week}-${adjacentPeriod}`;
+            const adjEntries = sectionsMap[adjKey] || [];
+            adjEntries.forEach(e => {
+                if (e.course_code === entry.course_code && e.session_type === 'LAB' && !fullSource.includes(e)) {
+                    fullSource.push(e);
+                }
+            });
+        }
+
+        // Remove source entries
+        let tempEntries = entries.filter(e => !fullSource.includes(e));
+
+        // Simple insert at target: remove whatever is at target (Fix 2)
+        const targetPeriods = isLab ? [newPeriod, newPeriod + 1] : [newPeriod];
+        tempEntries = tempEntries.filter(e => !(e.day_of_week === newDay && targetPeriods.includes(e.period_number)));
+
+        // Place all source entries at the new position
+        const sourceStartP = Math.min(...fullSource.map(e => e.period_number));
+        const movedEntries = fullSource.map(e => ({
+            ...e,
+            day_of_week: newDay,
+            period_number: newPeriod + (e.period_number - sourceStartP)
+        }));
+
+        const finalEntries = [...tempEntries, ...movedEntries];
+        const prevEntries = [...entries];
+        setEntries(finalEntries);
+
+        // Conflict check (Fix 7)
+        checkConflictsForEntries(movedEntries, () => { }, prevEntries);
     };
 
     // ─── Smart Logic ───
@@ -759,7 +875,6 @@ export default function TimetableEditor({ department, semester, onSave, onExport
 
         for (let i = 1; i < size; i++) {
             const nextCol = periodColumns[startIdx + i];
-            // Must strictly be the next period visually (no break)
             if (!nextCol || nextCol.type !== 'PERIOD' || nextCol.period !== parseInt(p) + i) {
                 return false;
             }
@@ -767,111 +882,22 @@ export default function TimetableEditor({ department, semester, onSave, onExport
         return true;
     };
 
-    const smartInsert = (newEntry, size, currentList = entries) => {
+    // Fix 2: Simple insert — just delete what's at target and place new entry
+    const simpleInsert = (newEntry, size, currentList = entries) => {
         const day = newEntry.day_of_week;
         const p = newEntry.period_number;
 
-        // 1. Identify Collisions
-        const collisions = [];
-        for (let i = 0; i < size; i++) {
-            const targetP = p + i;
-            const existing = currentList.find(e => e.day_of_week === day && e.period_number === targetP);
-            if (existing && !collisions.some(c => c.course_code === existing.course_code && c.day_of_week === existing.day_of_week && c.period_number === existing.period_number)) {
-                if (existing.session_type === 'LAB') {
-                    const labParts = currentList.filter(l => l.day_of_week === day && l.course_code === existing.course_code && l.session_type === 'LAB' && Math.abs(l.period_number - existing.period_number) <= 1);
-                    labParts.forEach(lp => {
-                        if (!collisions.some(c => c === lp)) collisions.push(lp);
-                    });
-                } else {
-                    collisions.push(existing);
-                }
-            }
-        }
+        // Remove any entries at target periods
+        const targetPeriods = [];
+        for (let i = 0; i < size; i++) targetPeriods.push(p + i);
 
-        // 2. Remove collisions
-        let tempList = currentList.filter(e => !collisions.includes(e));
+        let tempList = currentList.filter(e => !(e.day_of_week === day && targetPeriods.includes(e.period_number)));
 
-        // 3. Add Key Entry
-        const finalEntry1 = { ...newEntry };
-        const finalEntry2 = size === 2 ? { ...newEntry, period_number: newEntry.period_number + 1 } : null;
-        tempList = [...tempList, finalEntry1];
-        if (finalEntry2) tempList = [...tempList, finalEntry2];
+        // Add the new entry
+        tempList = [...tempList, { ...newEntry }];
+        if (size === 2) tempList = [...tempList, { ...newEntry, period_number: p + 1 }];
 
-        // 4. Relocate UNIQUE Collisions
-        if (collisions.length === 0) {
-            setEntries(tempList);
-            return;
-        }
-
-        const logicalCollisions = [];
-        collisions.forEach(c => {
-            if (c.session_type === 'LAB') {
-                const isStart = currentList.find(e => e.day_of_week === day && e.period_number === c.period_number - 1 && e.course_code === c.course_code && e.session_type === 'LAB') === undefined;
-                if (isStart) {
-                    logicalCollisions.push({ entry: c, size: 2 });
-                }
-            } else {
-                logicalCollisions.push({ entry: c, size: 1 });
-            }
-        });
-
-        let finalList = [...tempList];
-
-        logicalCollisions.forEach(item => {
-            const resultList = tryRelocate(item.entry, item.size, finalList, p);
-            if (resultList) {
-                finalList = resultList;
-            } else {
-                console.warn(`Could not relocate ${item.entry.course_code}, dropping it.`);
-            }
-        });
-
-        setEntries(finalList);
-    };
-
-    const tryRelocate = (entry, size, list, pivotPeriod) => {
-        const day = entry.day_of_week;
-
-        // 1. Left Search
-        let curr = pivotPeriod - 1;
-        while (curr > 0) {
-            if (isSlotFree(list, day, curr, size)) {
-                return placeAt(entry, day, curr, size, list);
-            }
-            curr--;
-        }
-
-        // 2. Right Search
-        curr = pivotPeriod + 1;
-        while (curr < 20) {
-            if (isValidPeriod(day, curr)) {
-                if (isSlotFree(list, day, curr, size)) {
-                    return placeAt(entry, day, curr, size, list);
-                }
-            }
-            curr++;
-        }
-
-        return null; // Could not place nearby
-    };
-
-    const isSlotFree = (list, day, startP, size) => {
-        if (!isValidPeriod(day, startP)) return false;
-
-        if (size === 2) {
-            if (!isContiguous(day, startP, 2)) return false;
-        }
-
-        const occupied = list.some(e => e.day_of_week === day && e.period_number >= startP && e.period_number < startP + size);
-        return !occupied;
-    };
-
-    const placeAt = (entry, day, p, size, list) => {
-        const main = { ...entry, day_of_week: day, period_number: p };
-        const secondary = size === 2 ? { ...entry, day_of_week: day, period_number: p + 1 } : null;
-        const res = [...list, main];
-        if (secondary) res.push(secondary);
-        return res;
+        return tempList;
     };
 
     const handleDeleteEntry = (day, period) => {
@@ -940,27 +966,33 @@ export default function TimetableEditor({ department, semester, onSave, onExport
         // setIsSwapMode(false); // User might want to do multiple swaps
     };
 
+    // Fix 1: executeSwap uses sectionsMap to get ALL entries at both slots
     const executeSwap = (source, target) => {
         pushHistory();
         let newEntries = [...entries];
 
-        const getRelatedEntries = (refEntry, d, p) => {
+        // Get ALL entries at source and target slots via sectionsMap
+        const getSlotEntries = (refEntry, d, p) => {
+            const key = `${d}-${p}`;
+            let group = [...(sectionsMap[key] || [])];
+            // For labs, also include adjacent period entries
             if (refEntry.session_type === 'LAB') {
-                return newEntries.filter(e =>
-                    e.day_of_week === d &&
-                    e.course_code === refEntry.course_code &&
-                    e.session_type === 'LAB' &&
-                    Math.abs(e.period_number - p) <= 1
-                );
-            } else {
-                return newEntries.filter(e => e.day_of_week === d && e.period_number === p);
+                const isStart = isLabBlockStart(d, p);
+                const adjP = isStart ? p + 1 : p - 1;
+                const adjKey = `${d}-${adjP}`;
+                const adjEntries = sectionsMap[adjKey] || [];
+                adjEntries.forEach(e => {
+                    if (e.course_code === refEntry.course_code && e.session_type === 'LAB' && !group.includes(e)) {
+                        group.push(e);
+                    }
+                });
             }
+            return group;
         };
 
-        const sourceGroup = getRelatedEntries(source.entry, source.day, source.period);
-        const targetGroup = getRelatedEntries(target.entry, target.day, target.period);
+        const sourceGroup = getSlotEntries(source.entry, source.day, source.period);
+        const targetGroup = getSlotEntries(target.entry, target.day, target.period);
 
-        // Remove old positions
         newEntries = newEntries.filter(e => !sourceGroup.includes(e) && !targetGroup.includes(e));
 
         const sourceStartP = Math.min(...sourceGroup.map(e => e.period_number));
@@ -978,7 +1010,12 @@ export default function TimetableEditor({ department, semester, onSave, onExport
             period_number: sourceStartP + (e.period_number - targetStartP)
         }));
 
-        setEntries([...newEntries, ...updatedSourceGroup, ...updatedTargetGroup]);
+        const finalEntries = [...newEntries, ...updatedSourceGroup, ...updatedTargetGroup];
+        const prevEntries = [...entries];
+        setEntries(finalEntries);
+
+        // Conflict check (Fix 7)
+        checkConflictsForEntries([...updatedSourceGroup, ...updatedTargetGroup], () => { }, prevEntries);
     };
 
     const handleCellClick = (day, period, entry = null) => {
@@ -1117,6 +1154,28 @@ export default function TimetableEditor({ department, semester, onSave, onExport
                             <LayoutTemplate className="w-4 h-4 text-violet-500" />
                             <span className="text-xs font-bold tracking-wide uppercase">{entries.length} Classes</span>
                         </div>
+                        {/* View Options (Fix 6) */}
+                        <div className="flex items-center gap-3 bg-white p-2 border border-gray-200 rounded-lg shadow-sm text-xs">
+                            <span className="font-semibold text-gray-500 flex items-center gap-1 pr-2 border-r border-gray-200">
+                                <Eye className="w-3.5 h-3.5" /> View:
+                            </span>
+                            <label className="flex items-center gap-1.5 cursor-pointer hover:text-violet-600 transition-colors">
+                                <input type="checkbox" checked={showLabels} onChange={e => setShowLabels(e.target.checked)} className="rounded text-violet-600 focus:ring-violet-500 cursor-pointer" />
+                                Labels
+                            </label>
+                            <label className="flex items-center gap-1.5 cursor-pointer hover:text-violet-600 transition-colors">
+                                <input type="checkbox" checked={showCourseCode} onChange={e => setShowCourseCode(e.target.checked)} className="rounded text-violet-600 focus:ring-violet-500 cursor-pointer" />
+                                Codes
+                            </label>
+                            <label className="flex items-center gap-1.5 cursor-pointer hover:text-violet-600 transition-colors">
+                                <input type="checkbox" checked={showFaculty} onChange={e => setShowFaculty(e.target.checked)} className="rounded text-violet-600 focus:ring-violet-500 cursor-pointer" />
+                                Faculty
+                            </label>
+                            <label className="flex items-center gap-1.5 cursor-pointer hover:text-violet-600 transition-colors">
+                                <input type="checkbox" checked={showVenues} onChange={e => setShowVenues(e.target.checked)} className="rounded text-violet-600 focus:ring-violet-500 cursor-pointer" />
+                                Venues
+                            </label>
+                        </div>
                     </div>
                 </div>
 
@@ -1240,6 +1299,10 @@ export default function TimetableEditor({ department, semester, onSave, onExport
                                                         isSwapMode={isSwapMode}
                                                         isSelected={swapSource?.day === day && Math.abs(swapSource?.period - p) < (entry?.session_type === 'LAB' ? 2 : 1)}
                                                         onCellClick={() => handleCellClick(day, p, entry)}
+                                                        showCourseCode={showCourseCode}
+                                                        showFaculty={showFaculty}
+                                                        showVenues={showVenues}
+                                                        showLabels={showLabels}
                                                     />
                                                 );
                                             })}

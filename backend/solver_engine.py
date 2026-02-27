@@ -129,7 +129,11 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
     def get_course_sections(course_code, is_lab_req):
         course_obj = next((c for c in courses if c.course_code == course_code), None)
         enrolled = course_obj.enrolled_students if course_obj and course_obj.enrolled_students else 0
-        base_count = enrolled if enrolled > 0 else student_count
+        
+        # Cap enrolled at student_count to prevent global course enrollments (e.g., 1784) 
+        # from creating absurd section counts (like 30 batches) for a single department.
+        base_count = min(enrolled, student_count) if enrolled > 0 else student_count
+        
         cap = max_lab_cap if is_lab_req else max_classroom_cap
         sections = math.ceil(base_count / cap) if cap > 0 else 1
         if base_count % cap > 0 and base_count % cap < 30:
@@ -140,6 +144,7 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
         return sections
 
     print(f"  👥 Fallback Dept Student count: {student_count}")
+    print(f"  🏢 max_classroom_cap: {max_classroom_cap}, max_lab_cap: {max_lab_cap}")
 
     # Faculty priority helpers
     def get_theory_faculty(course_code):
@@ -284,11 +289,43 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                     f'th_{c.course_code}_{day}_{period}'
                 )
 
+    # ---------------------------------------------------------
+    # BATCH ROTATION LOGIC (MERGED LABS)
+    # ---------------------------------------------------------
+    mini_projects = [c for c in courses if "mini project" in (c.course_name or "").lower()]
+    core_lab_courses = [c for c in regular_courses if course_lab_blocks[c.course_code] > 0 and not c.is_elective and c not in mini_projects]
+    
+    batch_rotation_needed = False
+    merged_batch_count = 0
+    if core_lab_courses:
+        merged_batch_count = max(get_course_sections(c.course_code, True) for c in core_lab_courses)
+        for c in core_lab_courses:
+            valid_facs = [f for f in get_lab_faculty(c.course_code) if f[2] in ('LAB', 'THEORY WITH LAB')]
+            if len(valid_facs) < get_course_sections(c.course_code, True):
+                batch_rotation_needed = True
+                break
+
+    if batch_rotation_needed:
+        print(f"  🔄 Lab Batch Rotation TRIGGERED: Lacking adequate unique faculty. Merging {len(core_lab_courses)} core labs into {merged_batch_count} batches.")
+    else:
+        print("  ✅ Sufficient faculty available. Lab Batch Rotation not needed.")
+
     # --- LAB variables ---
     lab_vars = {}
+    merged_lab_vars = {}
+    
+    if batch_rotation_needed:
+        for day in all_days:
+            for bs in lab_block_starts:
+                if (day, bs) in slot_lookup and (day, bs + 1) in slot_lookup:
+                    merged_lab_vars[(day, bs)] = model.NewBoolVar(f'merged_lab_{day}_{bs}')
+
     for c in regular_courses:
         if course_lab_blocks[c.course_code] == 0:
             continue
+        if batch_rotation_needed and c in core_lab_courses:
+            continue  # Skip standalone variables since this course is merged
+            
         for day in all_days:
             for bs in lab_block_starts:
                 if (day, bs) in slot_lookup and (day, bs + 1) in slot_lookup:
@@ -310,8 +347,15 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                 model.Add(v == 0)
 
         if course_lab_blocks[c.course_code] > 0:
-            lab_sum = [lab_vars[k] for k in lab_vars if k[0] == c.course_code]
-            model.Add(sum(lab_sum) == course_lab_blocks[c.course_code])
+            if batch_rotation_needed and c in core_lab_courses:
+                pass # Handled globally below
+            else:
+                lab_sum = [lab_vars[k] for k in lab_vars if k[0] == c.course_code]
+                model.Add(sum(lab_sum) == course_lab_blocks[c.course_code])
+
+    if batch_rotation_needed and core_lab_courses:
+        target_blocks = max(course_lab_blocks[c.course_code] for c in core_lab_courses) * merged_batch_count
+        model.Add(sum(merged_lab_vars.values()) == target_blocks)
 
     # --- C4: Mentor hour blocking ---
     for c in regular_courses:
@@ -324,6 +368,13 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                 key = (c.course_code, mentor_day_clean, bs)
                 if key in lab_vars:
                     model.Add(lab_vars[key] == 0)
+    
+    if batch_rotation_needed:
+        for bs in lab_block_starts:
+            if mentor_period in [bs, bs + 1]:
+                mkey = (mentor_day_clean, bs)
+                if mkey in merged_lab_vars:
+                    model.Add(merged_lab_vars[mkey] == 0)
 
     # --- Slot occupancy ---
     core_slot_fills = []
@@ -342,6 +393,14 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                             lkey = (c.course_code, day, bs)
                             if lkey in lab_vars:
                                 occupants.append(lab_vars[lkey])
+
+            if batch_rotation_needed:
+                for bs in lab_block_starts:
+                    if period in [bs, bs + 1]:
+                        mkey = (day, bs)
+                        if mkey in merged_lab_vars:
+                            occupants.append(merged_lab_vars[mkey])
+                            break
 
             if not occupants:
                 continue
@@ -388,6 +447,12 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
             for bs in lab_block_starts:
                 if (c.course_code, day, bs) in lab_vars:
                     all_lab_blocks_on_day.append(lab_vars[(c.course_code, day, bs)])
+        if batch_rotation_needed:
+            for bs in lab_block_starts:
+                mkey = (day, bs)
+                if mkey in merged_lab_vars:
+                    all_lab_blocks_on_day.append(merged_lab_vars[mkey])
+                    
         if len(all_lab_blocks_on_day) > 1:
             model.Add(sum(all_lab_blocks_on_day) <= 1)
 
@@ -407,6 +472,13 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                     labs_day1.append(lab_vars[(c.course_code, day1, bs)])
                 if (c.course_code, day2, bs) in lab_vars:
                     labs_day2.append(lab_vars[(c.course_code, day2, bs)])
+                    
+        if batch_rotation_needed:
+            for bs in lab_block_starts:
+                if (day1, bs) in merged_lab_vars:
+                    labs_day1.append(merged_lab_vars[(day1, bs)])
+                if (day2, bs) in merged_lab_vars:
+                    labs_day2.append(merged_lab_vars[(day2, bs)])
         if labs_day1 and labs_day2:
             # Count total lab blocks available to decide hard vs soft
             total_lab_blocks = sum(course_lab_blocks[c.course_code] for c in regular_courses)
@@ -429,13 +501,19 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
             continue
         for day in all_days:
             for bs in lab_block_starts:
-                lkey = (c.course_code, day, bs)
-                if lkey not in lab_vars:
+                lvar = None
+                if batch_rotation_needed and c in core_lab_courses:
+                    lvar = merged_lab_vars.get((day, bs))
+                else:
+                    lkey = (c.course_code, day, bs)
+                    lvar = lab_vars.get(lkey)
+                    
+                if lvar is None:
                     continue
                 for p in [bs, bs + 1]:
                     tkey = (c.course_code, day, p)
                     if tkey in theory_vars:
-                        model.Add(theory_vars[tkey] + lab_vars[lkey] <= 1)
+                        model.Add(theory_vars[tkey] + lvar <= 1)
 
     # --- C5: Faculty clash ---
     faculty_courses_map = {}
@@ -460,9 +538,14 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                     if course_lab_blocks.get(cc, 0) > 0:
                         for bs in lab_block_starts:
                             if period in [bs, bs + 1]:
-                                lkey = (cc, day, bs)
-                                if lkey in lab_vars:
-                                    occupants.append(lab_vars[lkey])
+                                if batch_rotation_needed and any(x for x in core_lab_courses if x.course_code == cc):
+                                    mkey = (day, bs)
+                                    if mkey in merged_lab_vars:
+                                        occupants.append(merged_lab_vars[mkey])
+                                else:
+                                    lkey = (cc, day, bs)
+                                    if lkey in lab_vars:
+                                        occupants.append(lab_vars[lkey])
                 if len(occupants) > 1:
                     model.Add(sum(occupants) <= 1)
 
@@ -472,9 +555,14 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
         if course_lab_blocks[c.course_code] == 0 or course_theory_count[c.course_code] == 0:
             continue
         for day in all_days:
-            day_lab_vars = [lab_vars[(c.course_code, day, bs)]
-                            for bs in lab_block_starts
-                            if (c.course_code, day, bs) in lab_vars]
+            if batch_rotation_needed and c in core_lab_courses:
+                day_lab_vars = [merged_lab_vars[(day, bs)]
+                                for bs in lab_block_starts
+                                if (day, bs) in merged_lab_vars]
+            else:
+                day_lab_vars = [lab_vars[(c.course_code, day, bs)]
+                                for bs in lab_block_starts
+                                if (c.course_code, day, bs) in lab_vars]
             day_theory_vars = [theory_vars[(c.course_code, day, p)]
                                for p in day_periods.get(day, [])
                                if (c.course_code, day, p) in theory_vars]
@@ -632,6 +720,9 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
     for c in regular_courses:
         if course_lab_blocks[c.course_code] == 0:
             continue
+        if batch_rotation_needed and c in core_lab_courses:
+            continue
+            
         partners = elective_partners.get(c.course_code, [])
         all_group_courses = [c] + partners
         
@@ -680,6 +771,100 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                                     count += 1
                             mark_faculty_busy(fac_assigned[0], day, bs)
                             mark_faculty_busy(fac_assigned[0], day, bs + 1)
+
+    # --- Save MERGED LAB entries (Batch Rotation) ---
+    if batch_rotation_needed and core_lab_courses:
+        core_lab_ordered = sorted(core_lab_courses, key=lambda x: x.course_code)
+        block_index = 0
+        for day in all_days:
+            for bs in lab_block_starts:
+                mkey = (day, bs)
+                if mkey in merged_lab_vars and solver.Value(merged_lab_vars[mkey]):
+                    
+                    for batch_idx in range(merged_batch_count):
+                        course_idx = (batch_idx + block_index) % max(len(core_lab_ordered), 1)
+                        if batch_idx >= len(core_lab_ordered):
+                            # FALLBACK: THEORY
+                            c = core_lab_ordered[course_idx]
+                            gc_fac = get_theory_faculty(c.course_code)
+                            cname = course_names.get(c.course_code, c.course_code)
+                            
+                            fac_assigned = None
+                            for fid, fname, dtype in gc_fac:
+                                if is_faculty_free(fid, day, bs) and is_faculty_free(fid, day, bs+1):
+                                    fac_assigned = (fid, fname)
+                                    break
+                            if not fac_assigned and gc_fac:
+                                fac_assigned = (gc_fac[batch_idx % len(gc_fac)][0], gc_fac[batch_idx % len(gc_fac)][1])
+                                generation_warnings.append(
+                                    f"⚠️  {c.course_code} (THEORY FALLBACK) {day} P{bs}-P{bs+1} Sec {batch_idx+1}: "
+                                    f"Reusing faculty {fac_assigned[1]}."
+                                )
+                            elif not fac_assigned:
+                                fac_assigned = (None, 'Unassigned')
+                            
+                            for p in [bs, bs+1]:
+                                c_v = assign_venue(day, p, c.course_code, False, count + batch_idx)
+                                slot_obj = slot_lookup.get((day, p))
+                                if slot_obj:
+                                    entry = models.TimetableEntry(
+                                        department_code=department_code, semester=semester,
+                                        course_code=c.course_code, course_name=f"{cname} (Theory)",
+                                        faculty_id=fac_assigned[0], faculty_name=fac_assigned[1],
+                                        session_type='THEORY',
+                                        slot_id=slot_obj.slot_id,
+                                        day_of_week=day, period_number=p,
+                                        venue_name=c_v,
+                                        section_number=batch_idx + 1,
+                                        created_at="now"
+                                    )
+                                    db.add(entry)
+                                    filled_slots.add((day, p))
+                                    count += 1
+                            mark_faculty_busy(fac_assigned[0], day, bs)
+                            mark_faculty_busy(fac_assigned[0], day, bs+1)
+                            
+                        else:
+                            # NORMAL LAB BATCH
+                            c = core_lab_ordered[course_idx]
+                            gc_fac = get_lab_faculty(c.course_code)
+                            cname = course_names.get(c.course_code, c.course_code)
+                            
+                            fac_assigned = None
+                            for fid, fname, dtype in gc_fac:
+                                if is_faculty_free(fid, day, bs) and is_faculty_free(fid, day, bs+1):
+                                    fac_assigned = (fid, fname)
+                                    break
+                            if not fac_assigned and gc_fac:
+                                fac_assigned = (gc_fac[batch_idx % len(gc_fac)][0], gc_fac[batch_idx % len(gc_fac)][1])
+                                generation_warnings.append(
+                                    f"⚠️  {c.course_code} (LAB) {day} P{bs}-P{bs+1} Sec {batch_idx+1}: "
+                                    f"Reusing faculty {fac_assigned[1]}."
+                                )
+                            elif not fac_assigned:
+                                fac_assigned = (None, 'Unassigned')
+                                
+                            for p in [bs, bs+1]:
+                                c_v = assign_venue(day, p, c.course_code, True, count + batch_idx)
+                                slot_obj = slot_lookup.get((day, p))
+                                if slot_obj:
+                                    entry = models.TimetableEntry(
+                                        department_code=department_code, semester=semester,
+                                        course_code=c.course_code, course_name=cname,
+                                        faculty_id=fac_assigned[0], faculty_name=fac_assigned[1],
+                                        session_type='LAB',
+                                        slot_id=slot_obj.slot_id,
+                                        day_of_week=day, period_number=p,
+                                        venue_name=c_v,
+                                        section_number=batch_idx + 1,
+                                        created_at="now"
+                                    )
+                                    db.add(entry)
+                                    filled_slots.add((day, p))
+                                    count += 1
+                            mark_faculty_busy(fac_assigned[0], day, bs)
+                            mark_faculty_busy(fac_assigned[0], day, bs+1)
+                    block_index += 1
 
     # =========================================================
     # 6. POST-SOLVE: Honours in P8, fill gaps
@@ -864,6 +1049,9 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
             # Check limits: 2 periods added -> daily + 2, weekly + 2
             # AND strictly demand the course physically possesses Practical (P) Hours > 0 before locking a LAB block
             course_has_practicals = (c.practical_hours or 0) > 0
+            if batch_rotation_needed and c in core_lab_courses:
+                course_has_practicals = False  # Prevent gap filler from breaking batch rotation logic
+                
             if course_has_practicals and weekly_extra_counts[c.course_code] <= 1 and daily_extra_counts[c.course_code][day] == 0 and not day_has_lab(day):
                 free_blocks_2.pop(0)
                 consecutive_failures = 0
@@ -1010,6 +1198,7 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
         fallback_courses = core_courses or elective_courses or courses
         if fallback_courses:
             fallback_courses.sort(key=lambda x: x.credits or 0, reverse=True)
+            idx = 0
             for day, p in single_frees:
                 c = fallback_courses[idx % len(fallback_courses)]
                 gc_fac = get_theory_faculty(c.course_code)

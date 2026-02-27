@@ -42,10 +42,16 @@ def import_registrations():
     print("\nRecalculating CourseMaster.enrolled_students for all courses...")
     courses = DB_SESSION.query(models.CourseMaster).all()
     for course in courses:
-        count = DB_SESSION.query(models.CourseRegistration).filter_by(
-            course_code=course.course_code,
-            semester=course.semester
+        # Join with StudentMaster to only count students from THIS course's department
+        count = DB_SESSION.query(models.CourseRegistration).join(
+            models.StudentMaster, 
+            models.CourseRegistration.student_id == models.StudentMaster.student_id
+        ).filter(
+            models.CourseRegistration.course_code == course.course_code,
+            models.CourseRegistration.semester == course.semester,
+            models.StudentMaster.department_code == course.department_code
         ).count()
+        
         course.enrolled_students = count
     
     DB_SESSION.commit()

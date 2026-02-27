@@ -735,9 +735,18 @@ def get_registrations(course_code: Optional[str] = None, semester: Optional[int]
 
 @app.post("/registrations", response_model=schemas.CourseRegistrationResponse)
 def create_registration(req: schemas.CourseRegistrationCreate, db: Session = Depends(get_db)):
-    course = db.query(models.CourseMaster).filter_by(course_code=req.course_code, semester=req.semester).first()
+    student = db.query(models.StudentMaster).filter_by(student_id=req.student_id).first()
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+
+    course = db.query(models.CourseMaster).filter_by(
+        course_code=req.course_code, 
+        semester=req.semester,
+        department_code=student.department_code
+    ).first()
+    
     if not course:
-        raise HTTPException(status_code=404, detail="Course not found")
+        raise HTTPException(status_code=404, detail=f"Course {req.course_code} not mapped to this student's department ({student.department_code})")
         
     existing = db.query(models.CourseRegistration).filter_by(student_id=req.student_id, course_code=req.course_code, semester=req.semester).first()
     if existing:
@@ -756,9 +765,15 @@ def delete_registration(reg_id: int, db: Session = Depends(get_db)):
     if not reg:
         raise HTTPException(status_code=404, detail="Registration not found")
         
-    course = db.query(models.CourseMaster).filter_by(course_code=reg.course_code, semester=reg.semester).first()
-    if course and course.enrolled_students and course.enrolled_students > 0:
-        course.enrolled_students -= 1
+    student = db.query(models.StudentMaster).filter_by(student_id=reg.student_id).first()
+    if student:
+        course = db.query(models.CourseMaster).filter_by(
+            course_code=reg.course_code, 
+            semester=reg.semester,
+            department_code=student.department_code
+        ).first()
+        if course and course.enrolled_students and course.enrolled_students > 0:
+            course.enrolled_students -= 1
         
     db.delete(reg)
     db.commit()
@@ -783,7 +798,11 @@ def delete_student(student_id: str, db: Session = Depends(get_db)):
         
     regs = db.query(models.CourseRegistration).filter_by(student_id=student_id).all()
     for r in regs:
-        course = db.query(models.CourseMaster).filter_by(course_code=r.course_code, semester=r.semester).first()
+        course = db.query(models.CourseMaster).filter_by(
+            course_code=r.course_code, 
+            semester=r.semester,
+            department_code=student.department_code
+        ).first()
         if course and course.enrolled_students and course.enrolled_students > 0:
             course.enrolled_students -= 1
         db.delete(r)

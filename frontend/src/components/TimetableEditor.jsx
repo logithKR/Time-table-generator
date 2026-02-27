@@ -261,7 +261,7 @@ const DroppableGridCellSpan = ({ id, colSpan, entry, sections, isLabStart, onDel
     );
 };
 
-const ManualEntryModal = ({ isOpen, onClose, onSave, initialData, allSections, department, semester, day, period }) => {
+const ManualEntryModal = ({ isOpen, onClose, onSave, initialData, allSections, allCourses, department, semester, day, period }) => {
     if (!isOpen) return null;
     const [formData, setFormData] = useState(initialData || { course_code: '', course_name: '', faculty_name: '', venue_name: '' });
     const [sectionEdits, setSectionEdits] = useState([]);
@@ -270,18 +270,19 @@ const ManualEntryModal = ({ isOpen, onClose, onSave, initialData, allSections, d
     const [loading, setLoading] = useState(false);
     const [manualMode, setManualMode] = useState({});
     const [activeTab, setActiveTab] = useState(0);
+    const [isAddingCourse, setIsAddingCourse] = useState(false);
 
     // Group sections by course_code for multi-course editing (Fix 3)
     const courseGroups = React.useMemo(() => {
-        if (!allSections || allSections.length === 0) return [];
+        if (!sectionEdits || sectionEdits.length === 0) return [];
         const groups = {};
-        allSections.forEach(s => {
+        sectionEdits.filter(s => !s._deleted).forEach(s => {
             const code = s.course_code || 'UNKNOWN';
             if (!groups[code]) groups[code] = { code, name: s.course_name || '', entries: [] };
             groups[code].entries.push(s);
         });
         return Object.values(groups);
-    }, [allSections]);
+    }, [sectionEdits]);
 
     // Current faculty/venue names for "Current" label (Fix 4)
     const currentFacultyNames = React.useMemo(() => {
@@ -325,8 +326,8 @@ const ManualEntryModal = ({ isOpen, onClose, onSave, initialData, allSections, d
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        const activeSections = sectionEdits.filter(s => !s._deleted);
-        onSave(formData, activeSections);
+        // Pass ALL sectionEdits (including deleted) so handleManualSave can remove originals
+        onSave(formData, sectionEdits);
         onClose();
     };
 
@@ -347,6 +348,31 @@ const ManualEntryModal = ({ isOpen, onClose, onSave, initialData, allSections, d
 
     const deleteSection = (idx) => {
         setSectionEdits(prev => prev.map((s, i) => i === idx ? { ...s, _deleted: true } : s));
+    };
+
+    const deleteEntireCourse = (courseCode) => {
+        setSectionEdits(prev => prev.map(s => s.course_code === courseCode ? { ...s, _deleted: true } : s));
+        setActiveTab(0); // Reset tab after deletion
+    };
+
+    const addNewCourseGroup = (courseCode) => {
+        const courseObj = allCourses.find(c => c.course_code === courseCode);
+        if (!courseObj) return;
+
+        setSectionEdits(prev => [...prev, {
+            faculty_name: '', venue_name: '',
+            course_code: courseObj.course_code,
+            course_name: courseObj.course_name,
+            section_number: 1,
+            session_type: courseObj.is_lab ? 'LAB' : 'THEORY',
+            _original: null, _deleted: false, _isNew: true
+        }]);
+
+        // Wait for next render cycle to set tab to newly added group
+        setTimeout(() => {
+            setActiveTab(courseGroups.length);
+        }, 10);
+        setIsAddingCourse(false);
     };
 
     const toggleManual = (key) => setManualMode(prev => ({ ...prev, [key]: !prev[key] }));
@@ -428,15 +454,21 @@ const ManualEntryModal = ({ isOpen, onClose, onSave, initialData, allSections, d
         const groupSections = sectionEdits.map((s, i) => ({ ...s, _globalIdx: i })).filter(s => s.course_code === courseCode && !s._deleted);
         return (
             <div className="space-y-2">
-                <div className="grid grid-cols-2 gap-3">
-                    <div>
-                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Code</label>
-                        <input type="text" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-bold focus:ring-2 focus:ring-violet-400 outline-none bg-gray-50" value={courseCode} readOnly />
+                <div className="flex items-center justify-between">
+                    <div className="grid grid-cols-2 gap-3 flex-1 mr-3">
+                        <div>
+                            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Code</label>
+                            <input type="text" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-bold focus:ring-2 focus:ring-violet-400 outline-none bg-gray-50" value={courseCode} readOnly />
+                        </div>
+                        <div>
+                            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Name</label>
+                            <input type="text" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-violet-400 outline-none bg-gray-50" value={courseName || ''} title={courseName} readOnly />
+                        </div>
                     </div>
-                    <div>
-                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Name</label>
-                        <input type="text" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-violet-400 outline-none bg-gray-50" value={courseName} readOnly />
-                    </div>
+                    <button type="button" onClick={() => deleteEntireCourse(courseCode)}
+                        className="self-end mb-1 text-xs px-2 py-1.5 font-bold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 transition-all rounded-lg flex items-center gap-1 min-w-max" title="Remove Entire Course">
+                        <Trash2 className="w-3.5 h-3.5" /> Remove Course
+                    </button>
                 </div>
                 <div className="flex items-center gap-2">
                     <span className="text-xs font-bold text-violet-600 uppercase tracking-wider">Sections ({groupSections.length})</span>
@@ -478,48 +510,68 @@ const ManualEntryModal = ({ isOpen, onClose, onSave, initialData, allSections, d
                     {loading && <span className="text-xs text-violet-500 animate-pulse font-semibold">Loading availability...</span>}
                 </div>
                 <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-                    {/* Multi-course tabs (Fix 3) */}
-                    {courseGroups.length > 1 ? (
+                    {/* Multi-course tabs (Fix 3 & Add/Delete) */}
+                    {courseGroups.length > 0 ? (
                         <>
-                            <div className="flex gap-1 bg-gray-100 p-1 rounded-xl">
+                            <div className="flex flex-wrap gap-1 bg-gray-100 p-1 rounded-xl items-center">
                                 {courseGroups.map((g, idx) => (
                                     <button key={idx} type="button" onClick={() => setActiveTab(idx)}
-                                        className={`flex-1 text-xs font-bold px-3 py-1.5 rounded-lg transition-all ${activeTab === idx ? 'bg-white text-violet-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+                                        className={`flex-1 min-w-[60px] text-xs font-bold px-3 py-1.5 rounded-lg transition-all ${activeTab === idx ? 'bg-white text-violet-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
                                         {g.code}
                                     </button>
                                 ))}
+                                {!isAddingCourse ? (
+                                    <button type="button" onClick={() => setIsAddingCourse(true)}
+                                        className="text-xs font-bold px-3 py-1.5 rounded-lg transition-all text-violet-600 hover:bg-violet-50 flex items-center gap-1 border border-dashed border-violet-300 ml-1">
+                                        <Plus className="w-3.5 h-3.5" /> Add Course
+                                    </button>
+                                ) : (
+                                    <div className="flex items-center gap-1 ml-1">
+                                        <select autoFocus className="text-xs border border-violet-300 rounded px-2 py-1 outline-none text-violet-800"
+                                            onChange={e => {
+                                                if (e.target.value) addNewCourseGroup(e.target.value);
+                                                else setIsAddingCourse(false);
+                                            }}
+                                            onBlur={() => setIsAddingCourse(false)}>
+                                            <option value="">Select course...</option>
+                                            {allCourses.map(c => (
+                                                <option key={c.course_code} value={c.course_code} disabled={courseGroups.some(g => g.code === c.course_code)}>
+                                                    {c.course_code} - {c.course_name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
                             </div>
-                            {renderCourseGroup(courseGroups[activeTab].code, courseGroups[activeTab].name)}
+                            {courseGroups[activeTab] && renderCourseGroup(courseGroups[activeTab].code, courseGroups[activeTab].name)}
                         </>
-                    ) : courseGroups.length === 1 ? (
-                        renderCourseGroup(courseGroups[0].code, courseGroups[0].name)
                     ) : (
-                        <>
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Code</label>
-                                    <input type="text" autoFocus className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-bold focus:ring-2 focus:ring-violet-400 outline-none"
-                                        value={formData.course_code} onChange={e => setFormData({ ...formData, course_code: e.target.value })} placeholder="e.g. CS101" />
+                        <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-gray-200 rounded-xl bg-gray-50/50">
+                            <BookOpen className="w-8 h-8 text-gray-300 mb-2" />
+                            <p className="text-sm font-semibold text-gray-500 mb-4">No courses scheduled here yet.</p>
+                            {!isAddingCourse ? (
+                                <button type="button" onClick={() => setIsAddingCourse(true)}
+                                    className="text-sm font-bold px-4 py-2 rounded-lg transition-all text-white bg-violet-600 hover:bg-violet-700 flex items-center gap-2 shadow-md">
+                                    <Plus className="w-4 h-4" /> Add First Course Session
+                                </button>
+                            ) : (
+                                <div className="w-full max-w-xs">
+                                    <select autoFocus className="w-full border border-violet-300 rounded-lg px-3 py-2 outline-none text-violet-800 shadow-sm"
+                                        onChange={e => {
+                                            if (e.target.value) addNewCourseGroup(e.target.value);
+                                            else setIsAddingCourse(false);
+                                        }}
+                                        onBlur={() => setIsAddingCourse(false)}>
+                                        <option value="">Select course to add...</option>
+                                        {allCourses.map(c => (
+                                            <option key={c.course_code} value={c.course_code}>
+                                                {c.course_code} - {c.course_name}
+                                            </option>
+                                        ))}
+                                    </select>
                                 </div>
-                                <div>
-                                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Name</label>
-                                    <input type="text" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-violet-400 outline-none"
-                                        value={formData.course_name} onChange={e => setFormData({ ...formData, course_name: e.target.value })} placeholder="Course name" />
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Faculty</label>
-                                    <input type="text" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-violet-400 outline-none"
-                                        value={formData.faculty_name || ''} onChange={e => setFormData({ ...formData, faculty_name: e.target.value })} placeholder="Optional" />
-                                </div>
-                                <div>
-                                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Venue</label>
-                                    <input type="text" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-violet-400 outline-none"
-                                        value={formData.venue_name || ''} onChange={e => setFormData({ ...formData, venue_name: e.target.value })} placeholder="e.g. CS 203" />
-                                </div>
-                            </div>
-                        </>
+                            )}
+                        </div>
                     )}
 
                     <div className="flex items-center gap-2 text-[10px] text-gray-400 font-medium">
@@ -1057,50 +1109,32 @@ export default function TimetableEditor({ department, semester, onSave, onExport
         if (sectionEdits.length > 0) {
             // Clean faculty names in section edits
             sectionEdits = sectionEdits.map(s => ({ ...s, faculty_name: cleanFaculty(s.faculty_name) }));
-            // Handle deletions: remove entries whose originals are no longer in active sections
-            if (allSections && allSections.length >= 1) {
-                // Find originals that were deleted
-                const survivingOriginals = new Set(sectionEdits.filter(s => s._original).map(s => s._original));
-                currentEntries = currentEntries.filter(e => {
-                    // If this entry is one of the slot's original sections, check if it survived
-                    const isSlotEntry = allSections.includes(e);
-                    if (isSlotEntry && !survivingOriginals.has(e)) return false; // deleted
-                    return true;
-                });
 
-                // Handle updates: update surviving originals
-                currentEntries = currentEntries.map(e => {
-                    const editMatch = sectionEdits.find(s => s._original === e);
-                    if (editMatch) {
-                        return {
-                            ...e,
-                            course_code: formData.course_code || e.course_code,
-                            course_name: formData.course_name || e.course_name,
-                            faculty_name: editMatch.faculty_name,
-                            venue_name: editMatch.venue_name
-                        };
-                    }
-                    return e;
-                });
-
-                // Handle additions: add new sections
-                sectionEdits.filter(s => s._isNew).forEach(s => {
-                    currentEntries.push({
-                        department_code: department,
-                        semester: parseInt(semester),
-                        course_code: formData.course_code || s.course_code || 'CUSTOM',
-                        course_name: formData.course_name || s.course_name || '',
-                        session_type: s.session_type || 'THEORY',
-                        faculty_id: null,
-                        faculty_name: s.faculty_name || '',
-                        venue_name: s.venue_name || '',
-                        slot_id: 0,
-                        day_of_week: day,
-                        period_number: period,
-                        section_number: s.section_number
-                    });
-                });
+            // Step 1: Remove ALL original entries that were in this slot
+            if (allSections && allSections.length > 0) {
+                const allSectionSet = new Set(allSections);
+                currentEntries = currentEntries.filter(e => !allSectionSet.has(e));
             }
+
+            // Step 2: Re-add only the surviving (non-deleted) sections
+            sectionEdits.filter(s => !s._deleted).forEach(s => {
+                const base = s._original ? { ...s._original } : {};
+                currentEntries.push({
+                    ...base,
+                    department_code: department,
+                    semester: parseInt(semester),
+                    course_code: s.course_code || 'CUSTOM',
+                    course_name: s.course_name || '',
+                    session_type: s.session_type || 'THEORY',
+                    faculty_id: base.faculty_id || null,
+                    faculty_name: s.faculty_name || '',
+                    venue_name: s.venue_name || '',
+                    slot_id: base.slot_id || 0,
+                    day_of_week: day,
+                    period_number: period,
+                    section_number: s.section_number
+                });
+            });
         } else {
             // Single-section edit / new entry (original logic)
             const isLab = entry?.session_type === 'LAB';
@@ -1358,6 +1392,7 @@ export default function TimetableEditor({ department, semester, onSave, onExport
                 onSave={handleManualSave}
                 initialData={editModalData?.initialData}
                 allSections={editModalData?.allSections}
+                allCourses={allCourses}
                 department={department}
                 semester={semester}
                 day={editModalData?.day}

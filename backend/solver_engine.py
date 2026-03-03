@@ -5,22 +5,57 @@ import math
 
 def generate_schedule(db: Session, department_code: str, semester: int, mentor_day: str, mentor_period: int = 8):
     """
-    Generates a timetable matching real BIT college pattern.
-    
-    Constraints:
-    C1: All slots filled (no empty periods)
-    C2: Labs = 2-period blocks at P1-P2, P3-P4, or P5-P6
-    C3: P8 exclusively for honours/minor (or regular overflow if overloaded)
-    C4: Mentor hour blocked
-    C5: No faculty clash
-    C6: Correct weekly session counts
-    C7: No back-to-back theory of same course (relaxed when overloaded)
-    C8: Max theory sessions per course per day (dynamic)
-    C9: Max 1 lab block per course per day
-    C10: Lab blocks on non-consecutive days (hard for <=2, soft for 3+)
-    C11 (soft): Theory of same course on same day as its lab
+    Generates a timetable matching real BIT college pattern, driven by SchedulerConfig.
     """
+    import json
+    from main import DEFAULT_CONFIG
+    
     print(f"🚀 Starting Solver for Dept: {department_code}, Sem: {semester}...")
+
+    # =========================================================
+    # 0. FETCH CONFIG
+    # =========================================================
+    config_record = db.query(models.SchedulerConfig).first()
+    config = config_record.config_json if config_record and config_record.config_json else DEFAULT_CONFIG
+
+    def get_conf(category, key, field='value', default=None):
+        try:
+            item = config.get(category, {}).get(key, {})
+            if not item.get('enabled', True):
+                return default
+            return item.get(field, default)
+        except:
+            return default
+
+    # Extract key constraints
+    c_max_lab_blocks = get_conf('hard_constraints', 'max_lab_blocks_per_day', 'value', 1)
+    c_mentor_blocked = get_conf('hard_constraints', 'mentor_hour_blocked', 'value', True)
+    c_no_fac_clash = get_conf('hard_constraints', 'no_faculty_clash', 'value', True)
+    c_no_theory_in_own_lab = get_conf('hard_constraints', 'no_theory_in_own_lab', 'value', True)
+
+    c_max_theory_norm = get_conf('dynamic_constraints', 'max_theory_per_course_per_day', 'value', 1)
+    c_max_theory_over = get_conf('dynamic_constraints', 'max_theory_per_course_per_day', 'overloaded_value', 2)
+    c_no_back_to_back = get_conf('dynamic_constraints', 'no_back_to_back_theory', 'value', True)
+    c_p8_honours_only = get_conf('dynamic_constraints', 'p8_honours_only', 'value', True)
+
+    c_consecutive_lab_penalty = get_conf('soft_constraints', 'non_consecutive_lab_days_penalty', 'value', -5)
+    c_theory_lab_bonus = get_conf('soft_constraints', 'theory_lab_same_day_bonus', 'value', 3)
+    c_fill_bonus = get_conf('soft_constraints', 'fill_slots_bonus', 'value', 10)
+
+    c_min_section_thresh = get_conf('section_settings', 'min_section_threshold', 'value', 30)
+    c_default_cap = get_conf('section_settings', 'default_venue_capacity', 'value', 60)
+
+    c_batch_rot_enabled = get_conf('batch_rotation', 'enabled', 'value', True)
+    c_max_merged = get_conf('batch_rotation', 'max_merged_entries', 'value', 15)
+
+    c_mini_proj_max = get_conf('gap_fill', 'mini_project_max_periods', 'value', 4)
+    c_core_extra_week = get_conf('gap_fill', 'core_extra_max_per_week', 'value', 3)
+    c_core_extra_day = get_conf('gap_fill', 'core_extra_max_per_day', 'value', 2)
+    c_open_elective_p = get_conf('gap_fill', 'open_elective_periods', 'value', 3)
+
+    c_pair_electives = get_conf('elective_handling', 'pair_same_category', 'value', True)
+
+    lab_block_starts = get_conf('hard_constraints', 'lab_block_starts', 'value', [1, 3, 5])
 
     # =========================================================
     # 1. FETCH DATA
@@ -118,26 +153,25 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
         v = db.query(models.VenueMaster).filter_by(venue_id=dvm.venue_id).first()
         if v:
             if v.is_lab:
-                lab_venues_info.append((v.venue_name, v.capacity or 60))
+                lab_venues_info.append((v.venue_name, v.capacity or c_default_cap))
             else:
-                classroom_venues_info.append((v.venue_name, v.capacity or 60))
+                classroom_venues_info.append((v.venue_name, v.capacity or c_default_cap))
 
-    max_classroom_cap = max((c[1] for c in classroom_venues_info), default=60)
-    max_lab_cap = max((c[1] for c in lab_venues_info), default=60)
+    max_classroom_cap = max((c[1] for c in classroom_venues_info), default=c_default_cap)
+    max_lab_cap = max((c[1] for c in lab_venues_info), default=c_default_cap)
 
     # Helper to calculate sections dynamically per course based on accurate enrollment counts
     def get_course_sections(course_code, is_lab_req):
         course_obj = next((c for c in courses if c.course_code == course_code), None)
         enrolled = course_obj.enrolled_students if course_obj and course_obj.enrolled_students else 0
         
-        # Cap enrolled at student_count to prevent global course enrollments (e.g., 1784) 
-        # from creating absurd section counts (like 30 batches) for a single department.
+        # Cap enrolled at student_count to prevent global course enrollments
         base_count = min(enrolled, student_count) if enrolled > 0 else student_count
         
         cap = max_lab_cap if is_lab_req else max_classroom_cap
         sections = math.ceil(base_count / cap) if cap > 0 else 1
-        if base_count % cap > 0 and base_count % cap < 30:
-            if enrolled > 0 and base_count < 30:
+        if base_count % cap > 0 and base_count % cap < c_min_section_thresh:
+            if enrolled > 0 and base_count < c_min_section_thresh:
                 sections = max(sections, 1) # Course with 1-29 students still gets 1 section
             else:
                 sections = max(sections - 1, 1)
@@ -194,7 +228,6 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
 
     generation_warnings = []  # Collect warnings for the user
 
-    lab_block_starts = [1, 3, 5]
     mentor_day_clean = mentor_day.strip().capitalize()
 
     # Separate courses
@@ -212,7 +245,7 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
         cat = (c.course_category or '').strip().upper()
         is_elective_cat = cat.startswith('ELECTIVE') and c.is_elective
         
-        if is_elective_cat:
+        if is_elective_cat and c_pair_electives:
             if cat not in elective_groups:
                 elective_groups[cat] = []
             elective_groups[cat].append(c)
@@ -258,7 +291,10 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
 
     # Determine if schedule is overloaded
     is_overloaded = reg_sessions > p17_slots
-    use_p8_for_regular = is_overloaded and len(honours_courses) == 0
+    use_p8_for_regular = is_overloaded and len(honours_courses) == 0 and c_p8_honours_only
+    # If p8 is NOT restricted to honours only, we can always use it
+    if not c_p8_honours_only:
+        use_p8_for_regular = True
 
     print(f"  📋 {len(regular_courses)} regular ({reg_sessions} sessions) + {len(honours_courses)} honours ({hon_sessions} sessions)")
     print(f"  🗓️  P1-P7 slots: {p17_slots}, P8 slots: {p8_slots_count}, Total: {total_available}")
@@ -310,12 +346,12 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
             else:
                 faculty_sufficient_labs.append(c)
         
-        if len(faculty_deficient_labs) >= 2:
+        if len(faculty_deficient_labs) >= 2 and c_batch_rot_enabled:
             # Only merge if 2+ labs are deficient — otherwise no point in rotation
             core_lab_courses_to_merge = faculty_deficient_labs
             batch_rotation_needed = True
             merged_batch_count = max(get_course_sections(c.course_code, True) for c in core_lab_courses_to_merge)
-        elif len(faculty_deficient_labs) == 1:
+        elif len(faculty_deficient_labs) == 1 and c_batch_rot_enabled:
             # Only 1 deficient lab — still needs rotation if there are sufficient labs to pair with
             if faculty_sufficient_labs:
                 core_lab_courses_to_merge = faculty_deficient_labs + faculty_sufficient_labs[:1]  # Pair with 1 sufficient lab
@@ -386,23 +422,24 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
         model.Add(sum(merged_lab_vars.values()) == target_blocks)
 
     # --- C4: Mentor hour blocking ---
-    for c in regular_courses:
-        key = (c.course_code, mentor_day_clean, mentor_period)
-        if key in theory_vars:
-            model.Add(theory_vars[key] == 0)
-    for c in regular_courses:
-        for bs in lab_block_starts:
-            if mentor_period in [bs, bs + 1]:
-                key = (c.course_code, mentor_day_clean, bs)
-                if key in lab_vars:
-                    model.Add(lab_vars[key] == 0)
-    
-    if batch_rotation_needed:
-        for bs in lab_block_starts:
-            if mentor_period in [bs, bs + 1]:
-                mkey = (mentor_day_clean, bs)
-                if mkey in merged_lab_vars:
-                    model.Add(merged_lab_vars[mkey] == 0)
+    if c_mentor_blocked:
+        for c in regular_courses:
+            key = (c.course_code, mentor_day_clean, mentor_period)
+            if key in theory_vars:
+                model.Add(theory_vars[key] == 0)
+        for c in regular_courses:
+            for bs in lab_block_starts:
+                if mentor_period in [bs, bs + 1]:
+                    key = (c.course_code, mentor_day_clean, bs)
+                    if key in lab_vars:
+                        model.Add(lab_vars[key] == 0)
+        
+        if batch_rotation_needed:
+            for bs in lab_block_starts:
+                if mentor_period in [bs, bs + 1]:
+                    mkey = (mentor_day_clean, bs)
+                    if mkey in merged_lab_vars:
+                        model.Add(merged_lab_vars[mkey] == 0)
 
     # --- Slot occupancy ---
     core_slot_fills = []
@@ -434,15 +471,15 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                 continue
 
             is_mentor = (day == mentor_day_clean and period == mentor_period)
-            if is_mentor:
+            if is_mentor and c_mentor_blocked:
                 model.Add(sum(occupants) == 0)
             else:
                 model.Add(sum(occupants) <= 1)
                 core_slot_fills.extend(occupants)
 
     # --- C7: No back-to-back theory of same course ---
-    # Only enforced when schedule is NOT overloaded
-    if not is_overloaded:
+    # Only enforced when schedule is NOT overloaded OR if user strictly demands it
+    if c_no_back_to_back and not is_overloaded:
         for c in regular_courses:
             for day in all_days:
                 pl = [p for p in day_periods.get(day, []) if p <= 7]
@@ -455,8 +492,8 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                             model.Add(theory_vars[k1] + theory_vars[k2] <= 1)
 
     # --- C8: Max theory sessions per course per day ---
-    max_theory_per_day = 2 if is_overloaded else 1
-    print(f"  📊 max_theory/course/day={max_theory_per_day}, back-to-back={'allowed' if is_overloaded else 'blocked'}")
+    max_theory_per_day = c_max_theory_over if is_overloaded else c_max_theory_norm
+    print(f"  📊 max_theory/course/day={max_theory_per_day}, back-to-back={'allowed' if is_overloaded or not c_no_back_to_back else 'blocked'}")
 
     for c in regular_courses:
         for day in all_days:
@@ -481,8 +518,8 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                 if mkey in merged_lab_vars:
                     all_lab_blocks_on_day.append(merged_lab_vars[mkey])
                     
-        if len(all_lab_blocks_on_day) > 1:
-            model.Add(sum(all_lab_blocks_on_day) <= 1)
+        if len(all_lab_blocks_on_day) > c_max_lab_blocks:
+            model.Add(sum(all_lab_blocks_on_day) <= c_max_lab_blocks)
 
     # --- C10: Lab blocks on NON-CONSECUTIVE days GLOBALLY ---
     # No lab day followed by another lab day (across all courses)
@@ -524,58 +561,60 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                 lab_spread_penalties.append(consec)
 
     # --- No theory in same slot as own lab block ---
-    for c in regular_courses:
-        if course_lab_blocks[c.course_code] == 0:
-            continue
-        for day in all_days:
-            for bs in lab_block_starts:
-                lvar = None
-                if batch_rotation_needed and c in core_lab_courses:
-                    lvar = merged_lab_vars.get((day, bs))
-                else:
-                    lkey = (c.course_code, day, bs)
-                    lvar = lab_vars.get(lkey)
-                    
-                if lvar is None:
-                    continue
-                for p in [bs, bs + 1]:
-                    tkey = (c.course_code, day, p)
-                    if tkey in theory_vars:
-                        model.Add(theory_vars[tkey] + lvar <= 1)
+    if c_no_theory_in_own_lab:
+        for c in regular_courses:
+            if course_lab_blocks[c.course_code] == 0:
+                continue
+            for day in all_days:
+                for bs in lab_block_starts:
+                    lvar = None
+                    if batch_rotation_needed and c in core_lab_courses:
+                        lvar = merged_lab_vars.get((day, bs))
+                    else:
+                        lkey = (c.course_code, day, bs)
+                        lvar = lab_vars.get(lkey)
+                        
+                    if lvar is None:
+                        continue
+                    for p in [bs, bs + 1]:
+                        tkey = (c.course_code, day, p)
+                        if tkey in theory_vars:
+                            model.Add(theory_vars[tkey] + lvar <= 1)
 
     # --- C5: Faculty clash ---
-    faculty_courses_map = {}
-    for c in regular_courses:
-        for fid, fname, dtype in course_faculty.get(c.course_code, []):
-            if not fid or str(fid).lower() in ['nan', 'none']: 
-                continue # Skip faculty clash check if no real faculty ID
-            if fid not in faculty_courses_map:
-                faculty_courses_map[fid] = set()
-            faculty_courses_map[fid].add(c.course_code)
+    if c_no_fac_clash:
+        faculty_courses_map = {}
+        for c in regular_courses:
+            for fid, fname, dtype in course_faculty.get(c.course_code, []):
+                if not fid or str(fid).lower() in ['nan', 'none']: 
+                    continue # Skip faculty clash check if no real faculty ID
+                if fid not in faculty_courses_map:
+                    faculty_courses_map[fid] = set()
+                faculty_courses_map[fid].add(c.course_code)
 
-    for fid, taught_codes in faculty_courses_map.items():
-        if len(taught_codes) <= 1:
-            continue
-        for day in all_days:
-            for period in day_periods.get(day, []):
-                occupants = []
-                for cc in taught_codes:
-                    key = (cc, day, period)
-                    if key in theory_vars:
-                        occupants.append(theory_vars[key])
-                    if course_lab_blocks.get(cc, 0) > 0:
-                        for bs in lab_block_starts:
-                            if period in [bs, bs + 1]:
-                                if batch_rotation_needed and any(x for x in core_lab_courses if x.course_code == cc):
-                                    mkey = (day, bs)
-                                    if mkey in merged_lab_vars:
-                                        occupants.append(merged_lab_vars[mkey])
-                                else:
-                                    lkey = (cc, day, bs)
-                                    if lkey in lab_vars:
-                                        occupants.append(lab_vars[lkey])
-                if len(occupants) > 1:
-                    model.Add(sum(occupants) <= 1)
+        for fid, taught_codes in faculty_courses_map.items():
+            if len(taught_codes) <= 1:
+                continue
+            for day in all_days:
+                for period in day_periods.get(day, []):
+                    occupants = []
+                    for cc in taught_codes:
+                        key = (cc, day, period)
+                        if key in theory_vars:
+                            occupants.append(theory_vars[key])
+                        if course_lab_blocks.get(cc, 0) > 0:
+                            for bs in lab_block_starts:
+                                if period in [bs, bs + 1]:
+                                    if batch_rotation_needed and any(x for x in core_lab_courses if x.course_code == cc):
+                                        mkey = (day, bs)
+                                        if mkey in merged_lab_vars:
+                                            occupants.append(merged_lab_vars[mkey])
+                                    else:
+                                        lkey = (cc, day, bs)
+                                        if lkey in lab_vars:
+                                            occupants.append(lab_vars[lkey])
+                    if len(occupants) > 1:
+                        model.Add(sum(occupants) <= 1)
 
     # --- C11 (SOFT): Theory on same day as lab ---
     theory_lab_same_day_bonus = []
@@ -605,12 +644,18 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
 
     # --- OBJECTIVE ---
     objective_terms = []
-    for v in core_slot_fills:
-        objective_terms.append(10 * v)  # Fill slots
-    for v in theory_lab_same_day_bonus:
-        objective_terms.append(3 * v)   # Theory near lab
-    for v in lab_spread_penalties:
-        objective_terms.append(-5 * v)  # Avoid consecutive-day labs
+    
+    if c_fill_bonus != 0:
+        for v in core_slot_fills:
+            objective_terms.append(c_fill_bonus * v)  # Fill slots
+            
+    if c_theory_lab_bonus != 0:
+        for v in theory_lab_same_day_bonus:
+            objective_terms.append(c_theory_lab_bonus * v)   # Theory near lab
+            
+    if c_consecutive_lab_penalty != 0:
+        for v in lab_spread_penalties:
+            objective_terms.append(c_consecutive_lab_penalty * v)  # Avoid consecutive-day labs
 
     if objective_terms:
         model.Maximize(sum(objective_terms))
@@ -1020,9 +1065,9 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                 return True
         return False
 
-    # 3. Assign Mini Projects to 2-period blocks first (Max 4 periods / 2 blocks)
+    # 3. Assign Mini Projects to 2-period blocks first
     for mp in mini_projects:
-        while free_blocks_2 and weekly_extra_counts[mp.course_code] < 4:
+        while free_blocks_2 and weekly_extra_counts[mp.course_code] < c_mini_proj_max:
             day, p1, p2 = free_blocks_2.pop(0)
 
             gc_fac = get_lab_faculty(mp.course_code)
@@ -1074,13 +1119,14 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
             
             day, p1, p2 = free_blocks_2[0]
             
-            # Check limits: 2 periods added -> daily + 2, weekly + 2
+            # Check limits: daily + 2, weekly + 2
             # AND strictly demand the course physically possesses Practical (P) Hours > 0 before locking a LAB block
             course_has_practicals = (c.practical_hours or 0) > 0
             if batch_rotation_needed and c in core_lab_courses:
                 course_has_practicals = False  # Prevent gap filler from breaking batch rotation logic
                 
-            if course_has_practicals and weekly_extra_counts[c.course_code] <= 1 and daily_extra_counts[c.course_code][day] == 0 and not day_has_lab(day):
+            # If we add a block of 2, ensure it won't exceed the weekly limit
+            if course_has_practicals and (weekly_extra_counts[c.course_code] + 2) <= c_core_extra_week and (daily_extra_counts[c.course_code][day] + 2) <= c_core_extra_day and not day_has_lab(day):
                 free_blocks_2.pop(0)
                 consecutive_failures = 0
                 
@@ -1135,7 +1181,7 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
             
             day, p = single_frees[0]
             
-            if weekly_extra_counts[c.course_code] < 3 and daily_extra_counts[c.course_code][day] < 2:
+            if weekly_extra_counts[c.course_code] < c_core_extra_week and daily_extra_counts[c.course_code][day] < c_core_extra_day:
                 single_frees.pop(0)
                 consecutive_failures = 0
                 
@@ -1187,8 +1233,8 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
     global_oe = db.query(models.CourseMaster).filter_by(semester=semester, is_open_elective=True).first()
     
     if semester == 5 and global_oe:
-        # We need 3 periods for an Open Elective natively.
-        oe_slots_needed = 3
+        # We need N periods for an Open Elective natively.
+        oe_slots_needed = c_open_elective_p
         
         # Flatten any remaining 2-blocks into single frees
         while free_blocks_2:

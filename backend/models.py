@@ -172,3 +172,10 @@ class CourseVenueMap(Base):
 # Index for fast retrieval by course
 Index('idx_course_venue', CourseVenueMap.course_code, CourseVenueMap.venue_id)
 
+
+class SchedulerConfig(Base):
+    __tablename__ = "scheduler_config"
+    
+    id = Column(Integer, primary_key=True, default=1)
+    config_json = Column(String, nullable=False)  # JSON blob with all constraint settings
+

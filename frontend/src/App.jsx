@@ -25,9 +25,11 @@ import {
     Search,
     MapPin,
     Building2,
-    LogOut
+    LogOut,
+    Settings
 } from 'lucide-react';
 import TimetableEditor from './components/TimetableEditor';
+import ConstraintsManager from './components/ConstraintsManager';
 import Venues from './components/Venues';
 import VenueMapping from './components/VenueMapping';
 import DepartmentsManager from './components/DepartmentsManager';
@@ -1207,7 +1209,7 @@ function App() {
         </div>
     );
 
-    const pageTitle = { dashboard: 'Timetable Generator', editor: 'Timetable Editor', print: 'Print View', timeslots: 'Time Slots', departments: 'Departments Setup', subjects: 'Course / Subject Details', faculty: 'Faculty Details', mappings: 'Course-Faculty Mappings', venues: 'Venues & Classrooms', venue_mappings: 'Department Venues', students: 'Students & Registrations', faculty_timetable: 'Faculty Personal Timetable', student_timetable: 'Student Personal Timetable' };
+    const pageTitle = { dashboard: 'Timetable Generator', editor: 'Timetable Editor', print: 'Print View', timeslots: 'Time Slots', departments: 'Departments Setup', subjects: 'Course / Subject Details', faculty: 'Faculty Details', mappings: 'Course-Faculty Mappings', venues: 'Venues & Classrooms', venue_mappings: 'Department Venues', students: 'Students & Registrations', faculty_timetable: 'Faculty Personal Timetable', student_timetable: 'Student Personal Timetable', constraints: 'Algorithm Constraints' };
 
     const switchTab = (tab) => {
         setActiveTab(tab);
@@ -1245,7 +1247,7 @@ function App() {
                     {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
                 </button>
 
-                <nav className="mt-8 px-3 space-y-2 flex-grow">
+                <nav className="mt-8 px-3 space-y-2 flex-grow overflow-y-auto">
                     {[
                         { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
                         { id: 'editor', icon: Edit2, label: 'Editor' },
@@ -1259,7 +1261,8 @@ function App() {
                         { id: 'mappings', icon: GraduationCap, label: 'Course-Faculty' },
                         { id: 'timeslots', icon: Clock, label: 'Time Slots' },
                         { id: 'venues', icon: MapPin, label: 'Venues' },
-                        { id: 'venue_mappings', icon: Layers, label: 'Venue Mapping' }
+                        { id: 'venue_mappings', icon: Layers, label: 'Venue Mapping' },
+                        { id: 'constraints', icon: Settings, label: 'Constraints & Rules' }
                     ].map(item => (
                         <button key={item.id} onClick={() => switchTab(item.id)}
                             title={isCollapsed ? item.label : ''}
@@ -1305,6 +1308,7 @@ function App() {
                         {activeTab === 'timeslots' && renderSlotsPage()}
                         {activeTab === 'venues' && <Venues />}
                         {activeTab === 'venue_mappings' && <VenueMapping />}
+                        {activeTab === 'constraints' && <ConstraintsManager />}
                         {/* New Print View Render */}
                         {activeTab === 'print' && renderPrintViewPage()}
                     </div>

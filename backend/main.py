@@ -970,3 +970,184 @@ def check_conflicts(request: schemas.ConflictCheckRequest, db: Session = Depends
         "faculty_conflicts": faculty_conflicts,
         "venue_conflicts": venue_conflicts
     }
+
+
+# ============================================
+# SCHEDULER CONFIG (Constraint Management)
+# ============================================
+import json
+
+DEFAULT_CONFIG = {
+    "hard_constraints": {
+        "max_courses_per_slot": {
+            "value": 1, "enabled": True, "type": "number",
+            "label": "Max Courses Per Slot",
+            "description": "Maximum number of different courses allowed in a single time slot"
+        },
+        "lab_block_starts": {
+            "value": [1, 3, 5], "enabled": True, "type": "array",
+            "label": "Lab Block Start Periods",
+            "description": "Periods where 2-period lab blocks can begin (e.g., P1-P2, P3-P4, P5-P6)"
+        },
+        "max_lab_blocks_per_day": {
+            "value": 1, "enabled": True, "type": "number",
+            "label": "Max Lab Blocks Per Day",
+            "description": "Maximum number of lab blocks (2-period) allowed across ALL courses in a single day"
+        },
+        "mentor_hour_blocked": {
+            "value": True, "enabled": True, "type": "boolean",
+            "label": "Block Mentor Hour",
+            "description": "Prevent any regular course from being scheduled during the mentor interaction hour"
+        },
+        "no_faculty_clash": {
+            "value": True, "enabled": True, "type": "boolean",
+            "label": "No Faculty Clash",
+            "description": "Same faculty cannot teach two different courses simultaneously"
+        },
+        "no_theory_in_own_lab": {
+            "value": True, "enabled": True, "type": "boolean",
+            "label": "No Theory in Own Lab Block",
+            "description": "A course cannot have theory in the same period as its own lab block"
+        }
+    },
+    "dynamic_constraints": {
+        "max_theory_per_course_per_day": {
+            "value": 1, "overloaded_value": 2, "enabled": True, "type": "number",
+            "label": "Max Theory/Course/Day",
+            "description": "Maximum theory periods for the same course in a single day (normal mode)"
+        },
+        "max_theory_per_course_per_day_overloaded": {
+            "value": 2, "enabled": True, "type": "number",
+            "label": "Max Theory/Course/Day (Overloaded)",
+            "description": "Maximum theory periods per course per day when schedule is overloaded"
+        },
+        "no_back_to_back_theory": {
+            "value": True, "enabled": True, "type": "boolean",
+            "label": "No Back-to-Back Theory",
+            "description": "Prevent consecutive theory periods of the same course (relaxed when overloaded)"
+        },
+        "p8_honours_only": {
+            "value": True, "enabled": True, "type": "boolean",
+            "label": "Period 8 for Honours Only",
+            "description": "Reserve Period 8 exclusively for Honours/Minor courses (opens for regular if no honours)"
+        }
+    },
+    "soft_constraints": {
+        "non_consecutive_lab_days_penalty": {
+            "value": -5, "enabled": True, "type": "number",
+            "label": "Consecutive Lab Days Penalty",
+            "description": "Penalty applied when lab blocks are scheduled on consecutive days (negative = penalty)"
+        },
+        "theory_lab_same_day_bonus": {
+            "value": 3, "enabled": True, "type": "number",
+            "label": "Theory+Lab Same Day Bonus",
+            "description": "Bonus for scheduling theory on the same day as its lab session"
+        },
+        "fill_slots_bonus": {
+            "value": 10, "enabled": True, "type": "number",
+            "label": "Filled Slot Bonus",
+            "description": "Bonus per slot that gets filled (maximizes slot utilization)"
+        }
+    },
+    "section_settings": {
+        "min_section_threshold": {
+            "value": 30, "enabled": True, "type": "number",
+            "label": "Min Students for Extra Section",
+            "description": "Minimum number of remaining students needed to create an additional section"
+        },
+        "default_venue_capacity": {
+            "value": 60, "enabled": True, "type": "number",
+            "label": "Default Venue Capacity",
+            "description": "Default seating capacity used when a venue has no capacity specified"
+        }
+    },
+    "gap_fill": {
+        "mini_project_max_periods": {
+            "value": 4, "enabled": True, "type": "number",
+            "label": "Mini Project Max Periods/Week",
+            "description": "Maximum periods per week allocated for mini projects during gap filling"
+        },
+        "core_extra_max_per_week": {
+            "value": 3, "enabled": True, "type": "number",
+            "label": "Core Extra Sessions/Week",
+            "description": "Maximum extra gap-fill sessions per core course per week"
+        },
+        "core_extra_max_per_day": {
+            "value": 2, "enabled": True, "type": "number",
+            "label": "Core Extra Sessions/Day",
+            "description": "Maximum extra gap-fill sessions per core course per day"
+        },
+        "open_elective_periods": {
+            "value": 3, "enabled": True, "type": "number",
+            "label": "Open Elective Periods (Sem 5)",
+            "description": "Number of periods injected for open electives in Semester 5"
+        }
+    },
+    "batch_rotation": {
+        "enabled": {
+            "value": True, "enabled": True, "type": "boolean",
+            "label": "Enable Lab Batch Rotation",
+            "description": "Automatically merge and rotate lab batches when there aren't enough unique lab faculty"
+        },
+        "max_merged_entries": {
+            "value": 15, "enabled": True, "type": "number",
+            "label": "Max Merged Entries Per Slot",
+            "description": "Maximum number of entries allowed in a single merged lab slot"
+        }
+    },
+    "elective_handling": {
+        "pair_same_category": {
+            "value": True, "enabled": True, "type": "boolean",
+            "label": "Pair Same-Category Electives",
+            "description": "Group electives with the same course_category into the same time slot"
+        },
+        "skip_no_faculty_lang": {
+            "value": True, "enabled": True, "type": "boolean",
+            "label": "Skip Language Electives Without Faculty",
+            "description": "Automatically skip language elective courses that have no faculty mapped"
+        }
+    },
+    "honours_minor": {
+        "slot_restriction": {
+            "value": 8, "enabled": True, "type": "number",
+            "label": "Honours/Minor Period",
+            "description": "Period number exclusively used for honours and minor courses"
+        }
+    }
+}
+
+
+@app.get("/api/config")
+def get_scheduler_config(db: Session = Depends(get_db)):
+    row = db.query(models.SchedulerConfig).filter_by(id=1).first()
+    if not row:
+        # Create defaults
+        row = models.SchedulerConfig(id=1, config_json=json.dumps(DEFAULT_CONFIG))
+        db.add(row)
+        db.commit()
+        db.refresh(row)
+    return json.loads(row.config_json)
+
+
+@app.put("/api/config")
+def update_scheduler_config(config: dict, db: Session = Depends(get_db)):
+    row = db.query(models.SchedulerConfig).filter_by(id=1).first()
+    if not row:
+        row = models.SchedulerConfig(id=1, config_json=json.dumps(config))
+        db.add(row)
+    else:
+        row.config_json = json.dumps(config)
+    db.commit()
+    return {"status": "saved"}
+
+
+@app.post("/api/config/reset")
+def reset_scheduler_config(db: Session = Depends(get_db)):
+    row = db.query(models.SchedulerConfig).filter_by(id=1).first()
+    if row:
+        row.config_json = json.dumps(DEFAULT_CONFIG)
+    else:
+        row = models.SchedulerConfig(id=1, config_json=json.dumps(DEFAULT_CONFIG))
+        db.add(row)
+    db.commit()
+    return json.loads(row.config_json)

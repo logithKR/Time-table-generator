@@ -114,3 +114,8 @@ export const getAvailableVenues = (deptCode, semester, day, period) =>
 
 // --- Conflict Check (Cross-Department) ---
 export const checkConflicts = (data) => axios.post(`${API_URL}/check-conflicts`, data);
+
+// --- Scheduler Config ---
+export const getConfig = () => axios.get(`${API_URL}/api/config`);
+export const saveConfig = (data) => axios.put(`${API_URL}/api/config`, data);
+export const resetConfig = () => axios.post(`${API_URL}/api/config/reset`);

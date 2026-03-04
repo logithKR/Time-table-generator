@@ -1089,6 +1089,11 @@ DEFAULT_CONFIG = {
             "label": "Enable Lab Batch Rotation",
             "description": "Automatically merge and rotate lab batches when there aren't enough unique lab faculty"
         },
+        "venue_aware_rotation": {
+            "value": True, "enabled": True, "type": "boolean",
+            "label": "Venue-Aware Batch Rotation",
+            "description": "Also trigger batch rotation when mapped lab venues are fewer than required sections"
+        },
         "max_merged_entries": {
             "value": 15, "enabled": True, "type": "number",
             "label": "Max Merged Entries Per Slot",

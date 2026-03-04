@@ -333,28 +333,53 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
     
     batch_rotation_needed = False
     merged_batch_count = 0
-    faculty_deficient_labs = []  # Only labs that ACTUALLY lack faculty
-    faculty_sufficient_labs = []  # Labs with enough faculty (schedule independently)
+    faculty_deficient_labs = []  # Labs that lack faculty
+    venue_deficient_labs = []    # Labs that lack venues
+    resource_sufficient_labs = []  # Labs with enough of both
+    
+    c_venue_aware_rot = get_conf('batch_rotation', 'venue_aware_rotation', 'value', True)
     
     if core_lab_courses:
         for c in core_lab_courses:
             needed_sections = get_course_sections(c.course_code, True)
             valid_facs = [f for f in get_lab_faculty(c.course_code) if f[2] in ('LAB', 'THEORY WITH LAB')]
-            print(f"    🔬 {c.course_code}: needs {needed_sections} sections, has {len(valid_facs)} valid lab faculty: {[f[1] for f in valid_facs]}")
-            if len(valid_facs) < needed_sections:
-                faculty_deficient_labs.append(c)
+            
+            # Check venue availability for this lab course
+            course_specific_venue = cv_lookup.get(c.course_code)
+            if course_specific_venue:
+                available_lab_venues = 1  # course-specific mapping = exactly 1 venue
             else:
-                faculty_sufficient_labs.append(c)
+                available_lab_venues = len(default_labs)
+            
+            is_faculty_deficient = len(valid_facs) < needed_sections
+            is_venue_deficient = c_venue_aware_rot and available_lab_venues < needed_sections
+            
+            print(f"    🔬 {c.course_code}: needs {needed_sections} sections, "
+                  f"has {len(valid_facs)} valid lab faculty, "
+                  f"has {available_lab_venues} lab venue(s)")
+            
+            if is_faculty_deficient:
+                faculty_deficient_labs.append(c)
+                print(f"       → Faculty-deficient ({len(valid_facs)} < {needed_sections})")
+            if is_venue_deficient:
+                venue_deficient_labs.append(c)
+                print(f"       → Venue-deficient ({available_lab_venues} < {needed_sections})")
+            
+            if not is_faculty_deficient and not is_venue_deficient:
+                resource_sufficient_labs.append(c)
         
-        if len(faculty_deficient_labs) >= 2 and c_batch_rot_enabled:
-            # Only merge if 2+ labs are deficient — otherwise no point in rotation
-            core_lab_courses_to_merge = faculty_deficient_labs
+        # Combine: any lab that is deficient in EITHER faculty OR venues
+        resource_deficient_labs = list({c.course_code: c for c in (faculty_deficient_labs + venue_deficient_labs)}.values())
+        
+        if len(resource_deficient_labs) >= 2 and c_batch_rot_enabled:
+            # 2+ labs are resource-deficient — merge them for rotation
+            core_lab_courses_to_merge = resource_deficient_labs
             batch_rotation_needed = True
             merged_batch_count = max(get_course_sections(c.course_code, True) for c in core_lab_courses_to_merge)
-        elif len(faculty_deficient_labs) == 1 and c_batch_rot_enabled:
+        elif len(resource_deficient_labs) == 1 and c_batch_rot_enabled:
             # Only 1 deficient lab — still needs rotation if there are sufficient labs to pair with
-            if faculty_sufficient_labs:
-                core_lab_courses_to_merge = faculty_deficient_labs + faculty_sufficient_labs[:1]  # Pair with 1 sufficient lab
+            if resource_sufficient_labs:
+                core_lab_courses_to_merge = resource_deficient_labs + resource_sufficient_labs[:1]
                 batch_rotation_needed = True
                 merged_batch_count = max(get_course_sections(c.course_code, True) for c in core_lab_courses_to_merge)
             else:
@@ -368,11 +393,21 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
     core_lab_courses = core_lab_courses_to_merge if batch_rotation_needed else []
 
     if batch_rotation_needed:
+        fac_def_codes = [c.course_code for c in faculty_deficient_labs]
+        ven_def_codes = [c.course_code for c in venue_deficient_labs]
+        reason_parts = []
+        if fac_def_codes:
+            reason_parts.append(f"faculty shortage: {fac_def_codes}")
+        if ven_def_codes:
+            reason_parts.append(f"venue shortage: {ven_def_codes}")
+        reason_str = "; ".join(reason_parts) if reason_parts else "unknown"
         print(f"  🔄 Lab Batch Rotation TRIGGERED: Merging {len(core_lab_courses)} labs into {merged_batch_count} batches.")
+        print(f"     Reason: {reason_str}")
         print(f"     Merged labs: {[c.course_code for c in core_lab_courses]}")
-        print(f"     Independent labs (enough faculty): {[c.course_code for c in faculty_sufficient_labs if c not in core_lab_courses]}")
+        print(f"     Independent labs (sufficient resources): {[c.course_code for c in resource_sufficient_labs if c not in core_lab_courses]}")
     else:
-        print("  ✅ Sufficient faculty available. Lab Batch Rotation not needed.")
+        print("  ✅ Sufficient faculty and venues available. Lab Batch Rotation not needed.")
+
 
     # --- LAB variables ---
     lab_vars = {}

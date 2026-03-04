@@ -14,6 +14,7 @@ const VenueMapping = () => {
     const [selectedVenue, setSelectedVenue] = useState('');
     const [selectedCourse, setSelectedCourse] = useState('');
     const [selectedCourseVenue, setSelectedCourseVenue] = useState('');
+    const [selectedVenueType, setSelectedVenueType] = useState('BOTH');
 
     const [isMapping, setIsMapping] = useState(false);
     const [isMappingCourse, setIsMappingCourse] = useState(false);
@@ -93,11 +94,13 @@ const VenueMapping = () => {
             await mapVenueToCourse({
                 department_code: selectedDept,
                 course_code: selectedCourse,
-                venue_id: parseInt(selectedCourseVenue)
+                venue_id: parseInt(selectedCourseVenue),
+                venue_type: selectedVenueType
             });
             await fetchDepartmentData(selectedDept, selectedSemester);
             setSelectedCourse('');
             setSelectedCourseVenue('');
+            setSelectedVenueType('BOTH');
         } catch (err) {
             console.error(err);
             alert("Error mapping course venue: " + (err.response?.data?.detail || err.message));
@@ -249,6 +252,18 @@ const VenueMapping = () => {
                                             ))}
                                         </select>
                                     </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-1">Venue Used For</label>
+                                        <select
+                                            className="w-full p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none bg-slate-50"
+                                            value={selectedVenueType}
+                                            onChange={(e) => setSelectedVenueType(e.target.value)}
+                                        >
+                                            <option value="BOTH">Both (Theory & Lab)</option>
+                                            <option value="THEORY">Theory Only</option>
+                                            <option value="LAB">Lab Only</option>
+                                        </select>
+                                    </div>
                                     <button
                                         type="submit"
                                         disabled={!selectedCourse || !selectedCourseVenue || isMappingCourse}
@@ -348,7 +363,16 @@ const VenueMapping = () => {
                                         {courseVenues.map(map => (
                                             <div key={map.id} className="flex justify-between items-center p-3 rounded-xl border border-slate-100 bg-slate-50/50 hover:border-amber-300 transition-colors group">
                                                 <div>
-                                                    <p className="font-semibold text-slate-800 text-sm">{map.venue_name} {map.is_lab ? '(Lab)' : ''}</p>
+                                                    <p className="font-semibold text-slate-800 text-sm flex items-center gap-2">
+                                                        {map.venue_name} {map.is_lab ? '(Lab)' : ''}
+                                                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wide ${
+                                                            map.venue_type === 'LAB' ? 'bg-emerald-100 text-emerald-700' :
+                                                            map.venue_type === 'THEORY' ? 'bg-blue-100 text-blue-700' :
+                                                            'bg-purple-100 text-purple-700'
+                                                        }`}>
+                                                            {map.venue_type === 'BOTH' ? 'Theory & Lab' : map.venue_type || 'Both'}
+                                                        </span>
+                                                    </p>
                                                     <p className="text-xs text-slate-500 font-medium text-amber-600 mt-0.5">Course: {map.course_code}</p>
                                                 </div>
                                                 <button

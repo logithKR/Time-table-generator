@@ -670,7 +670,8 @@ def get_course_venues(department_code: str = None, db: Session = Depends(get_db)
                 venue_id=venue.venue_id,
                 venue_name=venue.venue_name,
                 is_lab=venue.is_lab,
-                capacity=venue.capacity
+                capacity=venue.capacity,
+                venue_type=m.venue_type or 'BOTH'
             ))
     return result
 
@@ -687,7 +688,8 @@ def create_course_venue(req: schemas.CourseVenueCreate, db: Session = Depends(ge
     new_map = models.CourseVenueMap(
         department_code=req.department_code, 
         course_code=req.course_code, 
-        venue_id=req.venue_id
+        venue_id=req.venue_id,
+        venue_type=(req.venue_type or 'BOTH').upper()
     )
     db.add(new_map)
     db.commit()
@@ -701,7 +703,8 @@ def create_course_venue(req: schemas.CourseVenueCreate, db: Session = Depends(ge
         venue_id=venue.venue_id,
         venue_name=venue.venue_name,
         is_lab=venue.is_lab,
-        capacity=venue.capacity
+        capacity=venue.capacity,
+        venue_type=new_map.venue_type or 'BOTH'
     )
 
 @app.delete("/course-venues/{map_id}")

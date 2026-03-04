@@ -168,6 +168,7 @@ class CourseVenueMap(Base):
     department_code = Column(String, ForeignKey('department_master.department_code'), nullable=False)
     course_code = Column(String, ForeignKey('course_master.course_code'), nullable=False)
     venue_id = Column(Integer, ForeignKey('venue_master.venue_id'), nullable=False)
+    venue_type = Column(String, default='BOTH')  # 'THEORY', 'LAB', or 'BOTH'
 
 # Index for fast retrieval by course
 Index('idx_course_venue', CourseVenueMap.course_code, CourseVenueMap.venue_id)

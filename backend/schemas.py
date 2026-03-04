@@ -177,6 +177,7 @@ class CourseVenueCreate(BaseModel):
     department_code: str
     course_code: str
     venue_id: int
+    venue_type: Optional[str] = 'BOTH'  # 'THEORY', 'LAB', or 'BOTH'
 
 class CourseVenueResponse(BaseModel):
     id: int
@@ -186,6 +187,7 @@ class CourseVenueResponse(BaseModel):
     venue_name: Optional[str] = None
     is_lab: Optional[bool] = False
     capacity: Optional[int] = 60
+    venue_type: Optional[str] = 'BOTH'
     
     class Config:
         orm_mode = True

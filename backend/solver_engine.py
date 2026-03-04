@@ -115,13 +115,22 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
     for d in day_periods:
         day_periods[d] = sorted(set(day_periods[d]))
 
-    # Pre-fetch course-specific venues
+    # Pre-fetch course-specific venues (venue_type aware)
     course_venues = db.query(models.CourseVenueMap).filter_by(department_code=department_code).all()
-    cv_lookup = {}
+    cv_lookup = {}  # {course_code: {'theory': venue_name, 'lab': venue_name}}
     for cv in course_venues:
         v = db.query(models.VenueMaster).filter_by(venue_id=cv.venue_id).first()
         if v:
-            cv_lookup[cv.course_code] = v.venue_name
+            vtype = (cv.venue_type or 'BOTH').upper()
+            if cv.course_code not in cv_lookup:
+                cv_lookup[cv.course_code] = {}
+            if vtype == 'BOTH':
+                cv_lookup[cv.course_code]['theory'] = v.venue_name
+                cv_lookup[cv.course_code]['lab'] = v.venue_name
+            elif vtype == 'THEORY':
+                cv_lookup[cv.course_code]['theory'] = v.venue_name
+            elif vtype == 'LAB':
+                cv_lookup[cv.course_code]['lab'] = v.venue_name
 
     # Pre-fetch department default venues
     dept_venue_maps = db.query(models.DepartmentVenueMap).filter_by(department_code=department_code, semester=semester).all()
@@ -345,9 +354,9 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
             valid_facs = [f for f in get_lab_faculty(c.course_code) if f[2] in ('LAB', 'THEORY WITH LAB')]
             
             # Check venue availability for this lab course
-            course_specific_venue = cv_lookup.get(c.course_code)
-            if course_specific_venue:
-                available_lab_venues = 1  # course-specific mapping = exactly 1 venue
+            course_cv = cv_lookup.get(c.course_code, {})
+            if 'lab' in course_cv:
+                available_lab_venues = 1  # course-specific lab mapping = exactly 1 venue
             else:
                 available_lab_venues = len(default_labs)
             
@@ -733,8 +742,10 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
     current_run_occupancy = {}
 
     def assign_venue(day, period, course_code, is_lab, required_idx):
-        if course_code in cv_lookup:
-            return cv_lookup[course_code]
+        course_cv = cv_lookup.get(course_code, {})
+        session_key = 'lab' if is_lab else 'theory'
+        if session_key in course_cv:
+            return course_cv[session_key]
         pool = default_labs if is_lab else default_classrooms
         if not pool:
             return None

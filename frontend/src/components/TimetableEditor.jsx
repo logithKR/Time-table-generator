@@ -163,7 +163,7 @@ const CellContent = ({ entry, sections, cellId, isLabStart, isSwapMode, isSelect
                 {(showFaculty || showVenues) && groupEntries.length > 1 ? (
                     <div className="flex flex-col gap-0.5 border-t border-current/10 pt-0.5 mt-0.5">
                         {groupEntries.map((sec, sIdx) => (
-                            <div key={sIdx} className="flex items-center justify-center gap-1.5 w-full">
+                            <div key={sIdx} className="flex flex-row items-center justify-center gap-1.5 flex-wrap w-full">
                                 {showFaculty && isValidFaculty(sec.faculty_name) && (
                                     <span className={`text-[8.5px] font-semibold italic opacity-80 whitespace-nowrap ${isOEBlock ? 'text-teal-800' : ''}`}>{sec.faculty_name}</span>
                                 )}
@@ -175,7 +175,7 @@ const CellContent = ({ entry, sections, cellId, isLabStart, isSwapMode, isSelect
                     </div>
                 ) : (showFaculty || showVenues) ? (
                     (showFaculty && isValidFaculty(groupEntries[0]?.faculty_name) || showVenues && groupEntries[0]?.venue_name) && (
-                        <div className="flex items-center justify-center gap-1.5 mt-0.5 w-full">
+                        <div className="flex flex-row items-center justify-center gap-1.5 mt-0.5 flex-wrap w-full mx-auto">
                             {showFaculty && isValidFaculty(groupEntries[0]?.faculty_name) && (
                                 <span className={`text-[9px] italic font-semibold opacity-80 whitespace-nowrap ${isOEBlock ? 'text-teal-800' : ''}`}>{groupEntries[0].faculty_name}</span>
                             )}

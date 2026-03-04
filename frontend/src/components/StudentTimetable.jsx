@@ -292,7 +292,7 @@ const StudentTimetable = () => {
                                                                             {c.course_name}
                                                                         </div>
                                                                     )}
-                                                                    <div className="flex flex-col items-center mt-1.5 gap-1">
+                                                                    <div className="flex flex-row items-center justify-center mt-1.5 gap-1.5 flex-wrap">
                                                                         {c.faculty_name && c.faculty_name !== 'Unassigned' && (
                                                                             <span className="text-[10px] italic font-serif text-gray-600">
                                                                                 {c.faculty_name}

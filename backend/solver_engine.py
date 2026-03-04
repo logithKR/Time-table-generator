@@ -817,9 +817,12 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                             
                             c_venue = assign_venue(day, period, gc.course_code, False, count + sec)
                             
+                            total_secs = get_course_sections(gc.course_code, False)
+                            display_name = f"B{sec+1}: {gc_name}" if total_secs > 1 else gc_name
+                            
                             entry = models.TimetableEntry(
                                 department_code=department_code, semester=semester,
-                                course_code=gc.course_code, course_name=gc_name,
+                                course_code=gc.course_code, course_name=display_name,
                                 faculty_id=fac_assigned[0], faculty_name=fac_assigned[1],
                                 session_type='THEORY',
                                 slot_id=slot_obj.slot_id,
@@ -874,9 +877,12 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                                 c_v = assign_venue(day, p, gc.course_code, True, count + sec)
                                 slot_obj = slot_lookup.get((day, p))
                                 if slot_obj:
+                                    total_secs = get_course_sections(gc.course_code, True)
+                                    display_name = f"B{sec+1}: {gc_name}" if total_secs > 1 else gc_name
+                                    
                                     entry = models.TimetableEntry(
                                         department_code=department_code, semester=semester,
-                                        course_code=gc.course_code, course_name=gc_name,
+                                        course_code=gc.course_code, course_name=display_name,
                                         faculty_id=fac_assigned[0], faculty_name=fac_assigned[1],
                                         session_type='LAB',
                                         slot_id=slot_obj.slot_id,

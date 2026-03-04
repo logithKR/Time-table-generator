@@ -1,14 +1,15 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { Printer, AlertCircle, Loader2, Download, Search, AlertTriangle } from 'lucide-react';
+import { Printer, AlertCircle, Loader2, Download, Search, AlertTriangle, Layers } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
-import { getFaculty, getFacultyTimetable } from '../utils/api';
+import { getFaculty, getFacultyTimetable, getDepartments } from '../utils/api';
 
 const FacultyTimetable = () => {
     const componentRef = useRef();
     const [downloading, setDownloading] = useState(false);
 
     const [faculties, setFaculties] = useState([]);
+    const [departments, setDepartments] = useState([]);
     const [selectedFacultyId, setSelectedFacultyId] = useState('');
     const [timetableData, setTimetableData] = useState(null);
     const [conflicts, setConflicts] = useState([]);
@@ -16,10 +17,11 @@ const FacultyTimetable = () => {
 
     // Filter states
     const [searchTerm, setSearchTerm] = useState('');
+    const [selectedDeptFilter, setSelectedDeptFilter] = useState('');
 
     useEffect(() => {
-        // Fetch all faculty for the dropdown
         getFaculty().then(res => setFaculties(res.data)).catch(console.error);
+        getDepartments().then(res => setDepartments(res.data)).catch(console.error);
     }, []);
 
     const fetchTimetable = async () => {
@@ -56,11 +58,6 @@ const FacultyTimetable = () => {
         { name: 'VIII', time: '05.15 - 06.15 pm' }
     ];
     const DAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
-    const BREAKS = [
-        { name: 'Morning Break', time: '10.45 am - 11.00 am' },
-        { name: 'Lunch Break', time: '01.00 pm - 02.00 pm' },
-        { name: 'Evening Break', time: '04.00 pm - 04.15 pm' }
-    ];
 
     const getCellsData = useCallback((day, periodIndex) => {
         if (!timetableData) return [];
@@ -117,13 +114,16 @@ const FacultyTimetable = () => {
     const selectedFacObj = faculties.find(f => f.faculty_id === selectedFacultyId);
     let displayName = selectedFacObj ? `${selectedFacObj.faculty_name} (${selectedFacObj.faculty_id})` : selectedFacultyId;
 
-    const filteredFaculties = faculties.filter(f =>
-        f.faculty_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        f.faculty_id.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    // Filter faculties by department and search term
+    const filteredFaculties = faculties.filter(f => {
+        const matchesDept = !selectedDeptFilter || f.department_code === selectedDeptFilter;
+        const matchesSearch = f.faculty_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            f.faculty_id.toLowerCase().includes(searchTerm.toLowerCase());
+        return matchesDept && matchesSearch;
+    });
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-4">
             <style>{`
                 @media print {
                     body * { visibility: hidden; }
@@ -141,38 +141,64 @@ const FacultyTimetable = () => {
                 }
             `}</style>
 
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-gray-200 no-print">
-                <div className="flex-1 w-full max-w-xl flex gap-3">
-                    <div className="relative flex-1">
-                        <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+            {/* Consistent violet filter bar */}
+            <div className="flex flex-wrap gap-3 items-center bg-violet-50 p-4 rounded-2xl border border-violet-100 shadow-sm no-print">
+                <div className="flex items-center gap-2">
+                    <Layers className="w-4 h-4 text-violet-500" />
+                    <span className="text-sm font-semibold text-violet-700">Filter:</span>
+                </div>
+
+                {/* Department Filter */}
+                <select
+                    value={selectedDeptFilter}
+                    onChange={(e) => { setSelectedDeptFilter(e.target.value); setSelectedFacultyId(''); setTimetableData(null); }}
+                    className="p-2.5 border border-violet-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-violet-400 focus:border-violet-400 focus:outline-none shadow-sm font-medium text-gray-700 cursor-pointer transition-all hover:border-violet-300"
+                >
+                    <option value="">All Departments</option>
+                    {departments.map(d => (
+                        <option key={d.department_code} value={d.department_code}>{d.department_code}</option>
+                    ))}
+                </select>
+
+                {/* Search */}
+                <div className="flex-1 min-w-[200px]">
+                    <div className="relative group">
+                        <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-violet-500 transition-colors" />
                         <input
                             type="text"
-                            placeholder="Search Faculty by Name or ID..."
+                            placeholder="Search by name, ID..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                            className="w-full pl-10 p-2.5 border border-violet-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm placeholder:text-gray-400 font-medium text-gray-700 transition-all hover:border-violet-300"
                         />
                     </div>
-                    <select
-                        value={selectedFacultyId}
-                        onChange={(e) => setSelectedFacultyId(e.target.value)}
-                        className="w-64 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
-                    >
-                        <option value="">Select Faculty</option>
-                        {filteredFaculties.map(f => (
-                            <option key={f.faculty_id} value={f.faculty_id}>{f.faculty_name} ({f.faculty_id})</option>
-                        ))}
-                    </select>
+                </div>
+
+                {/* Faculty Select */}
+                <select
+                    value={selectedFacultyId}
+                    onChange={(e) => setSelectedFacultyId(e.target.value)}
+                    className="p-2.5 border border-violet-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-violet-400 focus:border-violet-400 focus:outline-none shadow-sm font-medium text-gray-700 cursor-pointer transition-all hover:border-violet-300 max-w-xs"
+                >
+                    <option value="">Select Faculty ({filteredFaculties.length})</option>
+                    {filteredFaculties.map(f => (
+                        <option key={f.faculty_id} value={f.faculty_id}>{f.faculty_name} ({f.faculty_id})</option>
+                    ))}
+                </select>
+
+                {/* Count */}
+                <div className="text-xs text-violet-600 font-semibold bg-white px-4 py-2.5 rounded-xl border border-violet-100 shadow-sm">
+                    {filteredFaculties.length} Faculty
                 </div>
 
                 {selectedFacultyId && timetableData && timetableData.length > 0 && (
-                    <div className="flex gap-3">
-                        <button onClick={handleDownloadPDF} disabled={downloading} className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg shadow hover:bg-emerald-700 transition-colors disabled:opacity-50">
-                            {downloading ? <Loader2 className="animate-spin" size={18} /> : <Download size={18} />}
-                            Download PDF
+                    <div className="flex gap-2">
+                        <button onClick={handleDownloadPDF} disabled={downloading} className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-emerald-200 hover:bg-emerald-700 transition-all disabled:opacity-50">
+                            {downloading ? <Loader2 className="animate-spin" size={16} /> : <Download size={16} />}
+                            PDF
                         </button>
-                        <button onClick={handlePrint} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg shadow hover:bg-blue-700 transition-colors">
-                            <Printer size={18} /> Print
+                        <button onClick={handlePrint} className="flex items-center gap-2 bg-violet-600 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-violet-200 hover:bg-violet-700 transition-all">
+                            <Printer size={16} /> Print
                         </button>
                     </div>
                 )}
@@ -180,13 +206,13 @@ const FacultyTimetable = () => {
 
             {loading ? (
                 <div className="flex justify-center p-20">
-                    <Loader2 className="w-10 h-10 text-blue-500 animate-spin" />
+                    <Loader2 className="w-10 h-10 text-violet-500 animate-spin" />
                 </div>
             ) : !selectedFacultyId ? (
-                <div className="flex flex-col items-center justify-center p-20 bg-white rounded-xl border border-gray-200 shadow-sm">
-                    <AlertCircle className="w-12 h-12 text-gray-300 mb-4" />
+                <div className="flex flex-col items-center justify-center p-20 bg-white rounded-2xl border border-violet-100 shadow-lg shadow-violet-50/50">
+                    <AlertCircle className="w-12 h-12 text-violet-200 mb-4" />
                     <div className="text-gray-500 text-xl font-bold mb-2">No Faculty Selected</div>
-                    <p className="text-sm text-gray-400">Search and select a faculty member to construct their master schedule.</p>
+                    <p className="text-sm text-gray-400">Filter by department, then search and select a faculty member.</p>
                 </div>
             ) : conflicts.length > 0 ? (
                 <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-r-lg shadow-sm mb-6 no-print">

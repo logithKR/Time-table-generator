@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Loader2, Trash2, Plus, Filter, Users, BookOpen } from 'lucide-react';
+import { Search, Loader2, Trash2, Plus, Filter, Users, BookOpen, Layers } from 'lucide-react';
 import { getStudents, getRegistrations, createStudent, deleteStudent, createRegistration, deleteRegistration, getCourses, getDepartments } from '../utils/api';
 
 const StudentRegistrations = () => {
@@ -14,6 +14,7 @@ const StudentRegistrations = () => {
     const [selectedDept, setSelectedDept] = useState('');
     const [selectedCourse, setSelectedCourse] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
+    const [semesterFilter, setSemesterFilter] = useState('');
 
     // Modals
     const [isAddStudentModalOpen, setIsAddStudentModalOpen] = useState(false);
@@ -38,6 +39,10 @@ const StudentRegistrations = () => {
         try {
             const res = await getDepartments();
             setDepartments(res.data);
+            // Auto-select first department so page isn't blank on entry
+            if (res.data.length > 0) {
+                setSelectedDept(res.data[0].department_code);
+            }
         } catch (err) { }
     };
 
@@ -64,13 +69,9 @@ const StudentRegistrations = () => {
     };
 
     const fetchRegistrations = async () => {
-        if (!selectedCourse) {
-            setRegistrations([]);
-            return;
-        }
         setLoading(true);
         try {
-            const res = await getRegistrations(selectedCourse, null);
+            const res = await getRegistrations(selectedCourse || '');
             setRegistrations(res.data);
         } catch (err) {
             console.error(err);
@@ -123,29 +124,41 @@ const StudentRegistrations = () => {
         s.student_id.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    const filteredRegistrations = registrations.filter(r =>
-        r.student_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        r.course_code.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredRegistrations = registrations.filter(r => {
+        const matchesSearch = r.student_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            r.course_code.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesSem = !semesterFilter || String(r.semester) === semesterFilter;
+        return matchesSearch && matchesSem;
+    });
+
+    // Get unique semesters for filter
+    const uniqueSemesters = [...new Set(registrations.map(r => r.semester))].sort((a, b) => a - b);
+
+    // Filter courses (show all, don't restrict by dept so they can find Open Electives)
+    const filteredCourses = courses;
+
+    const currentCount = activeTab === 'students' ? filteredStudents.length : filteredRegistrations.length;
+    const totalCount = activeTab === 'students' ? students.length : registrations.length;
 
     return (
-        <div className="space-y-6">
-            <div className="flex justify-between items-center mb-6">
+        <div className="space-y-4">
+            {/* Header + Tabs */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                 <div>
-                    <h2 className="text-2xl font-bold text-gray-800">Students & Registrations</h2>
-                    <p className="text-gray-500">Manage individuals and their course enrollments.</p>
+                    <h2 className="text-xl font-bold text-gray-800">Students & Registrations</h2>
+                    <p className="text-sm text-gray-500">Manage individuals and their course enrollments.</p>
                 </div>
-                <div className="flex bg-gray-100 p-1 rounded-lg">
+                <div className="flex bg-violet-50 p-1 rounded-xl border border-violet-100">
                     <button
-                        onClick={() => setActiveTab('students')}
-                        className={`flex items-center space-x-2 px-4 py-2 rounded-md transition-colors ${activeTab === 'students' ? 'bg-white shadow-sm text-blue-600 font-medium' : 'text-gray-600 hover:text-gray-900'}`}
+                        onClick={() => { setActiveTab('students'); setSearchTerm(''); }}
+                        className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all text-sm font-semibold ${activeTab === 'students' ? 'bg-violet-600 text-white shadow-lg shadow-violet-200' : 'text-violet-600 hover:bg-violet-100'}`}
                     >
                         <Users className="w-4 h-4" />
                         <span>Students</span>
                     </button>
                     <button
-                        onClick={() => setActiveTab('registrations')}
-                        className={`flex items-center space-x-2 px-4 py-2 rounded-md transition-colors ${activeTab === 'registrations' ? 'bg-white shadow-sm text-blue-600 font-medium' : 'text-gray-600 hover:text-gray-900'}`}
+                        onClick={() => { setActiveTab('registrations'); setSearchTerm(''); }}
+                        className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all text-sm font-semibold ${activeTab === 'registrations' ? 'bg-violet-600 text-white shadow-lg shadow-violet-200' : 'text-violet-600 hover:bg-violet-100'}`}
                     >
                         <BookOpen className="w-4 h-4" />
                         <span>Registrations</span>
@@ -153,77 +166,108 @@ const StudentRegistrations = () => {
                 </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                <div className="p-4 border-b border-gray-200 flex flex-wrap gap-4 items-center justify-between bg-gray-50">
-                    <div className="flex items-center gap-4 flex-1">
-                        <div className="relative max-w-sm flex-1">
-                            <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                            <input
-                                type="text"
-                                placeholder={`Search ${activeTab}...`}
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                            />
-                        </div>
-                        {activeTab === 'students' && (
-                            <select
-                                value={selectedDept}
-                                onChange={(e) => setSelectedDept(e.target.value)}
-                                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
-                            >
-                                <option value="">All Departments</option>
-                                {departments.map(d => (
-                                    <option key={d.department_code} value={d.department_code}>{d.department_code}</option>
-                                ))}
-                            </select>
-                        )}
-                        {activeTab === 'registrations' && (
-                            <select
-                                value={selectedCourse}
-                                onChange={(e) => setSelectedCourse(e.target.value)}
-                                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
-                            >
-                                <option value="">All Courses</option>
-                                {courses.map(c => (
-                                    <option key={c.course_code} value={c.course_code}>{c.course_code} - {c.course_name}</option>
-                                ))}
-                            </select>
-                        )}
-                    </div>
-                    <button
-                        onClick={() => activeTab === 'students' ? setIsAddStudentModalOpen(true) : setIsAddRegModalOpen(true)}
-                        className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
-                    >
-                        <Plus className="w-4 h-4" />
-                        <span>{activeTab === 'students' ? 'Add Student' : 'Add Registration'}</span>
-                    </button>
+            {/* Filter Bar — Consistent violet style */}
+            <div className="flex flex-wrap gap-3 items-center bg-violet-50 p-4 rounded-2xl border border-violet-100 shadow-sm">
+                <div className="flex items-center gap-2">
+                    <Layers className="w-4 h-4 text-violet-500" />
+                    <span className="text-sm font-semibold text-violet-700">Filter:</span>
                 </div>
 
+                {/* Department Dropdown — shown on both tabs */}
+                <select
+                    value={selectedDept}
+                    onChange={(e) => { setSelectedDept(e.target.value); setSelectedCourse(''); }}
+                    className="p-2.5 border border-violet-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-violet-400 focus:border-violet-400 focus:outline-none shadow-sm font-medium text-gray-700 cursor-pointer transition-all hover:border-violet-300"
+                >
+                    <option value="">All Departments</option>
+                    {departments.map(d => (
+                        <option key={d.department_code} value={d.department_code}>{d.department_code}</option>
+                    ))}
+                </select>
+
+                {/* Course Dropdown — registrations tab only */}
+                {activeTab === 'registrations' && (
+                    <>
+                        <select
+                            value={selectedCourse}
+                            onChange={(e) => setSelectedCourse(e.target.value)}
+                            className="p-2.5 border border-violet-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-violet-400 focus:border-violet-400 focus:outline-none shadow-sm font-medium text-gray-700 cursor-pointer transition-all hover:border-violet-300 max-w-xs"
+                        >
+                            <option value="">All Courses</option>
+                            {filteredCourses.map(c => (
+                                <option key={c.course_code} value={c.course_code}>{c.course_code} - {c.course_name}</option>
+                            ))}
+                        </select>
+
+                        {/* Semester Filter */}
+                        {uniqueSemesters.length > 0 && (
+                            <select
+                                value={semesterFilter}
+                                onChange={(e) => setSemesterFilter(e.target.value)}
+                                className="p-2.5 border border-violet-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-violet-400 focus:border-violet-400 focus:outline-none shadow-sm font-medium text-gray-700 cursor-pointer transition-all hover:border-violet-300"
+                            >
+                                <option value="">All Semesters</option>
+                                {uniqueSemesters.map(s => (
+                                    <option key={s} value={String(s)}>Semester {s}</option>
+                                ))}
+                            </select>
+                        )}
+                    </>
+                )}
+
+                {/* Search */}
+                <div className="flex-1 min-w-[200px]">
+                    <div className="relative group">
+                        <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-violet-500 transition-colors" />
+                        <input
+                            type="text"
+                            placeholder={`Search ${activeTab === 'students' ? 'by name, ID...' : 'by student ID, course...'}`}
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="w-full pl-10 p-2.5 border border-violet-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm placeholder:text-gray-400 font-medium text-gray-700 transition-all hover:border-violet-300"
+                        />
+                    </div>
+                </div>
+
+                {/* Count + Add Button */}
+                <div className="text-xs text-violet-600 font-semibold bg-white px-4 py-2.5 rounded-xl border border-violet-100 shadow-sm">
+                    Showing {currentCount} of {totalCount}
+                </div>
+                <button
+                    onClick={() => activeTab === 'students' ? setIsAddStudentModalOpen(true) : setIsAddRegModalOpen(true)}
+                    className="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-violet-200 hover:shadow-violet-300 transition-all whitespace-nowrap hover:-translate-y-0.5 active:scale-95"
+                >
+                    <Plus className="w-4 h-4" />
+                    {activeTab === 'students' ? 'Add Student' : 'Add Registration'}
+                </button>
+            </div>
+
+            {/* Data Table */}
+            <div className="bg-white rounded-2xl border border-violet-100 shadow-lg shadow-violet-50/50 overflow-hidden">
                 <div className="overflow-x-auto">
                     {loading ? (
-                        <div className="flex justify-center p-8">
-                            <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
+                        <div className="flex justify-center p-12">
+                            <Loader2 className="w-8 h-8 text-violet-500 animate-spin" />
                         </div>
                     ) : (
-                        <table className="w-full text-left border-collapse">
+                        <table className="min-w-full text-sm">
                             <thead>
-                                <tr className="bg-gray-50 border-b border-gray-200">
+                                <tr className="bg-gray-50 border-b border-gray-100">
                                     {activeTab === 'students' ? (
                                         <>
-                                            <th className="py-3 px-4 font-medium text-gray-600">Student ID</th>
-                                            <th className="py-3 px-4 font-medium text-gray-600">Name</th>
-                                            <th className="py-3 px-4 font-medium text-gray-600">Email</th>
-                                            <th className="py-3 px-4 font-medium text-gray-600">Department</th>
-                                            <th className="py-3 px-4 font-medium text-gray-600 w-20 text-center">Actions</th>
+                                            <th className="p-3.5 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">Student ID</th>
+                                            <th className="p-3.5 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">Name</th>
+                                            <th className="p-3.5 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">Email</th>
+                                            <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider">Department</th>
+                                            <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider w-16">Actions</th>
                                         </>
                                     ) : (
                                         <>
-                                            <th className="py-3 px-4 font-medium text-gray-600">ID</th>
-                                            <th className="py-3 px-4 font-medium text-gray-600">Student ID</th>
-                                            <th className="py-3 px-4 font-medium text-gray-600">Course Code</th>
-                                            <th className="py-3 px-4 font-medium text-gray-600">Semester</th>
-                                            <th className="py-3 px-4 font-medium text-gray-600 w-20 text-center">Actions</th>
+                                            <th className="p-3.5 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">ID</th>
+                                            <th className="p-3.5 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">Student ID</th>
+                                            <th className="p-3.5 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">Course Code</th>
+                                            <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider">Semester</th>
+                                            <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider w-16">Actions</th>
                                         </>
                                     )}
                                 </tr>
@@ -231,43 +275,45 @@ const StudentRegistrations = () => {
                             <tbody>
                                 {activeTab === 'students' ? (
                                     filteredStudents.length > 0 ? (
-                                        filteredStudents.map(s => (
-                                            <tr key={s.student_id} className="border-b border-gray-100 hover:bg-gray-50">
-                                                <td className="py-3 px-4 text-gray-800 font-medium">{s.student_id}</td>
-                                                <td className="py-3 px-4 text-gray-600">{s.name}</td>
-                                                <td className="py-3 px-4 text-gray-500">{s.email || '-'}</td>
-                                                <td className="py-3 px-4">
-                                                    <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                                        filteredStudents.map((s, i) => (
+                                            <tr key={s.student_id} className={`border-b border-violet-50 hover:bg-violet-50/40 transition-colors duration-200 ${i % 2 === 0 ? 'bg-white' : 'bg-purple-50/20'}`}>
+                                                <td className="p-3.5 font-mono font-bold text-violet-800">{s.student_id}</td>
+                                                <td className="p-3.5 text-gray-800 font-medium">{s.name}</td>
+                                                <td className="p-3.5 text-gray-500">{s.email || '-'}</td>
+                                                <td className="p-3.5 text-center">
+                                                    <span className="bg-violet-100 text-violet-800 px-2.5 py-1 rounded-full text-xs font-bold">
                                                         {s.department_code}
                                                     </span>
                                                 </td>
-                                                <td className="py-3 px-4 text-center">
-                                                    <button onClick={() => handleDeleteStudent(s.student_id)} className="text-red-400 hover:text-red-600">
+                                                <td className="p-3.5 text-center">
+                                                    <button onClick={() => handleDeleteStudent(s.student_id)} className="text-red-300 hover:text-red-600 transition-colors p-1 rounded-lg hover:bg-red-50" title="Delete">
                                                         <Trash2 className="w-4 h-4" />
                                                     </button>
                                                 </td>
                                             </tr>
                                         ))
                                     ) : (
-                                        <tr><td colSpan="5" className="py-8 text-center text-gray-500">{selectedDept ? 'No students found.' : 'Please select a Department from the dropdown to view students.'}</td></tr>
+                                        <tr><td colSpan="5" className="py-12 text-center text-gray-400 text-sm">{selectedDept ? 'No students found.' : 'Select a department to view students.'}</td></tr>
                                     )
                                 ) : (
                                     filteredRegistrations.length > 0 ? (
-                                        filteredRegistrations.map(r => (
-                                            <tr key={r.id} className="border-b border-gray-100 hover:bg-gray-50">
-                                                <td className="py-3 px-4 text-gray-500 text-sm">#{r.id}</td>
-                                                <td className="py-3 px-4 text-gray-800 font-medium">{r.student_id}</td>
-                                                <td className="py-3 px-4 text-blue-600 font-medium">{r.course_code}</td>
-                                                <td className="py-3 px-4 text-gray-600">{r.semester}</td>
-                                                <td className="py-3 px-4 text-center">
-                                                    <button onClick={() => handleDeleteRegistration(r.id)} className="text-red-400 hover:text-red-600">
+                                        filteredRegistrations.map((r, i) => (
+                                            <tr key={r.id} className={`border-b border-violet-50 hover:bg-violet-50/40 transition-colors duration-200 ${i % 2 === 0 ? 'bg-white' : 'bg-purple-50/20'}`}>
+                                                <td className="p-3.5 text-gray-400 text-sm font-mono">#{r.id}</td>
+                                                <td className="p-3.5 font-mono font-bold text-violet-800">{r.student_id}</td>
+                                                <td className="p-3.5 text-violet-600 font-bold">{r.course_code}</td>
+                                                <td className="p-3.5 text-center">
+                                                    <span className="bg-violet-100 text-violet-800 px-2.5 py-1 rounded-full text-xs font-bold">{r.semester}</span>
+                                                </td>
+                                                <td className="p-3.5 text-center">
+                                                    <button onClick={() => handleDeleteRegistration(r.id)} className="text-red-300 hover:text-red-600 transition-colors p-1 rounded-lg hover:bg-red-50" title="Delete">
                                                         <Trash2 className="w-4 h-4" />
                                                     </button>
                                                 </td>
                                             </tr>
                                         ))
                                     ) : (
-                                        <tr><td colSpan="5" className="py-8 text-center text-gray-500">{selectedCourse ? 'No registrations found.' : 'Please select a Course from the dropdown to view registrations.'}</td></tr>
+                                        <tr><td colSpan="5" className="py-12 text-center text-gray-400 text-sm">{selectedCourse ? 'No registrations found.' : 'Select a course to view registrations.'}</td></tr>
                                     )
                                 )}
                             </tbody>
@@ -278,32 +324,32 @@ const StudentRegistrations = () => {
 
             {/* Add Student Modal */}
             {isAddStudentModalOpen && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-                    <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
-                        <h3 className="text-lg font-bold text-gray-900 mb-4">Add New Student</h3>
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 border-2 border-violet-200">
+                        <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2"><Plus className="w-4 h-4 text-violet-600" /> Add New Student</h3>
                         <form onSubmit={handleCreateStudent} className="space-y-4">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Student ID (Reg No)</label>
-                                <input required type="text" value={newStudent.student_id} onChange={e => setNewStudent({ ...newStudent, student_id: e.target.value })} className="w-full px-3 py-2 border rounded-md" />
+                                <input required type="text" value={newStudent.student_id} onChange={e => setNewStudent({ ...newStudent, student_id: e.target.value })} className="w-full p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
-                                <input required type="text" value={newStudent.name} onChange={e => setNewStudent({ ...newStudent, name: e.target.value })} className="w-full px-3 py-2 border rounded-md" />
+                                <input required type="text" value={newStudent.name} onChange={e => setNewStudent({ ...newStudent, name: e.target.value })} className="w-full p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                                <input type="email" value={newStudent.email} onChange={e => setNewStudent({ ...newStudent, email: e.target.value })} className="w-full px-3 py-2 border rounded-md" />
+                                <input type="email" value={newStudent.email} onChange={e => setNewStudent({ ...newStudent, email: e.target.value })} className="w-full p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Department</label>
-                                <select required value={newStudent.department_code} onChange={e => setNewStudent({ ...newStudent, department_code: e.target.value })} className="w-full px-3 py-2 border rounded-md">
+                                <select required value={newStudent.department_code} onChange={e => setNewStudent({ ...newStudent, department_code: e.target.value })} className="w-full p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm">
                                     <option value="">Select Department</option>
                                     {departments.map(d => <option key={d.department_code} value={d.department_code}>{d.department_code}</option>)}
                                 </select>
                             </div>
                             <div className="mt-6 flex justify-end space-x-3">
-                                <button type="button" onClick={() => setIsAddStudentModalOpen(false)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>
-                                <button type="submit" className="px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg">Save Student</button>
+                                <button type="button" onClick={() => setIsAddStudentModalOpen(false)} className="bg-gray-100 hover:bg-gray-200 text-gray-600 px-4 py-2.5 rounded-xl text-sm font-medium transition-all">Cancel</button>
+                                <button type="submit" className="bg-violet-600 hover:bg-violet-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-violet-200 transition-all">Save Student</button>
                             </div>
                         </form>
                     </div>
@@ -312,31 +358,30 @@ const StudentRegistrations = () => {
 
             {/* Add Registration Modal */}
             {isAddRegModalOpen && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-                    <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
-                        <h3 className="text-lg font-bold text-gray-900 mb-4">Register Student to Course</h3>
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 border-2 border-violet-200">
+                        <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2"><Plus className="w-4 h-4 text-violet-600" /> Register Student to Course</h3>
                         <form onSubmit={handleCreateRegistration} className="space-y-4">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Student ID</label>
-                                <input required type="text" value={newReg.student_id} onChange={e => setNewReg({ ...newReg, student_id: e.target.value })} className="w-full px-3 py-2 border rounded-md" />
+                                <input required type="text" value={newReg.student_id} onChange={e => setNewReg({ ...newReg, student_id: e.target.value })} className="w-full p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Course Code</label>
-                                <input required type="text" value={newReg.course_code} onChange={e => setNewReg({ ...newReg, course_code: e.target.value.toUpperCase() })} className="w-full px-3 py-2 border rounded-md" placeholder="e.g. 22AG040" />
+                                <input required type="text" value={newReg.course_code} onChange={e => setNewReg({ ...newReg, course_code: e.target.value.toUpperCase() })} className="w-full p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" placeholder="e.g. 22AG040" />
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Semester</label>
-                                <input required type="number" min="1" max="8" value={newReg.semester} onChange={e => setNewReg({ ...newReg, semester: parseInt(e.target.value) })} className="w-full px-3 py-2 border rounded-md" />
+                                <input required type="number" min="1" max="8" value={newReg.semester} onChange={e => setNewReg({ ...newReg, semester: parseInt(e.target.value) })} className="w-full p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
                             </div>
                             <div className="mt-6 flex justify-end space-x-3">
-                                <button type="button" onClick={() => setIsAddRegModalOpen(false)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>
-                                <button type="submit" className="px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg">Add Registration</button>
+                                <button type="button" onClick={() => setIsAddRegModalOpen(false)} className="bg-gray-100 hover:bg-gray-200 text-gray-600 px-4 py-2.5 rounded-xl text-sm font-medium transition-all">Cancel</button>
+                                <button type="submit" className="bg-violet-600 hover:bg-violet-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-violet-200 transition-all">Add Registration</button>
                             </div>
                         </form>
                     </div>
                 </div>
             )}
-
         </div>
     );
 };

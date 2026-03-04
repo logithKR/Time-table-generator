@@ -81,7 +81,7 @@ const CourseChip = ({ course, colorStyle, facultyName, venueName }) => {
 };
 
 // ─── Draggable Grid Cell Content (Dashboard-style layout) ───
-const CellContent = ({ entry, sections, cellId, isLabStart, isSwapMode, isSelected, onClick, showCourseCode = true, showFaculty = true, showVenues = true, showLabels = true }) => {
+const CellContent = ({ entry, sections, cellId, isLabStart, isSwapMode, isSelected, onClick, showCourseCode = true, showFaculty = true, showVenues = true, showLabels = true, allCourses = [] }) => {
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
         id: cellId,
         data: { type: 'placed', entry },
@@ -117,9 +117,77 @@ const CellContent = ({ entry, sections, cellId, isLabStart, isSwapMode, isSelect
         return true;
     };
 
-    // Group sections by course code (like dashboard does)
-    const uniqueCodes = [...new Set(allSections.map(s => s.course_code))];
-    const isPaired = uniqueCodes.length > 1;
+    // Separate regular courses from explicit OE slots
+    const explicitOEEntries = allSections.filter(e => e.session_type === 'OPEN_ELECTIVE' || e.course_code === 'OPEN_ELEC' || allCourses.find(c => c.course_code === e.course_code)?.is_open_elective);
+    const regularEntries = allSections.filter(e => !explicitOEEntries.includes(e));
+
+    const regularCodes = [...new Set(regularEntries.map(e => e.course_code))];
+    const explicitOECodes = [...new Set(explicitOEEntries.map(e => e.course_code))];
+
+    // Check if any regular course has 'OPEN ELECTIVE' in its name
+    const hasImplicitOE = regularEntries.some(e => e.course_name && e.course_name.toLowerCase().includes('open elective'));
+    const shouldShowOEPlaceholder = hasImplicitOE && explicitOECodes.length === 0;
+
+    // Clean OE text from regular course names
+    const cleanName = (name) => {
+        if (!name) return '';
+        return name.replace(/\s*\/\s*OPEN\s*ELECTIVE\s*/gi, '').trim();
+    };
+
+    const renderCourseBlock = (code, idx, isOEBlock, groupEntries) => {
+        const groupName = cleanName(groupEntries[0]?.course_name || '');
+
+        return (
+            <div key={`${code}-${idx}`} className={`flex flex-col justify-center py-0.5 flex-grow ${idx > 0 || isOEBlock && regularCodes.length > 0 ? 'border-t border-current/15 mt-1 pt-1' : ''}`}>
+                {/* Course code + icon */}
+                {showCourseCode && (
+                    <div className="flex justify-center items-center gap-1">
+                        <span className={`font-bold text-[11px] tracking-tight leading-tight ${isOEBlock ? 'text-teal-800' : ''}`}>{code}</span>
+                        {!isOEBlock && entry.session_type === 'LAB' && isLabStart && idx === 0 && (
+                            <FlaskConical className="w-3 h-3 opacity-40 shrink-0 fill-current" />
+                        )}
+                        {isOEBlock && (
+                            <span className="text-[8px] bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded-full font-semibold border border-teal-200 uppercase tracking-wider ml-1">Open Elec</span>
+                        )}
+                    </div>
+                )}
+
+                {/* Course name */}
+                {showLabels && (
+                    <div className={`text-[9.5px] font-semibold leading-tight text-center px-0.5 my-0.5 opacity-80 ${isOEBlock ? 'text-teal-700' : ''}`}>
+                        {groupName || (isOEBlock ? 'OPEN ELECTIVE' : '')}
+                    </div>
+                )}
+
+                {/* Faculty & Venue inline */}
+                {(showFaculty || showVenues) && groupEntries.length > 1 ? (
+                    <div className="flex flex-col gap-0.5 border-t border-current/10 pt-0.5 mt-0.5">
+                        {groupEntries.map((sec, sIdx) => (
+                            <div key={sIdx} className="flex items-center justify-center gap-1.5 w-full">
+                                {showFaculty && isValidFaculty(sec.faculty_name) && (
+                                    <span className={`text-[8.5px] font-semibold italic opacity-80 whitespace-nowrap ${isOEBlock ? 'text-teal-800' : ''}`}>{sec.faculty_name}</span>
+                                )}
+                                {showVenues && sec.venue_name && (
+                                    <span className={`text-[7.5px] font-bold px-1.5 rounded border shrink-0 whitespace-nowrap ${isOEBlock ? 'text-teal-800 bg-teal-50/80 border-teal-200' : 'text-indigo-700 bg-indigo-50/80 border-indigo-200'}`}>{sec.venue_name}</span>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                ) : (showFaculty || showVenues) ? (
+                    (showFaculty && isValidFaculty(groupEntries[0]?.faculty_name) || showVenues && groupEntries[0]?.venue_name) && (
+                        <div className="flex items-center justify-center gap-1.5 mt-0.5 w-full">
+                            {showFaculty && isValidFaculty(groupEntries[0]?.faculty_name) && (
+                                <span className={`text-[9px] italic font-semibold opacity-80 whitespace-nowrap ${isOEBlock ? 'text-teal-800' : ''}`}>{groupEntries[0].faculty_name}</span>
+                            )}
+                            {showVenues && groupEntries[0]?.venue_name && (
+                                <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded border shrink-0 whitespace-nowrap ${isOEBlock ? 'text-teal-800 bg-teal-50/80 border-teal-200' : 'text-indigo-700 bg-indigo-50/80 border-indigo-200'}`}>{groupEntries[0].venue_name}</span>
+                            )}
+                        </div>
+                    )
+                ) : null}
+            </div>
+        );
+    };
 
     return (
         <div ref={setNodeRef} style={style} {...listeners} {...attributes} onClick={onClick}
@@ -129,65 +197,20 @@ const CellContent = ({ entry, sections, cellId, isLabStart, isSwapMode, isSelect
                     <div className="font-bold text-[10px] uppercase tracking-wider opacity-90">MENTOR</div>
                     <div className="text-[9px] opacity-60 font-medium mt-0.5">Interaction</div>
                 </div>
-            ) : isOE ? (
-                <div className="text-center">
-                    <div className="font-bold text-[10px] uppercase tracking-wider opacity-90">OPEN</div>
-                    <div className="text-[9px] font-medium opacity-60 mt-0.5">Elective</div>
-                </div>
             ) : (
                 <div className="flex flex-col gap-0.5 justify-center h-full w-full">
-                    {uniqueCodes.map((code, idx) => {
-                        const groupEntries = allSections.filter(s => s.course_code === code);
-                        const groupName = groupEntries[0]?.course_name || '';
+                    {/* All regular and explicit OE course entries */}
+                    {regularCodes.map((code, idx) => renderCourseBlock(code, idx, false, regularEntries.filter(s => s.course_code === code)))}
+                    {explicitOECodes.map((code, idx) => renderCourseBlock(code, regularCodes.length + idx, true, explicitOEEntries.filter(s => s.course_code === code)))}
 
-                        return (
-                            <div key={idx} className={`flex flex-col justify-center py-0.5 ${idx > 0 ? 'border-t border-current/15 mt-1 pt-1' : ''}`}>
-                                {/* Course code + lab icon */}
-                                {showCourseCode && (
-                                    <div className="flex justify-center items-center gap-1">
-                                        <span className="font-bold text-[11px] tracking-tight leading-tight">{code}</span>
-                                        {entry.session_type === 'LAB' && isLabStart && idx === 0 && (
-                                            <FlaskConical className="w-3 h-3 opacity-40 shrink-0 fill-current" />
-                                        )}
-                                    </div>
-                                )}
-
-                                {/* Course name */}
-                                {showLabels && (
-                                    <div className="text-[9.5px] font-semibold leading-tight text-center px-0.5 my-0.5 opacity-80">
-                                        {groupName}
-                                    </div>
-                                )}
-
-                                {/* Faculty & Venue inline */}
-                                {(showFaculty || showVenues) && groupEntries.length > 1 ? (
-                                    <div className="flex flex-col gap-0.5 border-t border-current/10 pt-0.5 mt-0.5">
-                                        {groupEntries.map((sec, sIdx) => (
-                                            <div key={sIdx} className="flex items-center justify-center gap-1.5 w-full">
-                                                {showFaculty && isValidFaculty(sec.faculty_name) && (
-                                                    <span className="text-[8.5px] font-semibold italic opacity-80 whitespace-nowrap">{sec.faculty_name}</span>
-                                                )}
-                                                {showVenues && sec.venue_name && (
-                                                    <span className="text-[7.5px] font-bold text-indigo-700 bg-indigo-50/80 px-1.5 rounded border border-indigo-200 shrink-0 whitespace-nowrap">{sec.venue_name}</span>
-                                                )}
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : (showFaculty || showVenues) ? (
-                                    (showFaculty && isValidFaculty(groupEntries[0]?.faculty_name) || showVenues && groupEntries[0]?.venue_name) && (
-                                        <div className="flex items-center justify-center gap-1.5 mt-0.5 w-full">
-                                            {showFaculty && isValidFaculty(groupEntries[0]?.faculty_name) && (
-                                                <span className="text-[9px] italic font-semibold opacity-80 whitespace-nowrap">{groupEntries[0].faculty_name}</span>
-                                            )}
-                                            {showVenues && groupEntries[0]?.venue_name && (
-                                                <span className="text-[8px] font-bold text-indigo-700 bg-indigo-50/80 px-1.5 py-0.5 rounded border border-indigo-200 shrink-0 whitespace-nowrap">{groupEntries[0].venue_name}</span>
-                                            )}
-                                        </div>
-                                    )
-                                ) : null}
+                    {/* Disconnected Open Elective Placeholder (Only if implicit OE but no explicit OE assigned) */}
+                    {shouldShowOEPlaceholder && (
+                        <div className={`flex flex-col justify-center flex-grow bg-teal-50/60 rounded-lg px-2 py-1.5 mt-1 border border-teal-100 ${regularCodes.length > 0 ? '' : 'h-full'}`}>
+                            <div className="flex justify-center items-center">
+                                <span className="text-[9px] bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full font-bold border border-teal-200 uppercase tracking-widest shadow-sm">OPEN ELECTIVE</span>
                             </div>
-                        );
-                    })}
+                        </div>
+                    )}
                 </div>
             )}
         </div>
@@ -224,7 +247,7 @@ const GridCell = ({ id, children, isEmpty, isBreak, isLunch, onCellClick }) => {
 };
 
 // ─── Droppable Grid Cell Span (Preserved Logic) ───
-const DroppableGridCellSpan = ({ id, colSpan, entry, sections, isLabStart, onDelete, isSwapMode, isSelected, onCellClick, showCourseCode, showFaculty, showVenues, showLabels }) => {
+const DroppableGridCellSpan = ({ id, colSpan, entry, sections, isLabStart, onDelete, isSwapMode, isSelected, onCellClick, showCourseCode, showFaculty, showVenues, showLabels, allCourses }) => {
     const { setNodeRef, isOver } = useDroppable({ id });
 
     return (
@@ -250,6 +273,7 @@ const DroppableGridCellSpan = ({ id, colSpan, entry, sections, isLabStart, onDel
                         showFaculty={showFaculty}
                         showVenues={showVenues}
                         showLabels={showLabels}
+                        allCourses={allCourses}
                     />
                     <button onClick={onDelete}
                         className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-rose-500 hover:bg-rose-600 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shadow-lg z-20 scale-75 group-hover:scale-100 cursor-pointer ring-2 ring-white">
@@ -756,7 +780,17 @@ export default function TimetableEditor({ department, semester, onSave, onExport
     }, [entries]);
 
     const filteredCourses = useMemo(() => {
-        let list = allCourses;
+        const dummyOE = {
+            course_code: 'OPEN_ELEC',
+            course_name: 'OPEN ELECTIVE',
+            session_type: 'OPEN_ELECTIVE',
+            is_open_elective: true,
+            is_lab: false
+        };
+
+        // Inject the dummy OE course into the allCourses list
+        let list = [...allCourses, dummyOE];
+
         if (!showTheory) list = list.filter(c => c.is_lab);
         if (!showLabs) list = list.filter(c => !c.is_lab);
         if (searchQuery) {
@@ -1466,6 +1500,7 @@ export default function TimetableEditor({ department, semester, onSave, onExport
                                                         showFaculty={showFaculty}
                                                         showVenues={showVenues}
                                                         showLabels={showLabels}
+                                                        allCourses={allCourses}
                                                     />
                                                 );
                                             })}

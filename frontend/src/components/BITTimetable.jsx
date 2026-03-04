@@ -106,61 +106,85 @@ const BITTimetable = ({ timetableData, department, semester, courses, onRefresh 
                     if (isMentor) bg = '#dbeafe';
 
                     if (cells.length > 0) {
-                        const uniqueCodes = [...new Set(cells.map(c => c.course_code))];
-                        const isPaired = uniqueCodes.length > 1;
-                        const hasMultiple = cells.length > 1;
+                        // Separate regular courses from explicit OE slots
+                        const explicitOEEntries = cells.filter(e => e.session_type === 'OPEN_ELECTIVE' || e.course_code === 'OPEN_ELEC' || courses.find(c => c.course_code === e.course_code)?.is_open_elective);
+                        const regularEntries = cells.filter(e => !explicitOEEntries.includes(e));
+
+                        const regularCodes = [...new Set(regularEntries.map(e => e.course_code))];
+                        const explicitOECodes = [...new Set(explicitOEEntries.map(e => e.course_code))];
+                        const isPaired = (regularCodes.length + explicitOECodes.length) > 1;
+
+                        // Check if any regular course has 'OPEN ELECTIVE' in its name
+                        const hasImplicitOE = regularEntries.some(e => e.course_name && e.course_name.toLowerCase().includes('open elective'));
+                        const shouldShowOEPlaceholder = hasImplicitOE && explicitOECodes.length === 0;
 
                         const deptBadge = isMasterView
                             ? `<span style="font-size:8px;padding:0 4px;border-radius:4px;margin:4px auto 0;background-color:#e5e7eb;font-family:Arial,sans-serif;display:inline-block;">${primaryCell.department_code || ''}</span>`
                             : '';
 
-                        let cellContentStr = '';
-                        // Render completely differently: vertically slice distinct courses
-                        const groupBlocks = uniqueCodes.map((code, idx) => {
-                            const groupEntries = cells.filter(c => c.course_code === code);
-                            const groupName = groupEntries[0]?.course_name || '';
+                        const renderCourseBlock = (code, idx, isOEBlock, groupEntries) => {
+                            let groupName = groupEntries[0]?.course_name || '';
+                            // Clean OE text
+                            groupName = groupName.replace(/\s*\/\s*OPEN\s*ELECTIVE\s*/gi, '').trim();
+
                             const isMiniProject = groupName.toLowerCase().includes('mini project');
 
-                            const codeHTML = showCourseCode ? `<span style="font-weight:bold;font-size:11px;font-family:Arial,sans-serif;letter-spacing:-0.025em;">${code}</span>` : '';
-                            const badgeHTML = getCourseBadge(code, true);
+                            const codeHTML = showCourseCode ? `<span style="font-weight:bold;font-size:11px;font-family:Arial,sans-serif;letter-spacing:-0.025em;${isOEBlock ? 'color:#0f766e;' : ''}">${code}</span>` : '';
+                            const badgeHTML = isOEBlock ? `<span style="font-size:7px;background-color:#ccfbf1;color:#0f766e;padding:1px 4px;border-radius:4px;font-weight:bold;border:1px solid #99f6e4;text-transform:uppercase;letter-spacing:0.05em;margin-left:4px;">Open Elec</span>` : getCourseBadge(code, true);
 
                             let detailsHTML = '';
                             if (!isMiniProject) {
                                 if (groupEntries.length > 1 && !isPaired) {
                                     // Multiple sections of the same exact code
-                                    detailsHTML = `<div style="border-top:1px solid #e5e7eb;margin-top:3px;padding-top:2px;">` + groupEntries.map((c, sIdx) => {
+                                    detailsHTML = `<div style="border-top:1px solid ${isOEBlock ? '#99f6e4' : '#e5e7eb'};margin-top:3px;padding-top:2px;">` + groupEntries.map((c, sIdx) => {
                                         const facHTML = (showFaculty && c.faculty_name && c.faculty_name !== 'Unassigned')
-                                            ? `<span style="font-size:8px;display:block;font-style:italic;color:#4b5563;white-space:nowrap;">${c.faculty_name}</span>`
+                                            ? `<span style="font-size:8px;display:block;font-style:italic;color:${isOEBlock ? '#0f766e' : '#4b5563'};white-space:nowrap;">${c.faculty_name}</span>`
                                             : '';
-                                        const venHTML = (showVenues && c.venue_name) ? `<span style="font-size:7.5px;padding:0 4px;border-radius:3px;margin:1px auto 0;background-color:#e0e7ff;color:#3730a3;font-family:Arial,sans-serif;display:inline-block;font-weight:bold;border:1px solid #c7d2fe;white-space:nowrap;">${c.venue_name}</span>` : '';
+                                        const venHTML = (showVenues && c.venue_name) ? `<span style="font-size:7.5px;padding:0 4px;border-radius:3px;margin:1px auto 0;background-color:${isOEBlock ? '#ccfbf1' : '#e0e7ff'};color:${isOEBlock ? '#0f766e' : '#3730a3'};font-family:Arial,sans-serif;display:inline-block;font-weight:bold;border:1px solid ${isOEBlock ? '#5eead4' : '#c7d2fe'};white-space:nowrap;">${c.venue_name}</span>` : '';
                                         return `<div style="margin-top:2px;">${facHTML}${venHTML}</div>`;
                                     }).join('') + `</div>`;
                                 } else {
                                     // Single section
                                     const c = groupEntries[0];
                                     const facHTML = (showFaculty && c.faculty_name && c.faculty_name !== 'Unassigned')
-                                        ? `<span style="font-size:9px;display:block;font-style:italic;color:#4b5563;white-space:nowrap;">${c.faculty_name}</span>`
+                                        ? `<span style="font-size:9px;display:block;font-style:italic;color:${isOEBlock ? '#0f766e' : '#4b5563'};white-space:nowrap;">${c.faculty_name}</span>`
                                         : '';
-                                    const venHTML = (showVenues && c.venue_name) ? `<span style="font-size:8.5px;padding:0 4px;border-radius:4px;margin:2px auto 0;background-color:#e0e7ff;color:#3730a3;font-family:Arial,sans-serif;display:inline-block;font-weight:bold;border:1px solid #c7d2fe;white-space:nowrap;">${c.venue_name}</span>` : '';
+                                    const venHTML = (showVenues && c.venue_name) ? `<span style="font-size:8.5px;padding:0 4px;border-radius:4px;margin:2px auto 0;background-color:${isOEBlock ? '#ccfbf1' : '#e0e7ff'};color:${isOEBlock ? '#0f766e' : '#3730a3'};font-family:Arial,sans-serif;display:inline-block;font-weight:bold;border:1px solid ${isOEBlock ? '#5eead4' : '#c7d2fe'};white-space:nowrap;">${c.venue_name}</span>` : '';
                                     detailsHTML = `${facHTML}${venHTML}`;
                                 }
                             }
 
                             return `
-                                <div style="display:flex;flex-direction:column;justify-content:center;padding:2px 0;${idx > 0 ? 'border-top:1px solid #d1d5db;margin-top:2px;' : ''}">
+                                <div style="display:flex;flex-direction:column;justify-content:center;padding:2px 0;${idx > 0 || isOEBlock && regularCodes.length > 0 ? 'border-top:1px solid #d1d5db;margin-top:2px;' : ''} flex-grow:1;${isOEBlock ? 'background-color:#f0fdf4;' : ''}">
                                     <div style="display:flex;justify-content:center;align-items:center;">
                                         ${codeHTML} ${badgeHTML}
                                     </div>
-                                    <span style="font-size:10px;font-weight:600;line-height:1.25;display:block;padding:0 4px;">${groupName}</span>
+                                    <span style="font-size:10px;font-weight:600;line-height:1.25;display:block;padding:0 4px; color:${isOEBlock ? '#0d9488' : '#2563eb'};">${groupName || (isOEBlock ? 'OPEN ELECTIVE' : '')}</span>
                                     ${detailsHTML}
                                 </div>
                             `;
-                        });
+                        };
 
-                        cellContentStr = groupBlocks.join('');
+                        let cellContentStr = '';
+                        const regularBlocks = regularCodes.map((code, idx) => renderCourseBlock(code, idx, false, regularEntries.filter(c => c.course_code === code)));
+                        const explicitOEBlocks = explicitOECodes.map((code, idx) => renderCourseBlock(code, regularCodes.length + idx, true, explicitOEEntries.filter(c => c.course_code === code)));
 
-                        return `<td style="border:1px solid black;padding:4px;text-align:center;vertical-align:middle;background-color:${bg};">
-                            <div style="display:flex;flex-direction:column;gap:2px;justify-content:center;height:100%;">
+                        // Append OE Placeholder if needed
+                        let oePlaceholderHTML = '';
+                        if (shouldShowOEPlaceholder) {
+                            oePlaceholderHTML = `
+                                <div style="display:flex;flex-direction:column;justify-content:center;padding:4px 0;${regularCodes.length > 0 ? 'border-top:2px solid #d1d5db;margin-top:2px;' : ''} background-color:#f0fdf4; flex-grow:1;">
+                                    <div style="display:flex;justify-content:center;align-items:center;">
+                                        <span style="font-size:9px;background-color:#ccfbf1;color:#0f766e;padding:2px 6px;border-radius:4px;font-weight:bold;border:1px solid #99f6e4;text-transform:uppercase;letter-spacing:0.1em;box-shadow:0 1px 2px rgba(0,0,0,0.05);">OPEN ELECTIVE</span>
+                                    </div>
+                                </div>
+                            `;
+                        }
+
+                        cellContentStr = regularBlocks.join('') + explicitOEBlocks.join('') + oePlaceholderHTML;
+
+                        return `<td style="border:1px solid black;padding:0;text-align:center;vertical-align:middle;background-color:${bg};">
+                            <div style="display:flex;flex-direction:column;height:100%;min-height:60px;">
                                 ${cellContentStr}
                                 ${deptBadge}
                             </div>
@@ -427,46 +451,69 @@ body { background: white; color: black; font-family: 'Times New Roman', serif; }
 
                                         return (
                                             <td key={i} className="p-1 text-center align-middle" style={{ border: '1px solid #000000', WebkitPrintColorAdjust: 'exact', ...bgStyle }}>
-                                                {cells.length > 0 ? (
-                                                    <div className="flex flex-col gap-0.5 justify-center h-full">
-                                                        <div className="font-bold text-[11px] font-sans tracking-tight flex justify-center items-center flex-wrap gap-1 leading-tight" style={{ color: '#000000' }}>
-                                                            {uniqueCodes.map((code, idx) => {
-                                                                const groupEntries = cells.filter(e => e.course_code === code);
-                                                                const groupName = groupEntries[0]?.course_name || '';
-                                                                const isMiniProject = groupName.toLowerCase().includes('mini project');
+                                                {cells.length > 0 ? (() => {
+                                                    const explicitOEEntries = cells.filter(e => e.session_type === 'OPEN_ELECTIVE' || e.course_code === 'OPEN_ELEC' || courses?.find(c => c.course_code === e.course_code)?.is_open_elective);
+                                                    const regularEntries = cells.filter(e => !explicitOEEntries.includes(e));
 
-                                                                return (
-                                                                    <div key={idx} className={`flex flex-col justify-center flex-grow py-1 ${idx > 0 ? 'border-t border-gray-300 mt-1' : ''}`}>
-                                                                        <div className="font-bold text-[11px] font-sans tracking-tight flex justify-center items-center gap-1 leading-tight" style={{ color: '#000000' }}>
-                                                                            {showCourseCode && <span>{code}</span>}
-                                                                            {getCourseBadge(code, false)}
-                                                                        </div>
-                                                                        <span className="text-[10.5px] font-semibold leading-tight block px-1 font-serif my-0.5" style={{ color: '#000000' }}>{groupName}</span>
+                                                    const regularCodes = [...new Set(regularEntries.map(e => e.course_code))];
+                                                    const explicitOECodes = [...new Set(explicitOEEntries.map(e => e.course_code))];
+                                                    const isPaired = (regularCodes.length + explicitOECodes.length) > 1;
 
-                                                                        {!isMiniProject && (
-                                                                            groupEntries.length > 1 && !isPaired ? (
-                                                                                <div className="flex flex-col gap-0.5 border-t border-gray-200/50 pt-1 mt-0.5">
-                                                                                    {groupEntries.map((e, sIdx) => (
-                                                                                        <div key={sIdx} className="flex flex-col items-center">
-                                                                                            {showFaculty && e.faculty_name && e.faculty_name !== 'Unassigned' && <span className="text-[8.5px] font-semibold italic font-serif opacity-80 whitespace-nowrap" style={{ color: '#4b5563' }}>{e.faculty_name}</span>}
-                                                                                            {showVenues && e.venue_name && <span className="text-[7.5px] px-1 rounded mt-0.5 font-sans font-bold shadow-sm whitespace-nowrap" style={{ backgroundColor: '#e0e7ff', color: '#3730a3', border: '1px solid #c7d2fe' }}>{e.venue_name}</span>}
-                                                                                        </div>
-                                                                                    ))}
+                                                    const hasImplicitOE = regularEntries.some(e => e.course_name && e.course_name.toLowerCase().includes('open elective'));
+                                                    const shouldShowOEPlaceholder = hasImplicitOE && explicitOECodes.length === 0;
+
+                                                    const renderBlock = (code, idx, isOEBlock, groupEntries) => {
+                                                        let groupName = groupEntries[0]?.course_name || '';
+                                                        groupName = groupName.replace(/\s*\/\s*OPEN\s*ELECTIVE\s*/gi, '').trim();
+                                                        const isMiniProject = groupName.toLowerCase().includes('mini project');
+
+                                                        return (
+                                                            <div key={code + idx} className={`flex flex-col justify-center flex-grow py-1 ${idx > 0 || (isOEBlock && regularCodes.length > 0) ? 'border-t border-gray-300 mt-1' : ''} ${isOEBlock ? 'bg-teal-50/50' : ''}`}>
+                                                                <div className="font-bold text-[11px] font-sans tracking-tight flex justify-center items-center gap-1 leading-tight" style={{ color: isOEBlock ? '#0f766e' : '#000000' }}>
+                                                                    {showCourseCode && <span>{code}</span>}
+                                                                    {isOEBlock ? (
+                                                                        <span className="text-[7px] bg-teal-100 text-teal-700 px-1 py-0.5 rounded shadow-sm font-bold border border-teal-200 uppercase tracking-wider ml-1 align-middle whitespace-nowrap">Open Elec</span>
+                                                                    ) : getCourseBadge(code, false)}
+                                                                </div>
+                                                                <span className="text-[10.5px] font-semibold leading-tight block px-1 font-serif my-0.5" style={{ color: isOEBlock ? '#0d9488' : '#000000' }}>{groupName || (isOEBlock ? 'OPEN ELECTIVE' : '')}</span>
+
+                                                                {!isMiniProject && (
+                                                                    groupEntries.length > 1 && !isPaired ? (
+                                                                        <div className="flex flex-col gap-0.5 border-t border-gray-200/50 pt-1 mt-0.5">
+                                                                            {groupEntries.map((e, sIdx) => (
+                                                                                <div key={sIdx} className="flex flex-col items-center">
+                                                                                    {showFaculty && e.faculty_name && e.faculty_name !== 'Unassigned' && <span className="text-[8.5px] font-semibold italic font-serif opacity-80 whitespace-nowrap" style={{ color: isOEBlock ? '#0f766e' : '#4b5563' }}>{e.faculty_name}</span>}
+                                                                                    {showVenues && e.venue_name && <span className="text-[7.5px] px-1 rounded mt-0.5 font-sans font-bold shadow-sm whitespace-nowrap border" style={{ backgroundColor: isOEBlock ? '#ccfbf1' : '#e0e7ff', color: isOEBlock ? '#0f766e' : '#3730a3', borderColor: isOEBlock ? '#5eead4' : '#c7d2fe' }}>{e.venue_name}</span>}
                                                                                 </div>
-                                                                            ) : (
-                                                                                <>
-                                                                                    {showFaculty && groupEntries[0]?.faculty_name && groupEntries[0]?.faculty_name !== 'Unassigned' && <span className="text-[9px] block italic font-serif mt-0.5 whitespace-nowrap" style={{ color: '#4b5563' }}>{groupEntries[0].faculty_name}</span>}
-                                                                                    {showVenues && groupEntries[0]?.venue_name && <span className="text-[8.5px] px-1 rounded mx-auto mt-0.5 font-sans font-bold shadow-sm w-fit whitespace-nowrap" style={{ backgroundColor: '#e0e7ff', color: '#3730a3', border: '1px solid #c7d2fe' }}>{groupEntries[0].venue_name}</span>}
-                                                                                </>
-                                                                            )
-                                                                        )}
+                                                                            ))}
+                                                                        </div>
+                                                                    ) : (
+                                                                        <>
+                                                                            {showFaculty && groupEntries[0]?.faculty_name && groupEntries[0]?.faculty_name !== 'Unassigned' && <span className="text-[9px] block italic font-serif mt-0.5 whitespace-nowrap" style={{ color: isOEBlock ? '#0f766e' : '#4b5563' }}>{groupEntries[0].faculty_name}</span>}
+                                                                            {showVenues && groupEntries[0]?.venue_name && <span className="text-[8.5px] px-1 rounded mx-auto mt-0.5 font-sans font-bold shadow-sm w-fit whitespace-nowrap border" style={{ backgroundColor: isOEBlock ? '#ccfbf1' : '#e0e7ff', color: isOEBlock ? '#0f766e' : '#3730a3', borderColor: isOEBlock ? '#5eead4' : '#c7d2fe' }}>{groupEntries[0].venue_name}</span>}
+                                                                        </>
+                                                                    )
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    };
+
+                                                    return (
+                                                        <div className="flex flex-col gap-0.5 justify-center h-full">
+                                                            {regularCodes.map((code, idx) => renderBlock(code, idx, false, regularEntries.filter(c => c.course_code === code)))}
+                                                            {explicitOECodes.map((code, idx) => renderBlock(code, regularCodes.length + idx, true, explicitOEEntries.filter(c => c.course_code === code)))}
+
+                                                            {shouldShowOEPlaceholder && (
+                                                                <div className={`flex flex-col justify-center flex-grow py-2 ${regularCodes.length > 0 ? 'border-t-2 border-gray-300 mt-1' : ''} bg-teal-50/50`}>
+                                                                    <div className="flex justify-center items-center">
+                                                                        <span className="text-[9px] bg-teal-100 text-teal-700 px-2 py-0.5 rounded shadow-sm font-bold border border-teal-200 uppercase tracking-widest block whitespace-nowrap">OPEN ELECTIVE</span>
                                                                     </div>
-                                                                );
-                                                            })}
+                                                                </div>
+                                                            )}
+                                                            {isMasterView && <span className="text-[8px] px-1 rounded mx-auto mt-1 font-sans" style={{ backgroundColor: '#e5e7eb', color: '#000000' }}>{primaryCell.department_code}</span>}
                                                         </div>
-                                                        {isMasterView && <span className="text-[8px] px-1 rounded mx-auto mt-1 font-sans" style={{ backgroundColor: '#e5e7eb', color: '#000000' }}>{primaryCell.department_code}</span>}
-                                                    </div>
-                                                ) : (
+                                                    );
+                                                })() : (
                                                     <span style={{ color: '#e5e7eb' }}>-</span>
                                                 )}
                                             </td>

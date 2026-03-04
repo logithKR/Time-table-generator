@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { Printer, AlertCircle, Loader2, Download, Search, AlertTriangle } from 'lucide-react';
+import { Printer, AlertCircle, Loader2, Download, Search, AlertTriangle, Layers } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { getDepartments, getStudents, getStudentTimetable } from '../utils/api';
@@ -23,18 +23,14 @@ const StudentTimetable = () => {
     const [searchTerm, setSearchTerm] = useState('');
 
     useEffect(() => {
-        getDepartments().then(res => setDepartments(res.data)).catch(console.error);
+        getDepartments().then(res => {
+            setDepartments(res.data);
+        }).catch(console.error);
     }, []);
 
     useEffect(() => {
-        if (!selectedDept) {
-            setStudents([]);
-            setSelectedStudentId('');
-            setTimetableData(null);
-            return;
-        }
         setLoadingStudents(true);
-        getStudents(selectedDept).then(res => {
+        getStudents(selectedDept || '').then(res => {
             setStudents(res.data);
             setSelectedStudentId('');
             setTimetableData(null);
@@ -155,53 +151,67 @@ const StudentTimetable = () => {
                 }
             `}</style>
 
-            <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-gray-200 no-print">
-                <div className="flex-1 w-full flex flex-wrap gap-3">
-                    <select
-                        value={selectedDept}
-                        onChange={(e) => setSelectedDept(e.target.value)}
-                        className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
-                    >
-                        <option value="">1. Select Department</option>
-                        {departments.map(d => (
-                            <option key={d.department_code} value={d.department_code}>{d.department_code}</option>
-                        ))}
-                    </select>
+            {/* Consistent violet filter bar */}
+            <div className="flex flex-wrap gap-3 items-center bg-violet-50 p-4 rounded-2xl border border-violet-100 shadow-sm no-print">
+                <div className="flex items-center gap-2">
+                    <Layers className="w-4 h-4 text-violet-500" />
+                    <span className="text-sm font-semibold text-violet-700">Filter:</span>
+                </div>
 
-                    <div className="relative flex-1 min-w-[200px]">
-                        <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                {/* Department */}
+                <select
+                    value={selectedDept}
+                    onChange={(e) => setSelectedDept(e.target.value)}
+                    className="p-2.5 border border-violet-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-violet-400 focus:border-violet-400 focus:outline-none shadow-sm font-medium text-gray-700 cursor-pointer transition-all hover:border-violet-300"
+                >
+                    <option value="">All Departments</option>
+                    {departments.map(d => (
+                        <option key={d.department_code} value={d.department_code}>{d.department_code}</option>
+                    ))}
+                </select>
+
+                {/* Search */}
+                <div className="flex-1 min-w-[200px]">
+                    <div className="relative group">
+                        <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-violet-500 transition-colors" />
                         <input
                             type="text"
-                            placeholder="2. Search Students..."
+                            placeholder="Search students by name, ID..."
                             value={searchTerm}
-                            disabled={!selectedDept}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                            className="w-full pl-10 p-2.5 border border-violet-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm placeholder:text-gray-400 font-medium text-gray-700 transition-all hover:border-violet-300"
                         />
                     </div>
+                </div>
 
-                    <select
-                        value={selectedStudentId}
-                        onChange={(e) => setSelectedStudentId(e.target.value)}
-                        disabled={!selectedDept || loadingStudents}
-                        className="w-64 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
-                    >
-                        <option value="">3. Select Student</option>
-                        {filteredStudents.map(s => (
-                            <option key={s.student_id} value={s.student_id}>{s.name} ({s.student_id})</option>
-                        ))}
-                    </select>
-                    {loadingStudents && <Loader2 className="w-6 h-6 text-blue-500 animate-spin mt-2" />}
+                {/* Student Select */}
+                <select
+                    value={selectedStudentId}
+                    onChange={(e) => setSelectedStudentId(e.target.value)}
+                    disabled={loadingStudents}
+                    className="p-2.5 border border-violet-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-violet-400 focus:border-violet-400 focus:outline-none shadow-sm font-medium text-gray-700 cursor-pointer transition-all hover:border-violet-300 max-w-xs disabled:bg-gray-100 disabled:cursor-not-allowed"
+                >
+                    <option value="">Select Student ({filteredStudents.length})</option>
+                    {filteredStudents.map(s => (
+                        <option key={s.student_id} value={s.student_id}>{s.name} ({s.student_id})</option>
+                    ))}
+                </select>
+
+                {loadingStudents && <Loader2 className="w-5 h-5 text-violet-500 animate-spin" />}
+
+                {/* Count */}
+                <div className="text-xs text-violet-600 font-semibold bg-white px-4 py-2.5 rounded-xl border border-violet-100 shadow-sm">
+                    {filteredStudents.length} Students
                 </div>
 
                 {selectedStudentId && timetableData && timetableData.length > 0 && (
-                    <div className="flex justify-start gap-3 w-full xl:w-auto mt-2 xl:mt-0">
-                        <button onClick={handleDownloadPDF} disabled={downloading} className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg shadow hover:bg-emerald-700 transition-colors disabled:opacity-50">
-                            {downloading ? <Loader2 className="animate-spin" size={18} /> : <Download size={18} />}
-                            Download PDF
+                    <div className="flex gap-2">
+                        <button onClick={handleDownloadPDF} disabled={downloading} className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-emerald-200 hover:bg-emerald-700 transition-all disabled:opacity-50">
+                            {downloading ? <Loader2 className="animate-spin" size={16} /> : <Download size={16} />}
+                            PDF
                         </button>
-                        <button onClick={handlePrint} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg shadow hover:bg-blue-700 transition-colors">
-                            <Printer size={18} /> Print
+                        <button onClick={handlePrint} className="flex items-center gap-2 bg-violet-600 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-violet-200 hover:bg-violet-700 transition-all">
+                            <Printer size={16} /> Print
                         </button>
                     </div>
                 )}
@@ -209,13 +219,13 @@ const StudentTimetable = () => {
 
             {loadingTimetable ? (
                 <div className="flex justify-center p-20">
-                    <Loader2 className="w-10 h-10 text-blue-500 animate-spin" />
+                    <Loader2 className="w-10 h-10 text-violet-500 animate-spin" />
                 </div>
             ) : !selectedStudentId ? (
-                <div className="flex flex-col items-center justify-center p-20 bg-white rounded-xl border border-gray-200 shadow-sm">
-                    <AlertCircle className="w-12 h-12 text-gray-300 mb-4" />
+                <div className="flex flex-col items-center justify-center p-20 bg-white rounded-2xl border border-violet-100 shadow-lg shadow-violet-50/50">
+                    <AlertCircle className="w-12 h-12 text-violet-200 mb-4" />
                     <div className="text-gray-500 text-xl font-bold mb-2">No Student Selected</div>
-                    <p className="text-sm text-gray-400">Select a department and then a student to view their exact registered schedule.</p>
+                    <p className="text-sm text-gray-400">Filter by department, then search and select a student to view their schedule.</p>
                 </div>
             ) : conflicts.length > 0 ? (
                 <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-r-lg shadow-sm mb-6 no-print">

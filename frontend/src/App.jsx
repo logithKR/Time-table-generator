@@ -420,46 +420,75 @@ function App() {
                                         return;
                                     }
 
-                                    const uniqueCodes = [...new Set(cellEntries.map(e => e.course_code))];
-                                    const isPaired = uniqueCodes.length > 1;
-                                    const hasMultiple = cellEntries.length > 1;
+                                    // Separate regular courses from explicit OE slots
+                                    const explicitOEEntries = cellEntries.filter(e => e.session_type === 'OPEN_ELECTIVE' || e.course_code === 'OPEN_ELEC' || allCourses.find(c => c.course_code === e.course_code)?.is_open_elective);
+                                    const regularEntries = cellEntries.filter(e => !explicitOEEntries.includes(e));
+
+                                    const regularCodes = [...new Set(regularEntries.map(e => e.course_code))];
+                                    const explicitOECodes = [...new Set(explicitOEEntries.map(e => e.course_code))];
+                                    const isPaired = (regularCodes.length + explicitOECodes.length) > 1;
+
+                                    // Check if any regular course has 'OPEN ELECTIVE' in its name
+                                    const hasImplicitOE = regularEntries.some(e => e.course_name && e.course_name.toLowerCase().includes('open elective'));
+                                    const shouldShowOEPlaceholder = hasImplicitOE && explicitOECodes.length === 0;
+
+                                    // Helper to clean OE from course name
+                                    const cleanCourseName = (name) => {
+                                        if (!name) return '';
+                                        return name.replace(/\s*\/\s*OPEN\s*ELECTIVE\s*/gi, '').trim();
+                                    };
+
+                                    const renderCourseBlock = (code, idx, isOEBlock, groupEntries) => {
+                                        const groupName = cleanCourseName(groupEntries[0]?.course_name || '');
+                                        const isMiniProject = groupName.toLowerCase().includes('mini project');
+
+                                        return (
+                                            <div key={`${code}-${idx}`} className={`p-2 flex flex-col justify-center flex-grow ${idx > 0 || isOEBlock && regularCodes.length > 0 ? 'border-t border-gray-200' : ''} ${isOEBlock ? 'bg-teal-50 hover:bg-teal-100/50' : 'bg-gray-50 hover:bg-blue-50'}`}>
+                                                <div className={`font-bold text-[11px] leading-tight flex justify-center items-center gap-1 flex-wrap ${isOEBlock ? 'text-teal-800' : 'text-blue-800'}`}>
+                                                    {showCourseCode && <span>{code}</span>}
+                                                    {isOEBlock ? (
+                                                        <span className="text-[8px] bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded-full font-semibold border border-teal-200 uppercase tracking-wider">Open Elec</span>
+                                                    ) : (
+                                                        showLabels && getCourseBadge(code)
+                                                    )}
+                                                </div>
+                                                <div className={`text-[9.5px] font-medium leading-tight my-0.5 ${isOEBlock ? 'text-teal-600' : 'text-blue-600'}`}>{groupName || (isOEBlock ? 'OPEN ELECTIVE' : '')}</div>
+
+                                                {!isMiniProject && (
+                                                    groupEntries.length > 1 && !isPaired ? (
+                                                        <div className={`mt-1 flex flex-col gap-0.5 pt-1 border-t ${isOEBlock ? 'border-teal-100' : 'border-blue-50/50'}`}>
+                                                            {groupEntries.map((e, sIdx) => (
+                                                                <div key={sIdx} className={`text-[8.5px] italic leading-tight whitespace-nowrap ${isOEBlock ? 'text-teal-700' : 'text-gray-600'}`}>
+                                                                    {showFaculty && e.faculty_name && e.faculty_name !== 'Unassigned' && <>{e.faculty_name}</>}
+                                                                    {showVenues && e.venue_name && <span className={`ml-1 px-1 rounded font-bold whitespace-nowrap ${isOEBlock ? 'bg-teal-100 border border-teal-200 text-teal-700' : 'bg-indigo-50 border border-indigo-100 text-indigo-600'}`}>{e.venue_name}</span>}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    ) : (
+                                                        <>
+                                                            {showFaculty && groupEntries[0]?.faculty_name && groupEntries[0]?.faculty_name !== 'Unassigned' && <div className={`text-[9px] italic mt-0.5 whitespace-nowrap ${isOEBlock ? 'text-teal-700' : 'text-gray-500'}`}>{groupEntries[0].faculty_name}</div>}
+                                                            {showVenues && groupEntries[0]?.venue_name && <div className={`text-[8.5px] px-1 rounded font-bold mt-0.5 mx-auto w-fit whitespace-nowrap ${isOEBlock ? 'border border-teal-200 bg-teal-100 text-teal-700' : 'border border-indigo-200 bg-indigo-50 text-indigo-700'}`}>{groupEntries[0].venue_name}</div>}
+                                                        </>
+                                                    )
+                                                )}
+                                            </div>
+                                        );
+                                    };
 
                                     cells.push(
                                         <td key={p} className="p-0 border border-gray-300 text-center align-middle hover:bg-blue-50 transition-colors">
                                             <div className="flex flex-col h-full h-auto min-h-[80px]">
-                                                {uniqueCodes.map((code, idx) => {
-                                                    const groupEntries = cellEntries.filter(e => e.course_code === code);
-                                                    const groupName = groupEntries[0]?.course_name || '';
-                                                    const isMiniProject = groupName.toLowerCase().includes('mini project');
+                                                {regularCodes.map((code, idx) => renderCourseBlock(code, idx, false, regularEntries.filter(e => e.course_code === code)))}
+                                                {explicitOECodes.map((code, idx) => renderCourseBlock(code, regularCodes.length + idx, true, explicitOEEntries.filter(e => e.course_code === code)))}
 
-                                                    return (
-                                                        <div key={idx} className={`p-2 flex flex-col justify-center flex-grow ${idx > 0 ? 'border-t border-gray-200 bg-gray-50 hover:bg-blue-50' : ''}`}>
-                                                            <div className="font-bold text-blue-800 text-[11px] leading-tight flex justify-center items-center gap-1 flex-wrap">
-                                                                {showCourseCode && <span>{code}</span>}
-                                                                {showLabels && getCourseBadge(code)}
-                                                            </div>
-                                                            <div className="text-[9.5px] text-blue-600 font-medium leading-tight my-0.5">{groupName}</div>
-
-                                                            {!isMiniProject && (
-                                                                groupEntries.length > 1 && !isPaired ? (
-                                                                    <div className="mt-1 flex flex-col gap-0.5 pt-1 border-t border-blue-50/50">
-                                                                        {groupEntries.map((e, sIdx) => (
-                                                                            <div key={sIdx} className="text-[8.5px] text-gray-600 italic leading-tight whitespace-nowrap">
-                                                                                {showFaculty && e.faculty_name && e.faculty_name !== 'Unassigned' && <>{e.faculty_name}</>}
-                                                                                {showVenues && e.venue_name && <span className="ml-1 px-1 rounded bg-indigo-50 border border-indigo-100 font-bold text-indigo-600 whitespace-nowrap">{e.venue_name}</span>}
-                                                                            </div>
-                                                                        ))}
-                                                                    </div>
-                                                                ) : (
-                                                                    <>
-                                                                        {showFaculty && groupEntries[0]?.faculty_name && groupEntries[0]?.faculty_name !== 'Unassigned' && <div className="text-[9px] text-gray-500 italic mt-0.5 whitespace-nowrap">{groupEntries[0].faculty_name}</div>}
-                                                                        {showVenues && groupEntries[0]?.venue_name && <div className="text-[8.5px] px-1 rounded border border-indigo-200 bg-indigo-50 font-bold text-indigo-700 mt-0.5 mx-auto w-fit whitespace-nowrap">{groupEntries[0].venue_name}</div>}
-                                                                    </>
-                                                                )
-                                                            )}
+                                                {/* Disconnected Open Elective Placeholder */}
+                                                {shouldShowOEPlaceholder && (
+                                                    <div className={`p-2 flex flex-col justify-center flex-grow bg-teal-50 border-t border-teal-100 ${regularCodes.length > 0 ? 'border-t-2 border-t-gray-200' : ''}`}>
+                                                        <div className="flex justify-center items-center">
+                                                            <span className="text-[9px] bg-teal-100 text-teal-700 px-2 py-1 rounded-md font-bold border border-teal-200 uppercase tracking-widest shadow-sm">OPEN ELECTIVE</span>
                                                         </div>
-                                                    );
-                                                })}
+                                                    </div>
+                                                )}
                                             </div>
                                         </td>
                                     );

@@ -496,6 +496,9 @@ const ManualEntryModal = ({ isOpen, onClose, onSave, initialData, allSections, a
                 </div>
                 <div className="flex items-center gap-2">
                     <span className="text-xs font-bold text-violet-600 uppercase tracking-wider">Sections ({groupSections.length})</span>
+                    {groupSections[0]?.session_type === 'LAB' && (
+                        <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full border border-amber-200">LAB · 2 Periods</span>
+                    )}
                     <div className="flex-1 h-px bg-violet-100"></div>
                     <button type="button" onClick={() => addSection(courseCode, courseName)}
                         className="flex items-center gap-1 text-[10px] font-bold text-green-600 hover:text-green-700 bg-green-50 hover:bg-green-100 px-2 py-1 rounded-lg border border-green-200 transition-all">
@@ -1262,7 +1265,7 @@ export default function TimetableEditor({ department, semester, onSave, onExport
             // Step 2: Re-add only the surviving (non-deleted) sections
             sectionEdits.filter(s => !s._deleted).forEach(s => {
                 const base = s._original ? { ...s._original } : {};
-                currentEntries.push({
+                const newEntry = {
                     ...base,
                     department_code: department,
                     semester: parseInt(semester),
@@ -1276,7 +1279,17 @@ export default function TimetableEditor({ department, semester, onSave, onExport
                     day_of_week: day,
                     period_number: period,
                     section_number: s.section_number
-                });
+                };
+                currentEntries.push(newEntry);
+
+                // For LAB entries, also create entry at period+1
+                if ((s.session_type || '').toUpperCase() === 'LAB') {
+                    currentEntries = currentEntries.filter(e =>
+                        !(e.day_of_week === day && e.period_number === period + 1 &&
+                          e.course_code === s.course_code && e.section_number === s.section_number)
+                    );
+                    currentEntries.push({ ...newEntry, period_number: period + 1 });
+                }
             });
         } else {
             // Single-section edit / new entry (original logic)
@@ -1305,6 +1318,12 @@ export default function TimetableEditor({ department, semester, onSave, onExport
             } else {
                 currentEntries = currentEntries.filter(e => !(e.day_of_week === day && e.period_number === period));
                 currentEntries.push(newEntry);
+
+                // For LAB, also place at period+1
+                if (isLab) {
+                    currentEntries = currentEntries.filter(e => !(e.day_of_week === day && e.period_number === period + 1));
+                    currentEntries.push({ ...newEntry, period_number: period + 1 });
+                }
             }
         }
 

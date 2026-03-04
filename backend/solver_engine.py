@@ -928,7 +928,7 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                                 if slot_obj:
                                     entry = models.TimetableEntry(
                                         department_code=department_code, semester=semester,
-                                        course_code=c.course_code, course_name=f"{cname} (Theory)",
+                                        course_code=c.course_code, course_name=f"B{batch_idx+1}: {cname} (Theory)",
                                         faculty_id=fac_assigned[0], faculty_name=fac_assigned[1],
                                         session_type='THEORY',
                                         slot_id=slot_obj.slot_id,
@@ -969,7 +969,7 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                                 if slot_obj:
                                     entry = models.TimetableEntry(
                                         department_code=department_code, semester=semester,
-                                        course_code=c.course_code, course_name=cname,
+                                        course_code=c.course_code, course_name=f"B{batch_idx+1}: {cname}",
                                         faculty_id=fac_assigned[0], faculty_name=fac_assigned[1],
                                         session_type='LAB',
                                         slot_id=slot_obj.slot_id,

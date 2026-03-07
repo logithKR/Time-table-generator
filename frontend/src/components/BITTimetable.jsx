@@ -88,6 +88,39 @@ const BITTimetable = ({ timetableData, department, semester, courses, slots, onR
                 scrollY: -window.scrollY,
                 windowWidth: document.documentElement.scrollWidth,
                 windowHeight: document.documentElement.scrollHeight,
+                onclone: (_clonedDoc, clonedElement) => {
+                    // html2canvas reads computed styles — Tailwind v4 resolves color classes
+                    // like bg-white to oklch() which html2canvas can't parse.
+                    // Fix: read computed styles from ORIGINAL elements, copy safe hex values to clones.
+                    const origEl = componentRef.current;
+                    const origAll = Array.from(origEl.querySelectorAll('*'));
+                    const cloneAll = Array.from(clonedElement.querySelectorAll('*'));
+                    const colorProps = [
+                        'backgroundColor', 'color',
+                        'borderTopColor', 'borderRightColor', 'borderBottomColor', 'borderLeftColor',
+                    ];
+                    const oklchToSafe = (prop, _val) => {
+                        if (prop === 'color') return '#000000';
+                        if (prop === 'backgroundColor') return '#ffffff';
+                        return '#000000';
+                    };
+                    // Fix root cloned element itself
+                    const rootCs = window.getComputedStyle(origEl);
+                    colorProps.forEach(prop => {
+                        const val = rootCs[prop];
+                        if (val && val.includes('oklch')) clonedElement.style[prop] = oklchToSafe(prop, val);
+                    });
+                    // Fix all descendants
+                    origAll.forEach((orig, idx) => {
+                        const clone = cloneAll[idx];
+                        if (!clone) return;
+                        const cs = window.getComputedStyle(orig);
+                        colorProps.forEach(prop => {
+                            const val = cs[prop];
+                            if (val && val.includes('oklch')) clone.style[prop] = oklchToSafe(prop, val);
+                        });
+                    });
+                },
             });
 
             const imgData = canvas.toDataURL('image/png');

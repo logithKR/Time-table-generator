@@ -462,7 +462,10 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                 model.Add(sum(lab_sum) == course_lab_blocks[c.course_code])
 
     if batch_rotation_needed and core_lab_courses:
-        target_blocks = max(course_lab_blocks[c.course_code] for c in core_lab_courses) * merged_batch_count
+        # We only need num_merged_labs × lab_blocks merged slots (one rotation cycle per lab per week).
+        # The extra batch entires (theory fallback for batches > num_labs) are filled in the save phase.
+        num_merged_labs = len(core_lab_courses)
+        target_blocks = max(course_lab_blocks[c.course_code] for c in core_lab_courses) * num_merged_labs
         model.Add(sum(merged_lab_vars.values()) == target_blocks)
 
     # --- C4: Mentor hour blocking ---
@@ -898,98 +901,97 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                             mark_faculty_busy(fac_assigned[0], day, bs + 1)
 
     # --- Save MERGED LAB entries (Batch Rotation) ---
+    # Each merged slot: all merged_batch_count batches rotate through lab courses.
+    # assigned_lab_pairs ensures each (batch, course) gets exactly 1 LAB entry.
+    # If the rotation revisits a (batch, course) pair, it saves a THEORY entry instead.
     if batch_rotation_needed and core_lab_courses:
         core_lab_ordered = sorted(core_lab_courses, key=lambda x: x.course_code)
-        block_index = 0
+        num_labs = len(core_lab_ordered)
+        assigned_lab_pairs = set()  # (batch_idx, course_code) already given a LAB slot
+
+        # Collect solver-chosen merged slots in day/period order
+        chosen_merged_slots = []
         for day in all_days:
             for bs in lab_block_starts:
                 mkey = (day, bs)
                 if mkey in merged_lab_vars and solver.Value(merged_lab_vars[mkey]):
-                    
-                    for batch_idx in range(merged_batch_count):
-                        course_idx = (batch_idx + block_index) % max(len(core_lab_ordered), 1)
-                        if batch_idx >= len(core_lab_ordered):
-                            # FALLBACK: THEORY
-                            c = core_lab_ordered[course_idx]
-                            gc_fac = get_theory_faculty(c.course_code)
-                            cname = course_names.get(c.course_code, c.course_code)
-                            
-                            fac_assigned = None
-                            for fid, fname, dtype in gc_fac:
-                                if is_faculty_free(fid, day, bs) and is_faculty_free(fid, day, bs+1):
-                                    fac_assigned = (fid, fname)
-                                    break
-                            if not fac_assigned and gc_fac:
-                                fac_assigned = (gc_fac[batch_idx % len(gc_fac)][0], gc_fac[batch_idx % len(gc_fac)][1])
-                                generation_warnings.append(
-                                    f"⚠️  {c.course_code} (THEORY FALLBACK) {day} P{bs}-P{bs+1} Sec {batch_idx+1}: "
-                                    f"Reusing faculty {fac_assigned[1]}."
-                                )
-                            elif not fac_assigned:
-                                fac_assigned = (None, 'Unassigned')
-                            
-                            for p in [bs, bs+1]:
-                                c_v = assign_venue(day, p, c.course_code, False, count + batch_idx)
-                                slot_obj = slot_lookup.get((day, p))
-                                if slot_obj:
-                                    entry = models.TimetableEntry(
-                                        department_code=department_code, semester=semester,
-                                        course_code=c.course_code, course_name=f"B{batch_idx+1}: {cname} (Theory)",
-                                        faculty_id=fac_assigned[0], faculty_name=fac_assigned[1],
-                                        session_type='THEORY',
-                                        slot_id=slot_obj.slot_id,
-                                        day_of_week=day, period_number=p,
-                                        venue_name=c_v,
-                                        section_number=batch_idx + 1,
-                                        created_at="now"
-                                    )
-                                    db.add(entry)
-                                    filled_slots.add((day, p))
-                                    count += 1
-                            mark_faculty_busy(fac_assigned[0], day, bs)
-                            mark_faculty_busy(fac_assigned[0], day, bs+1)
-                            
-                        else:
-                            # NORMAL LAB BATCH
-                            c = core_lab_ordered[course_idx]
-                            gc_fac = get_lab_faculty(c.course_code)
-                            cname = course_names.get(c.course_code, c.course_code)
-                            
-                            fac_assigned = None
-                            for fid, fname, dtype in gc_fac:
-                                if is_faculty_free(fid, day, bs) and is_faculty_free(fid, day, bs+1):
-                                    fac_assigned = (fid, fname)
-                                    break
-                            if not fac_assigned and gc_fac:
-                                fac_assigned = (gc_fac[batch_idx % len(gc_fac)][0], gc_fac[batch_idx % len(gc_fac)][1])
-                                generation_warnings.append(
-                                    f"⚠️  {c.course_code} (LAB) {day} P{bs}-P{bs+1} Sec {batch_idx+1}: "
-                                    f"Reusing faculty {fac_assigned[1]}."
-                                )
-                            elif not fac_assigned:
-                                fac_assigned = (None, 'Unassigned')
-                                
-                            for p in [bs, bs+1]:
-                                c_v = assign_venue(day, p, c.course_code, True, count + batch_idx)
-                                slot_obj = slot_lookup.get((day, p))
-                                if slot_obj:
-                                    entry = models.TimetableEntry(
-                                        department_code=department_code, semester=semester,
-                                        course_code=c.course_code, course_name=f"B{batch_idx+1}: {cname}",
-                                        faculty_id=fac_assigned[0], faculty_name=fac_assigned[1],
-                                        session_type='LAB',
-                                        slot_id=slot_obj.slot_id,
-                                        day_of_week=day, period_number=p,
-                                        venue_name=c_v,
-                                        section_number=batch_idx + 1,
-                                        created_at="now"
-                                    )
-                                    db.add(entry)
-                                    filled_slots.add((day, p))
-                                    count += 1
-                            mark_faculty_busy(fac_assigned[0], day, bs)
-                            mark_faculty_busy(fac_assigned[0], day, bs+1)
-                    block_index += 1
+                    chosen_merged_slots.append((day, bs))
+
+        for slot_order, (day, bs) in enumerate(chosen_merged_slots):
+            for batch_idx in range(merged_batch_count):
+                lab_idx = (batch_idx + slot_order) % num_labs
+                c = core_lab_ordered[lab_idx]
+                cname = course_names.get(c.course_code, c.course_code)
+                pair_key = (batch_idx, c.course_code)
+
+                if pair_key not in assigned_lab_pairs:
+                    # First time this batch visits this lab course → LAB session
+                    assigned_lab_pairs.add(pair_key)
+                    gc_fac = get_lab_faculty(c.course_code)
+                    fac_assigned = None
+                    for fid, fname, dtype in gc_fac:
+                        if is_faculty_free(fid, day, bs) and is_faculty_free(fid, day, bs+1):
+                            fac_assigned = (fid, fname)
+                            break
+                    if not fac_assigned and gc_fac:
+                        fac_assigned = (gc_fac[batch_idx % len(gc_fac)][0], gc_fac[batch_idx % len(gc_fac)][1])
+                        generation_warnings.append(f"LAB reuse: {c.course_code} B{batch_idx+1} {day} P{bs}-P{bs+1}")
+                    elif not fac_assigned:
+                        fac_assigned = (None, 'Unassigned')
+                    for p in [bs, bs+1]:
+                        c_v = assign_venue(day, p, c.course_code, True, batch_idx)
+                        slot_obj = slot_lookup.get((day, p))
+                        if slot_obj:
+                            db.add(models.TimetableEntry(
+                                department_code=department_code, semester=semester,
+                                course_code=c.course_code,
+                                course_name=f"B{batch_idx+1}: {cname}",
+                                faculty_id=fac_assigned[0], faculty_name=fac_assigned[1],
+                                session_type='LAB',
+                                slot_id=slot_obj.slot_id,
+                                day_of_week=day, period_number=p,
+                                venue_name=c_v,
+                                section_number=batch_idx + 1,
+                                created_at="now"
+                            ))
+                            filled_slots.add((day, p))
+                            count += 1
+                    mark_faculty_busy(fac_assigned[0], day, bs)
+                    mark_faculty_busy(fac_assigned[0], day, bs+1)
+                else:
+                    # This (batch, lab) already has a LAB. Give theory session instead.
+                    gc_fac = get_theory_faculty(c.course_code)
+                    fac_assigned = None
+                    for fid, fname, dtype in gc_fac:
+                        if is_faculty_free(fid, day, bs) and is_faculty_free(fid, day, bs+1):
+                            fac_assigned = (fid, fname)
+                            break
+                    if not fac_assigned and gc_fac:
+                        fac_assigned = (gc_fac[batch_idx % len(gc_fac)][0], gc_fac[batch_idx % len(gc_fac)][1])
+                    elif not fac_assigned:
+                        fac_assigned = (None, 'Unassigned')
+                    for p in [bs, bs+1]:
+                        c_v = assign_venue(day, p, c.course_code, False, batch_idx)
+                        slot_obj = slot_lookup.get((day, p))
+                        if slot_obj:
+                            db.add(models.TimetableEntry(
+                                department_code=department_code, semester=semester,
+                                course_code=c.course_code,
+                                course_name=f"B{batch_idx+1}: {cname} (Theory)",
+                                faculty_id=fac_assigned[0], faculty_name=fac_assigned[1],
+                                session_type='THEORY',
+                                slot_id=slot_obj.slot_id,
+                                day_of_week=day, period_number=p,
+                                venue_name=c_v,
+                                section_number=batch_idx + 1,
+                                created_at="now"
+                            ))
+                            filled_slots.add((day, p))
+                            count += 1
+                    mark_faculty_busy(fac_assigned[0], day, bs)
+                    mark_faculty_busy(fac_assigned[0], day, bs+1)
+
+
 
     # =========================================================
     # 6. POST-SOLVE: Honours in P8, fill gaps

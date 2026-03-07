@@ -159,19 +159,28 @@ const CellContent = ({ entry, sections, cellId, isLabStart, isSwapMode, isSelect
                     </div>
                 )}
 
-                {/* Faculty & Venue inline */}
+                {/* Faculty & Venue inline — with session-type distinction for mixed blocks */}
                 {(showFaculty || showVenues) && groupEntries.length > 1 ? (
                     <div className="flex flex-col gap-0.5 border-t border-current/10 pt-0.5 mt-0.5">
-                        {groupEntries.map((sec, sIdx) => (
-                            <div key={sIdx} className="flex flex-row items-center justify-center gap-1.5 flex-wrap w-full">
-                                {showFaculty && isValidFaculty(sec.faculty_name) && (
-                                    <span className={`text-[8.5px] font-semibold italic opacity-80 whitespace-nowrap ${isOEBlock ? 'text-teal-800' : ''}`}>{sec.faculty_name}</span>
-                                )}
-                                {showVenues && sec.venue_name && (
-                                    <span className={`text-[7.5px] font-bold px-1.5 rounded border shrink-0 whitespace-nowrap ${isOEBlock ? 'text-teal-800 bg-teal-50/80 border-teal-200' : 'text-indigo-700 bg-indigo-50/80 border-indigo-200'}`}>{sec.venue_name}</span>
-                                )}
-                            </div>
-                        ))}
+                        {groupEntries.map((sec, sIdx) => {
+                            const isTheoryFallback = sec.session_type === 'THEORY' && entry.session_type === 'LAB';
+                            return (
+                                <div key={sIdx} className={`flex flex-row items-center justify-center gap-1 flex-wrap w-full rounded px-0.5 ${isTheoryFallback ? 'bg-blue-50/60' : ''}`}>
+                                    {isTheoryFallback && (
+                                        <span className="text-[7px] font-bold bg-blue-100 text-blue-700 border border-blue-200 px-1 rounded uppercase tracking-wider shrink-0">Theory</span>
+                                    )}
+                                    {showFaculty && isValidFaculty(sec.faculty_name) && (
+                                        <span className={`text-[8.5px] font-semibold italic opacity-90 whitespace-nowrap ${isOEBlock ? 'text-teal-800' : isTheoryFallback ? 'text-blue-800' : ''}`}>{sec.faculty_name}</span>
+                                    )}
+                                    {showVenues && sec.venue_name && (
+                                        <span className={`text-[7.5px] font-bold px-1.5 rounded border shrink-0 whitespace-nowrap ${isOEBlock ? 'text-teal-800 bg-teal-50/80 border-teal-200'
+                                            : isTheoryFallback ? 'text-blue-700 bg-blue-50/80 border-blue-200'
+                                                : 'text-indigo-700 bg-indigo-50/80 border-indigo-200'
+                                            }`}>{sec.venue_name}</span>
+                                    )}
+                                </div>
+                            );
+                        })}
                     </div>
                 ) : (showFaculty || showVenues) ? (
                     (showFaculty && isValidFaculty(groupEntries[0]?.faculty_name) || showVenues && groupEntries[0]?.venue_name) && (
@@ -184,8 +193,9 @@ const CellContent = ({ entry, sections, cellId, isLabStart, isSwapMode, isSelect
                             )}
                         </div>
                     )
-                ) : null}
-            </div>
+                ) : null
+                }
+            </div >
         );
     };
 
@@ -1286,7 +1296,7 @@ export default function TimetableEditor({ department, semester, onSave, onExport
                 if ((s.session_type || '').toUpperCase() === 'LAB') {
                     currentEntries = currentEntries.filter(e =>
                         !(e.day_of_week === day && e.period_number === period + 1 &&
-                          e.course_code === s.course_code && e.section_number === s.section_number)
+                            e.course_code === s.course_code && e.section_number === s.section_number)
                     );
                     currentEntries.push({ ...newEntry, period_number: period + 1 });
                 }

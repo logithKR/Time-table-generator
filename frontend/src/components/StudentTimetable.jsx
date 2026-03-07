@@ -4,7 +4,7 @@ import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { getDepartments, getStudents, getStudentTimetable } from '../utils/api';
 
-const StudentTimetable = () => {
+const StudentTimetable = ({ slots }) => {
     const componentRef = useRef();
     const [downloading, setDownloading] = useState(false);
 
@@ -60,16 +60,20 @@ const StudentTimetable = () => {
         window.print();
     };
 
-    const PERIODS = [
-        { name: 'I', time: '08.45 - 09.45 am' },
-        { name: 'II', time: '09.45 - 10.45 am' },
-        { name: 'III', time: '11.00 - 12.00 pm' },
-        { name: 'IV', time: '12.00 - 01.00 pm' },
-        { name: 'V', time: '02.00 - 03.00 pm' },
-        { name: 'VI', time: '03.00 - 04.00 pm' },
-        { name: 'VII', time: '04.15 - 05.15 pm' },
-        { name: 'VIII', time: '05.15 - 06.15 pm' }
-    ];
+    const PERIODS = slots && slots.length > 0
+        ? slots.filter(s => s.day_of_week === 'Monday' && s.slot_type === 'REGULAR')
+            .sort((a, b) => a.period_number - b.period_number)
+            .map((s, i) => ({ name: ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'][i] || `${i + 1}`, time: `${s.start_time} - ${s.end_time}` }))
+        : [
+            { name: 'I', time: '08.45 - 09.45 am' },
+            { name: 'II', time: '09.45 - 10.45 am' },
+            { name: 'III', time: '11.00 - 12.00 pm' },
+            { name: 'IV', time: '12.00 - 01.00 pm' },
+            { name: 'V', time: '02.00 - 03.00 pm' },
+            { name: 'VI', time: '03.00 - 04.00 pm' },
+            { name: 'VII', time: '04.15 - 05.15 pm' },
+            { name: 'VIII', time: '05.15 - 06.15 pm' }
+        ];
     const DAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 
     const getCellsData = useCallback((day, periodIndex) => {
@@ -99,23 +103,12 @@ const StudentTimetable = () => {
             });
 
             const imgData = canvas.toDataURL('image/png');
-            const pdf = new jsPDF('l', 'mm', 'a4');
-            const pdfWidth = pdf.internal.pageSize.getWidth();
-            const pdfHeight = pdf.internal.pageSize.getHeight();
-            const imgProperties = pdf.getImageProperties(imgData);
-
-            const margin = 10;
-            const availableWidth = pdfWidth - (margin * 2);
-            const availableHeight = pdfHeight - (margin * 2);
-
-            const ratio = Math.min(availableWidth / imgProperties.width, availableHeight / imgProperties.height);
-            const finalWidth = imgProperties.width * ratio;
-            const finalHeight = imgProperties.height * ratio;
-
-            const x = (pdfWidth - finalWidth) / 2;
-            const y = (pdfHeight - finalHeight) / 2;
-
-            pdf.addImage(imgData, 'PNG', x, y, finalWidth, finalHeight);
+            const pdf = new jsPDF({
+                orientation: 'landscape',
+                unit: 'px',
+                format: [canvas.width, canvas.height]
+            });
+            pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
             pdf.save(`Student_Timetable_${selectedStudentId}.pdf`);
         } catch (error) {
             alert(`Failed to generate PDF: ${error.message}`);
@@ -316,12 +309,7 @@ const StudentTimetable = () => {
                             </tbody>
                         </table>
 
-                        <div className="flex justify-between font-bold text-sm px-10 text-gray-800 mt-16 pt-8 border-t border-gray-300 print:mt-16">
-                            <div>STUDENT SIGNATURE</div>
-                            <div>CLASS TUTOR</div>
-                            <div>HoD</div>
-                            <div>PRINCIPAL</div>
-                        </div>
+
                     </div>
                 </div>
             )}

@@ -331,8 +331,8 @@ const ManualEntryModal = ({ isOpen, onClose, onSave, initialData, allSections, a
     React.useEffect(() => {
         if (allSections && allSections.length >= 1) {
             setSectionEdits(allSections.map(s => ({
-                faculty_name: s.faculty_name || '',
-                venue_name: s.venue_name || '',
+                faculty_name: s.faculty_name ? s.faculty_name.trim() : '',
+                venue_name: s.venue_name ? s.venue_name.trim() : '',
                 course_code: s.course_code,
                 course_name: s.course_name,
                 section_number: s.section_number,
@@ -431,16 +431,23 @@ const ManualEntryModal = ({ isOpen, onClose, onSave, initialData, allSections, a
                     <select className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-violet-400 outline-none bg-white cursor-pointer"
                         value={sec.faculty_name} onChange={e => updateSection(actualIdx, 'faculty_name', e.target.value)}>
                         <option value="">-- Select Faculty --</option>
-                        {availableFaculty.map(f => {
-                            const isCurrent = currentFacultyNames.has(f.faculty_name);
-                            const selectable = f.is_available || isCurrent;
-                            return (
-                                <option key={f.faculty_id} value={f.faculty_name} disabled={!selectable}
-                                    style={{ color: isCurrent ? '#7c3aed' : selectable ? '#059669' : '#dc2626' }}>
-                                    {isCurrent ? '★ ' : selectable ? '✓ ' : '✗ '}{f.faculty_name}{isCurrent ? ' (Current)' : !f.is_available ? ' (In Use)' : ''}
-                                </option>
-                            );
-                        })}
+                        {(() => {
+                            // Ensure the currently assigned faculty is always in the list
+                            let displayFaculty = [...availableFaculty];
+                            if (sec.faculty_name && !displayFaculty.find(f => f.faculty_name === sec.faculty_name)) {
+                                displayFaculty.push({ faculty_id: 'auto-' + sec.faculty_name, faculty_name: sec.faculty_name, is_available: false });
+                            }
+                            return displayFaculty.map(f => {
+                                const isCurrent = currentFacultyNames.has(f.faculty_name);
+                                const selectable = f.is_available || isCurrent;
+                                return (
+                                    <option key={f.faculty_id} value={f.faculty_name} disabled={!selectable}
+                                        style={{ color: isCurrent ? '#7c3aed' : selectable ? '#059669' : '#dc2626' }}>
+                                        {isCurrent ? '★ ' : selectable ? '✓ ' : '✗ '}{f.faculty_name}{isCurrent ? ' (Current)' : !f.is_available ? ' (In Use)' : ''}
+                                    </option>
+                                );
+                            });
+                        })()}
                     </select>
                 )}
             </div>
@@ -467,16 +474,23 @@ const ManualEntryModal = ({ isOpen, onClose, onSave, initialData, allSections, a
                     <select className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-violet-400 outline-none bg-white cursor-pointer"
                         value={sec.venue_name} onChange={e => updateSection(actualIdx, 'venue_name', e.target.value)}>
                         <option value="">-- Select Venue --</option>
-                        {availableVenues.map(v => {
-                            const isCurrent = currentVenueNames.has(v.venue_name);
-                            const selectable = v.is_available || isCurrent;
-                            return (
-                                <option key={v.venue_id} value={v.venue_name} disabled={!selectable}
-                                    style={{ color: isCurrent ? '#7c3aed' : selectable ? '#059669' : '#dc2626' }}>
-                                    {isCurrent ? '★ ' : selectable ? '✓ ' : '✗ '}{v.venue_name}{v.capacity ? ` (${v.capacity})` : ''}{v.is_lab ? ' [Lab]' : ''}{isCurrent ? ' (Current)' : !v.is_available ? ' (In Use)' : ''}
-                                </option>
-                            );
-                        })}
+                        {(() => {
+                            // Ensure the currently assigned venue is always in the list
+                            let displayVenues = [...availableVenues];
+                            if (sec.venue_name && !displayVenues.find(v => v.venue_name === sec.venue_name)) {
+                                displayVenues.push({ venue_id: 'auto-' + sec.venue_name, venue_name: sec.venue_name, is_available: false });
+                            }
+                            return displayVenues.map(v => {
+                                const isCurrent = currentVenueNames.has(v.venue_name);
+                                const selectable = v.is_available || isCurrent;
+                                return (
+                                    <option key={v.venue_id} value={v.venue_name} disabled={!selectable}
+                                        style={{ color: isCurrent ? '#7c3aed' : selectable ? '#059669' : '#dc2626' }}>
+                                        {isCurrent ? '★ ' : selectable ? '✓ ' : '✗ '}{v.venue_name}{v.capacity ? ` (${v.capacity})` : ''}{v.is_lab ? ' [Lab]' : ''}{isCurrent ? ' (Current)' : !v.is_available ? ' (In Use)' : ''}
+                                    </option>
+                                );
+                            });
+                        })()}
                     </select>
                 )}
             </div>
@@ -1420,47 +1434,7 @@ export default function TimetableEditor({ department, semester, onSave, onExport
                     </button>
                 </div>
 
-                {/* ─── COURSE PALETTE (ELEGANT) ─── */}
-                <div className="bg-white border-b border-gray-100 px-8 py-5 flex-shrink-0 z-10 sticky top-0 shadow-sm">
-                    <div className="flex items-center gap-6 mb-4">
-                        <div className="flex items-center gap-2.5 text-xs font-extra-bold text-gray-400 uppercase tracking-widest">
-                            <Palette className="w-4 h-4 text-violet-400" /> Palette
-                        </div>
 
-                        <div className="h-6 w-px bg-violet-100"></div>
-
-                        <select value={paletteDept} onChange={e => setPaletteDept(e.target.value)}
-                            className="text-sm border border-gray-200 rounded-lg px-4 py-2 bg-gray-50/50 hover:bg-white focus:ring-2 focus:ring-violet-400 focus:outline-none font-semibold text-gray-700 shadow-sm transition-all cursor-pointer">
-                            {departments.map(d => <option key={d} value={d}>{d}</option>)}
-                        </select>
-                        <div className="relative flex-1 max-w-sm group">
-                            <Search className="absolute left-3.5 top-2.5 w-4 h-4 text-gray-400 group-focus-within:text-violet-500 transition-colors" />
-                            <input type="text" placeholder="Search courses..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-                                className="w-full pl-10 pr-9 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-violet-100 focus:border-violet-300 focus:outline-none shadow-sm transition-all placeholder:text-gray-400 font-medium text-gray-700" />
-                            {searchQuery && <button onClick={() => setSearchQuery('')} className="absolute right-3 top-2.5"><X className="w-4 h-4 text-gray-300 hover:text-gray-500 transition-colors" /></button>}
-                        </div>
-
-                        <div className="flex items-center gap-1.5 ml-auto bg-gray-50 p-1.5 rounded-xl border border-gray-100 shadow-inner">
-                            <button onClick={() => setShowTheory(!showTheory)}
-                                className={`text-[11px] px-4 py-1.5 rounded-lg font-bold transition-all ${showTheory ? 'bg-white text-violet-700 shadow-sm ring-1 ring-violet-100' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'}`}>
-                                Theory
-                            </button>
-                            <button onClick={() => setShowLabs(!showLabs)}
-                                className={`text-[11px] px-4 py-1.5 rounded-lg font-bold transition-all ${showLabs ? 'bg-white text-amber-700 shadow-sm ring-1 ring-amber-100' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'}`}>
-                                Labs
-                            </button>
-                        </div>
-                    </div>
-                    {/* Course Chips */}
-                    <div className="flex gap-3 overflow-x-auto pb-4 pt-1 px-1 scrollbar-thin scrollbar-thumb-violet-100 scrollbar-track-transparent hover:scrollbar-thumb-violet-200 transition-all">
-                        {filteredCourses.map(c => (
-                            <CourseChip key={c.course_code} course={c}
-                                colorStyle={c.is_lab ? LAB_STYLE : THEORY_STYLE}
-                                facultyName={facultyMap[c.course_code]}
-                                venueName={venueMap[c.course_code]} />
-                        ))}
-                    </div>
-                </div>
 
                 {/* ─── MODE BANNERS ─── */}
                 {isSwapMode && (

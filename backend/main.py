@@ -411,11 +411,9 @@ def get_available_faculty(
     period: int,
     db: Session = Depends(get_db)
 ):
-    """Return faculty from the given department who are NOT busy at this day+period across all depts/sems."""
-    # All faculty in the department
-    all_faculty = db.query(models.FacultyMaster).filter(
-        models.FacultyMaster.department_code == department_code
-    ).all()
+    """Return faculty who are NOT busy at this day+period across all depts/sems."""
+    # All faculty across all departments
+    all_faculty = db.query(models.FacultyMaster).all()
 
     # All faculty_names busy at this exact slot (across ALL departments and semesters)
     busy_names = set()
@@ -450,23 +448,9 @@ def get_available_venues(
     period: int,
     db: Session = Depends(get_db)
 ):
-    """Return venues mapped to this dept+semester that are NOT used at this day+period across all depts/sems."""
-    # Get venue IDs mapped to this department + semester
-    dept_venue_ids = [
-        dv.venue_id for dv in
-        db.query(models.DepartmentVenueMap).filter(
-            models.DepartmentVenueMap.department_code == department_code,
-            models.DepartmentVenueMap.semester == semester
-        ).all()
-    ]
-
-    if not dept_venue_ids:
-        return []
-
-    # Get the actual venue objects
-    venues = db.query(models.VenueMaster).filter(
-        models.VenueMaster.venue_id.in_(dept_venue_ids)
-    ).all()
+    """Return venues that are NOT used at this day+period across all depts/sems."""
+    # Get all venues
+    venues = db.query(models.VenueMaster).all()
 
     # All venue_names busy at this exact slot (across ALL departments and semesters)
     busy_venue_names = set()

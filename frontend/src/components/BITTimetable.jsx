@@ -3,7 +3,7 @@ import { Printer, AlertCircle, RefreshCw, Download, Loader2 } from 'lucide-react
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 
-const BITTimetable = ({ timetableData, department, semester, courses, onRefresh }) => {
+const BITTimetable = ({ timetableData, department, semester, courses, slots, onRefresh }) => {
     const componentRef = useRef();
     const [downloading, setDownloading] = useState(false);
 
@@ -17,23 +17,31 @@ const BITTimetable = ({ timetableData, department, semester, courses, onRefresh 
         window.print();
     };
 
-    // --- Data Setup (must be before hooks that depend on it) ---
-    const PERIODS = [
-        { name: 'I', time: '08.45 - 09.45 am' },
-        { name: 'II', time: '09.45 - 10.45 am' },
-        { name: 'III', time: '11.00 - 12.00 pm' },
-        { name: 'IV', time: '12.00 - 01.00 pm' },
-        { name: 'V', time: '02.00 - 03.00 pm' },
-        { name: 'VI', time: '03.00 - 04.00 pm' },
-        { name: 'VII', time: '04.15 - 05.15 pm' },
-        { name: 'VIII', time: '05.15 - 06.15 pm' }
-    ];
+    // --- Data Setup ---
+    const PERIODS = slots && slots.length > 0
+        ? slots.filter(s => s.day_of_week === 'Monday' && s.slot_type === 'REGULAR')
+            .sort((a, b) => a.period_number - b.period_number)
+            .map((s, i) => ({ name: ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'][i] || `${i + 1}`, time: `${s.start_time} - ${s.end_time}` }))
+        : [
+            { name: 'I', time: '08.45 - 09.45' },
+            { name: 'II', time: '09.45 - 10.45' },
+            { name: 'III', time: '11.00 - 12.00' },
+            { name: 'IV', time: '12.00 - 01.00' },
+            { name: 'V', time: '02.00 - 03.00' },
+            { name: 'VI', time: '03.00 - 04.00' },
+            { name: 'VII', time: '04.15 - 05.15' },
+            { name: 'VIII', time: '05.15 - 06.15' }
+        ];
     const DAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
-    const BREAKS = [
-        { name: 'Morning Break', time: '10.45 am - 11.00 am' },
-        { name: 'Lunch Break', time: '01.00 pm - 02.00 pm' },
-        { name: 'Evening Break', time: '04.00 pm - 04.15 pm' }
-    ];
+    const BREAKS = slots && slots.length > 0
+        ? slots.filter(s => s.day_of_week === 'Monday' && s.slot_type !== 'REGULAR')
+            .sort((a, b) => a.start_time.localeCompare(b.start_time))
+            .map(s => ({ name: s.slot_type === 'LUNCH' ? 'Lunch Break' : s.slot_type || 'Break', time: `${s.start_time} - ${s.end_time}` }))
+        : [
+            { name: 'Morning Break', time: '10.45 - 11.00' },
+            { name: 'Lunch Break', time: '01.00 - 02.00' },
+            { name: 'Evening Break', time: '04.00 - 04.15' }
+        ];
 
     const uniqueDepts = [...new Set((timetableData || []).map(t => t.department_code))];
     const isMasterView = uniqueDepts.length > 1 || (!department && (timetableData || []).length > 0);
@@ -54,249 +62,41 @@ const BITTimetable = ({ timetableData, department, semester, courses, onRefresh 
         );
     }, [timetableData]);
 
-    const getCourseBadge = useCallback((courseCode, isPdf = false) => {
-        if (!courses) return isPdf ? '' : null;
+    const getCourseBadge = useCallback((courseCode) => {
+        if (!courses) return null;
         const course = courses.find(c => c.course_code === courseCode);
-        if (!course) return isPdf ? '' : null;
+        if (!course) return null;
+        if (!showLabels) return null;
+        if (course.is_honours) return <span className="text-[7.5px] bg-purple-100 text-purple-700 px-1 py-0.5 rounded shadow-sm font-bold border border-purple-200 uppercase tracking-wider ml-1 align-middle">Honours</span>;
+        if (course.is_minor) return <span className="text-[7.5px] bg-indigo-100 text-indigo-700 px-1 py-0.5 rounded shadow-sm font-bold border border-indigo-200 uppercase tracking-wider ml-1 align-middle">Minor</span>;
+        if (course.is_elective) return <span className="text-[7.5px] bg-green-100 text-green-700 px-1 py-0.5 rounded shadow-sm font-bold border border-green-200 uppercase tracking-wider ml-1 align-middle">Elective</span>;
+        return null;
+    }, [courses, showLabels]);
 
-        if (isPdf) {
-            if (!showLabels) return '';
-            if (course.is_honours) return `<span style="font-size:7px;background-color:#f3e8ff;color:#7e22ce;padding:1px 3px;border-radius:2px;border:1px solid #e9d5ff;margin-left:3px;text-transform:uppercase;letter-spacing:0.05em;display:inline-block;vertical-align:middle;">Honours</span>`;
-            if (course.is_minor) return `<span style="font-size:7px;background-color:#e0e7ff;color:#4338ca;padding:1px 3px;border-radius:2px;border:1px solid #c7d2fe;margin-left:3px;text-transform:uppercase;letter-spacing:0.05em;display:inline-block;vertical-align:middle;">Minor</span>`;
-            if (course.is_elective) return `<span style="font-size:7px;background-color:#dcfce7;color:#15803d;padding:1px 3px;border-radius:2px;border:1px solid #bbf7d0;margin-left:3px;text-transform:uppercase;letter-spacing:0.05em;display:inline-block;vertical-align:middle;">Elective</span>`;
-        } else {
-            if (!showLabels) return null;
-            if (course.is_honours) return <span className="text-[7.5px] bg-purple-100 text-purple-700 px-1 py-0.5 rounded shadow-sm font-bold border border-purple-200 uppercase tracking-wider ml-1 align-middle">Honours</span>;
-            if (course.is_minor) return <span className="text-[7.5px] bg-indigo-100 text-indigo-700 px-1 py-0.5 rounded shadow-sm font-bold border border-indigo-200 uppercase tracking-wider ml-1 align-middle">Minor</span>;
-            if (course.is_elective) return <span className="text-[7.5px] bg-green-100 text-green-700 px-1 py-0.5 rounded shadow-sm font-bold border border-green-200 uppercase tracking-wider ml-1 align-middle">Elective</span>;
-        }
-        return isPdf ? '' : null;
-    }, [courses]);
-
-    // --- PDF Download: render in isolated iframe, capture, remove ---
+    // --- PDF Download: capture the on-screen timetable directly (screenshot quality) ---
     const handleDownloadPDF = useCallback(async () => {
         if (!timetableData || timetableData.length === 0) return;
+        if (!componentRef.current) return;
         setDownloading(true);
         try {
-            // Build breaks HTML
-            const breaksHTML = BREAKS.map(b => `
-                <div style="display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid black;height:32px;align-items:center;">
-                    <div style="padding:4px;text-align:center;border-right:1px solid black;">${b.name}</div>
-                    <div style="padding:4px;text-align:center;font-family:Arial,sans-serif;">${b.time}</div>
-                </div>
-            `).join('');
-
-            // Build period headers
-            const periodsHeaderHTML = PERIODS.map(p => `
-                <th style="border:1px solid black;padding:8px;height:40px;">
-                    <span style="font-size:14px;">${p.name}</span><br/>
-                    <span style="font-weight:normal;font-size:10px;font-family:Arial,sans-serif;">${p.time}</span>
-                </th>
-            `).join('');
-
-            // Build table rows
-            const rowsHTML = DAYS.map(day => {
-                const cellsHTML = PERIODS.map((p, i) => {
-                    const cells = getCellsData(day, i);
-                    const primaryCell = cells[0];
-                    const isLab = primaryCell && (primaryCell.session_type === 'LAB' || primaryCell.session_type === 'Lab');
-                    const isMentor = primaryCell && (primaryCell.session_type === 'MENTOR' || primaryCell.session_type === 'Mentor');
-                    let bg = '#ffffff';
-                    if (isLab) bg = '#fefce8';
-                    if (isMentor) bg = '#dbeafe';
-
-                    if (cells.length > 0) {
-                        // Separate regular courses from explicit OE slots
-                        const explicitOEEntries = cells.filter(e => e.session_type === 'OPEN_ELECTIVE' || e.course_code === 'OPEN_ELEC' || courses.find(c => c.course_code === e.course_code)?.is_open_elective);
-                        const regularEntries = cells.filter(e => !explicitOEEntries.includes(e));
-
-                        const regularCodes = [...new Set(regularEntries.map(e => e.course_code))];
-                        const explicitOECodes = [...new Set(explicitOEEntries.map(e => e.course_code))];
-                        const isPaired = (regularCodes.length + explicitOECodes.length) > 1;
-
-                        // Check if any regular course has 'OPEN ELECTIVE' in its name
-                        const hasImplicitOE = regularEntries.some(e => e.course_name && e.course_name.toLowerCase().includes('open elective'));
-                        const shouldShowOEPlaceholder = hasImplicitOE && explicitOECodes.length === 0;
-
-                        const deptBadge = isMasterView
-                            ? `<span style="font-size:8px;padding:0 4px;border-radius:4px;margin:4px auto 0;background-color:#e5e7eb;font-family:Arial,sans-serif;display:inline-block;">${primaryCell.department_code || ''}</span>`
-                            : '';
-
-                        const renderCourseBlock = (code, idx, isOEBlock, groupEntries) => {
-                            let groupName = groupEntries[0]?.course_name || '';
-                            // Clean OE text
-                            groupName = groupName.replace(/\s*\/\s*OPEN\s*ELECTIVE\s*/gi, '').trim();
-
-                            const isMiniProject = groupName.toLowerCase().includes('mini project');
-
-                            const codeHTML = showCourseCode ? `<span style="font-weight:bold;font-size:11px;font-family:Arial,sans-serif;letter-spacing:-0.025em;${isOEBlock ? 'color:#0f766e;' : ''}">${code}</span>` : '';
-                            const badgeHTML = isOEBlock ? `<span style="font-size:7px;background-color:#ccfbf1;color:#0f766e;padding:1px 4px;border-radius:4px;font-weight:bold;border:1px solid #99f6e4;text-transform:uppercase;letter-spacing:0.05em;margin-left:4px;">Open Elec</span>` : getCourseBadge(code, true);
-
-                            let detailsHTML = '';
-                            if (!isMiniProject) {
-                                if (groupEntries.length > 1 && !isPaired) {
-                                    // Multiple sections of the same exact code
-                                    detailsHTML = `<div style="border-top:1px solid ${isOEBlock ? '#99f6e4' : '#e5e7eb'};margin-top:3px;padding-top:2px;">` + groupEntries.map((c, sIdx) => {
-                                        const facHTML = (showFaculty && c.faculty_name && c.faculty_name !== 'Unassigned')
-                                            ? `<span style="font-size:8px;display:block;font-style:italic;color:${isOEBlock ? '#0f766e' : '#4b5563'};white-space:nowrap;">${c.faculty_name}</span>`
-                                            : '';
-                                        const venHTML = (showVenues && c.venue_name) ? `<span style="font-size:7.5px;padding:0 4px;border-radius:3px;margin:1px auto 0;background-color:${isOEBlock ? '#ccfbf1' : '#e0e7ff'};color:${isOEBlock ? '#0f766e' : '#3730a3'};font-family:Arial,sans-serif;display:inline-block;font-weight:bold;border:1px solid ${isOEBlock ? '#5eead4' : '#c7d2fe'};white-space:nowrap;">${c.venue_name}</span>` : '';
-                                        return `<div style="margin-top:2px;">${facHTML}${venHTML}</div>`;
-                                    }).join('') + `</div>`;
-                                } else {
-                                    // Single section
-                                    const c = groupEntries[0];
-                                    const facHTML = (showFaculty && c.faculty_name && c.faculty_name !== 'Unassigned')
-                                        ? `<span style="font-size:9px;display:block;font-style:italic;color:${isOEBlock ? '#0f766e' : '#4b5563'};white-space:nowrap;">${c.faculty_name}</span>`
-                                        : '';
-                                    const venHTML = (showVenues && c.venue_name) ? `<span style="font-size:8.5px;padding:0 4px;border-radius:4px;margin:2px auto 0;background-color:${isOEBlock ? '#ccfbf1' : '#e0e7ff'};color:${isOEBlock ? '#0f766e' : '#3730a3'};font-family:Arial,sans-serif;display:inline-block;font-weight:bold;border:1px solid ${isOEBlock ? '#5eead4' : '#c7d2fe'};white-space:nowrap;">${c.venue_name}</span>` : '';
-                                    detailsHTML = `${facHTML}${venHTML}`;
-                                }
-                            }
-
-                            return `
-                                <div style="display:flex;flex-direction:column;justify-content:center;padding:2px 0;${idx > 0 || isOEBlock && regularCodes.length > 0 ? 'border-top:1px solid #d1d5db;margin-top:2px;' : ''} flex-grow:1;${isOEBlock ? 'background-color:#f0fdf4;' : ''}">
-                                    <div style="display:flex;justify-content:center;align-items:center;">
-                                        ${codeHTML} ${badgeHTML}
-                                    </div>
-                                    <span style="font-size:10px;font-weight:600;line-height:1.25;display:block;padding:0 4px; color:${isOEBlock ? '#0d9488' : '#2563eb'};">${groupName || (isOEBlock ? 'OPEN ELECTIVE' : '')}</span>
-                                    ${detailsHTML}
-                                </div>
-                            `;
-                        };
-
-                        let cellContentStr = '';
-                        const regularBlocks = regularCodes.map((code, idx) => renderCourseBlock(code, idx, false, regularEntries.filter(c => c.course_code === code)));
-                        const explicitOEBlocks = explicitOECodes.map((code, idx) => renderCourseBlock(code, regularCodes.length + idx, true, explicitOEEntries.filter(c => c.course_code === code)));
-
-                        // Append OE Placeholder if needed
-                        let oePlaceholderHTML = '';
-                        if (shouldShowOEPlaceholder) {
-                            oePlaceholderHTML = `
-                                <div style="display:flex;flex-direction:column;justify-content:center;padding:4px 0;${regularCodes.length > 0 ? 'border-top:2px solid #d1d5db;margin-top:2px;' : ''} background-color:#f0fdf4; flex-grow:1;">
-                                    <div style="display:flex;justify-content:center;align-items:center;">
-                                        <span style="font-size:9px;background-color:#ccfbf1;color:#0f766e;padding:2px 6px;border-radius:4px;font-weight:bold;border:1px solid #99f6e4;text-transform:uppercase;letter-spacing:0.1em;box-shadow:0 1px 2px rgba(0,0,0,0.05);">OPEN ELECTIVE</span>
-                                    </div>
-                                </div>
-                            `;
-                        }
-
-                        cellContentStr = regularBlocks.join('') + explicitOEBlocks.join('') + oePlaceholderHTML;
-
-                        return `<td style="border:1px solid black;padding:0;text-align:center;vertical-align:middle;background-color:${bg};">
-                            <div style="display:flex;flex-direction:column;height:100%;min-height:60px;">
-                                ${cellContentStr}
-                                ${deptBadge}
-                            </div>
-                        </td>`;
-                    } else {
-                        return `<td style="border:1px solid black;padding:4px;text-align:center;vertical-align:middle;background-color:${bg};"><span style="color:#e5e7eb;">-</span></td>`;
-                    }
-                }).join('');
-
-                return `<tr style="height:96px;">
-                    <td style="border:1px solid black;font-weight:bold;text-align:center;font-size:18px;background-color:#f9fafb;letter-spacing:0.1em;">${day}</td>
-                    ${cellsHTML}
-                </tr>`;
-            }).join('');
-
-            const fullHTML = `<!DOCTYPE html>
-<html><head><meta charset="utf-8"><style>
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body { background: white; color: black; font-family: 'Times New Roman', serif; }
-</style></head>
-<body>
-<div id="capture-root" style="width:1123px;padding:40px;background:white;">
-    <div style="display:flex;border:2px solid black;border-bottom:none;">
-        <div style="flex-grow:1;text-align:center;display:flex;flex-direction:column;justify-content:center;">
-            <h1 style="margin:4px 0;font-size:24px;font-weight:bold;">BANNARI AMMAN INSTITUTE OF TECHNOLOGY</h1>
-            <h2 style="margin:4px 0;font-size:20px;font-weight:bold;">SATHYAMANGALAM</h2>
-            <h3 style="margin:4px 0;font-size:16px;font-weight:bold;">CLASS TIMETABLE</h3>
-            <div style="margin:4px 0;font-size:14px;font-family:Arial,sans-serif;font-weight:bold;">ACADEMIC YEAR 2025 - 2026</div>
-        </div>
-        <div style="width:320px;font-size:12px;font-weight:bold;border-left:2px solid black;">
-            <div style="display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid black;background-color:#f9fafb;">
-                <div style="padding:4px;text-align:center;border-right:1px solid black;">Breaks</div>
-                <div style="padding:4px;text-align:center;">Timings</div>
-            </div>
-            ${breaksHTML}
-        </div>
-    </div>
-    <div style="display:flex;border:2px solid black;border-top:none;border-bottom:none;font-size:18px;font-weight:bold;">
-        <div style="flex-grow:1;padding:8px;text-align:center;text-transform:uppercase;letter-spacing:0.05em;">
-            DEPARTMENT OF ${deptName}
-        </div>
-    </div>
-    <div style="display:flex;border:2px solid black;border-bottom:none;font-weight:bold;text-align:center;">
-        <div style="width:100px;padding:8px;border-right:1px solid black;background-color:#f9fafb;">Year</div>
-        <div style="flex-grow:1;padding:8px;border-right:1px solid black;font-size:20px;font-family:Arial,sans-serif;">III</div>
-        <div style="width:150px;padding:8px;border-right:1px solid black;background-color:#f9fafb;">Semester</div>
-        <div style="width:100px;padding:8px;font-size:20px;font-family:Arial,sans-serif;">${semNum}</div>
-    </div>
-    <table style="width:100%;border-collapse:collapse;border:2px solid black;font-size:12px;">
-        <thead>
-            <tr>
-                <th style="border:1px solid black;padding:8px;width:120px;height:40px;background-color:#f9fafb;">Day / Period</th>
-                ${periodsHeaderHTML}
-            </tr>
-        </thead>
-        <tbody>${rowsHTML}</tbody>
-    </table>
-    <div style="margin-top:32px;display:flex;justify-content:space-between;font-weight:bold;font-size:14px;padding:0 40px;">
-        <div>HoD</div>
-        <div>PRINCIPAL</div>
-    </div>
-</div>
-</body></html>`;
-
-            // 1. Create hidden iframe (completely isolated from Tailwind)
-            const iframe = document.createElement('iframe');
-            iframe.style.cssText = 'position:fixed;top:0;left:0;width:1250px;height:1000px;opacity:0;pointer-events:none;z-index:-1;border:none;';
-            document.body.appendChild(iframe);
-
-            // 2. Write clean HTML into the iframe
-            const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
-            iframeDoc.open();
-            iframeDoc.write(fullHTML);
-            iframeDoc.close();
-
-            // 3. Wait for paint
-            await new Promise(resolve => setTimeout(resolve, 1000));
-
-            // 4. Capture from the iframe
-            const captureElement = iframeDoc.getElementById('capture-root');
-            if (!captureElement) throw new Error('Could not find capture element in iframe');
-
-            const canvas = await html2canvas(captureElement, {
-                scale: 2,
+            const canvas = await html2canvas(componentRef.current, {
+                scale: 3,
                 useCORS: true,
                 logging: false,
                 backgroundColor: '#ffffff',
-                windowWidth: 1250,
-                windowHeight: 1000,
+                scrollX: 0,
+                scrollY: -window.scrollY,
+                windowWidth: document.documentElement.scrollWidth,
+                windowHeight: document.documentElement.scrollHeight,
             });
 
-            // 5. Remove iframe
-            document.body.removeChild(iframe);
-
-            // 6. Generate PDF
             const imgData = canvas.toDataURL('image/png');
-            const pdf = new jsPDF('l', 'mm', 'a4');
-            const pdfWidth = pdf.internal.pageSize.getWidth();
-            const pdfHeight = pdf.internal.pageSize.getHeight();
-            const imgProperties = pdf.getImageProperties(imgData);
-            const margin = 10;
-            const availableWidth = pdfWidth - (margin * 2);
-            const availableHeight = pdfHeight - (margin * 2);
-            const widthRatio = availableWidth / imgProperties.width;
-            const heightRatio = availableHeight / imgProperties.height;
-            const ratio = Math.min(widthRatio, heightRatio);
-            const finalWidth = imgProperties.width * ratio;
-            const finalHeight = imgProperties.height * ratio;
-            const x = (pdfWidth - finalWidth) / 2;
-            const y = (pdfHeight - finalHeight) / 2;
-
-            pdf.addImage(imgData, 'PNG', x, y, finalWidth, finalHeight);
+            const pdf = new jsPDF({
+                orientation: canvas.width > canvas.height ? 'landscape' : 'portrait',
+                unit: 'px',
+                format: [canvas.width, canvas.height]
+            });
+            pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
             pdf.save(`Timetable_${department || 'Master'}_${semester || 'All'}.pdf`);
         } catch (error) {
             console.error("PDF Generation failed:", error);
@@ -304,7 +104,7 @@ body { background: white; color: black; font-family: 'Times New Roman', serif; }
         } finally {
             setDownloading(false);
         }
-    }, [timetableData, department, semester, isMasterView, deptName, semNum, getCellsData, getCourseBadge]);
+    }, [timetableData, department, semester, componentRef]);
 
     // --- SAFETY CHECK ---
     if (!timetableData || timetableData.length === 0) {
@@ -323,29 +123,29 @@ body { background: white; color: black; font-family: 'Times New Roman', serif; }
     }
 
     return (
-        <div className="p-4 bg-gray-100 min-h-screen font-serif">
-            {/* CSS for Print Formatting */}
+        <div className="bg-white min-h-screen" style={{ fontFamily: 'Arial, sans-serif' }}>
+            {/* CSS for Print */}
             <style>{`
                 @media print {
                     body * { visibility: hidden; }
                     #printable-content, #printable-content * { visibility: visible; }
-                    #printable-content { 
-                        position: absolute; 
-                        left: 0; 
-                        top: 0; 
-                        width: 100% !important; 
+                    #printable-content {
+                        position: fixed;
+                        inset: 0;
+                        width: 100vw !important;
+                        height: 100vh !important;
                         max-width: none !important;
-                        margin: 0; 
-                        padding: 5mm;
-                        transform: scale(0.95);
-                        transform-origin: top left;
+                        margin: 0 !important;
+                        padding: 4mm !important;
+                        box-sizing: border-box;
                     }
-                    .no-print, button, .sidebar, header, .glass-card { display: none !important; }
+                    .no-print, button { display: none !important; }
                     @page { size: landscape; margin: 0; }
                 }
             `}</style>
 
-            <div className="flex flex-col sm:flex-row justify-between gap-4 mb-4 dont-print no-print">
+            {/* Controls */}
+            <div className="flex flex-col sm:flex-row justify-between gap-4 mb-4 no-print" style={{ fontFamily: 'Arial, sans-serif' }}>
                 <div className="flex flex-wrap gap-3 bg-white p-2 border border-gray-200 rounded-lg shadow-sm text-xs">
                     <span className="font-semibold text-gray-600 flex items-center pr-2 border-r border-gray-200">View Options:</span>
                     <label className="flex items-center gap-1.5 cursor-pointer hover:text-blue-600 transition-colors">
@@ -365,7 +165,6 @@ body { background: white; color: black; font-family: 'Times New Roman', serif; }
                         Venues
                     </label>
                 </div>
-
                 <div className="flex gap-4">
                     <button onClick={handleDownloadPDF} disabled={downloading} className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded shadow hover:bg-emerald-700 font-sans transition-all disabled:opacity-50">
                         {downloading ? <Loader2 className="animate-spin" size={20} /> : <Download size={20} />}
@@ -377,156 +176,181 @@ body { background: white; color: black; font-family: 'Times New Roman', serif; }
                 </div>
             </div>
 
-            <div className="mx-auto shadow-lg max-w-[1400px] mb-8 bg-white print:shadow-none print:w-full print:max-w-none">
-                <div id="printable-content" ref={componentRef} className="w-full" style={{ minHeight: '210mm', padding: '10mm', backgroundColor: '#ffffff' }}>
+            {/* Printable Content */}
+            <div className="w-full bg-white print:shadow-none">
+                <div id="printable-content" ref={componentRef} className="w-full" style={{ backgroundColor: '#ffffff', padding: '6mm' }}>
                     {/* Header */}
                     <div className="flex" style={{ border: '2px solid #000000', borderBottom: 'none' }}>
                         <div className="flex-grow text-center">
-                            <div className="h-full flex flex-col justify-center">
-                                <h1 className="font-bold text-xl py-1 font-serif tracking-wide" style={{ color: '#000000' }}>BANNARI AMMAN INSTITUTE OF TECHNOLOGY</h1>
-                                <h2 className="font-bold text-lg py-1 font-serif tracking-wide" style={{ color: '#000000' }}>SATHYAMANGALAM</h2>
-                                <h3 className="font-bold text-md py-1 font-serif tracking-wide" style={{ color: '#000000' }}>CLASS TIMETABLE</h3>
-                                <div className="font-bold text-sm py-1 font-sans" style={{ color: '#000000' }}>ACADEMIC YEAR 2025 - 2026</div>
+                            <div className="h-full flex flex-col justify-center py-1">
+                                <h1 className="font-bold text-xl py-0.5 tracking-wide" style={{ color: '#000000', fontFamily: 'Arial, sans-serif' }}>BANNARI AMMAN INSTITUTE OF TECHNOLOGY</h1>
+                                <h2 className="font-bold text-base py-0.5 tracking-wide" style={{ color: '#000000', fontFamily: 'Arial, sans-serif' }}>SATHYAMANGALAM</h2>
+                                <h3 className="font-bold text-sm py-0.5 tracking-wide" style={{ color: '#000000', fontFamily: 'Arial, sans-serif' }}>CLASS TIMETABLE</h3>
+                                <div className="font-bold text-xs py-0.5" style={{ color: '#000000', fontFamily: 'Arial, sans-serif' }}>ACADEMIC YEAR 2025 - 2026</div>
                             </div>
                         </div>
-                        <div className="w-80 text-xs font-bold" style={{ borderLeft: '2px solid #000000' }}>
-                            <div className="grid grid-cols-2" style={{ borderBottom: '1px solid #000000', backgroundColor: '#f9fafb' }}>
-                                <div className="p-1 text-center font-serif" style={{ borderRight: '1px solid #000000', color: '#000000' }}>Breaks</div>
-                                <div className="p-1 text-center font-serif" style={{ color: '#000000' }}>Timings</div>
+                        <div className="w-72 text-xs font-bold" style={{ borderLeft: '2px solid #000000' }}>
+                            <div className="grid grid-cols-2" style={{ borderBottom: '1px solid #000000', backgroundColor: '#f3f4f6' }}>
+                                <div className="p-1 text-center" style={{ borderRight: '1px solid #000000', color: '#000000', fontFamily: 'Arial, sans-serif' }}>Breaks</div>
+                                <div className="p-1 text-center" style={{ color: '#000000', fontFamily: 'Arial, sans-serif' }}>Timings</div>
                             </div>
                             {BREAKS.map((b, i) => (
-                                <div key={i} className="grid grid-cols-2 h-8 items-center" style={{ borderBottom: '1px solid #000000' }}>
-                                    <div className="p-1 text-center font-serif" style={{ borderRight: '1px solid #000000', color: '#000000' }}>{b.name}</div>
-                                    <div className="p-1 text-center font-sans" style={{ color: '#000000' }}>{b.time}</div>
+                                <div key={i} className="grid grid-cols-2 items-center" style={{ borderBottom: '1px solid #000000', minHeight: '28px' }}>
+                                    <div className="p-1 text-center text-[10px]" style={{ borderRight: '1px solid #000000', color: '#000000', fontFamily: 'Arial, sans-serif' }}>{b.name}</div>
+                                    <div className="p-1 text-center text-[10px]" style={{ color: '#000000', fontFamily: 'Arial, sans-serif' }}>{b.time}</div>
                                 </div>
                             ))}
                         </div>
                     </div>
 
-                    {/* Status Bar */}
-                    <div className="flex text-lg font-bold" style={{ border: '2px solid #000000', borderTop: 'none', borderBottom: 'none' }}>
-                        <div className="flex-grow p-2 text-center uppercase font-serif tracking-wider" style={{ backgroundColor: '#ffffff', color: '#000000' }}>
+                    {/* Department bar */}
+                    <div className="flex text-base font-bold" style={{ border: '2px solid #000000', borderTop: 'none', borderBottom: 'none', fontFamily: 'Arial, sans-serif' }}>
+                        <div className="flex-grow p-1.5 text-center uppercase tracking-wider" style={{ backgroundColor: '#ffffff', color: '#000000' }}>
                             DEPARTMENT OF {deptName}
                         </div>
                     </div>
 
                     {/* Sem Row */}
-                    <div className="flex font-bold text-center" style={{ border: '2px solid #000000', borderBottom: 'none' }}>
-                        <div className="w-24 p-2 font-serif" style={{ borderRight: '1px solid #000000', backgroundColor: '#f9fafb', color: '#000000' }}>Year</div>
-                        <div className="flex-grow p-2 text-xl font-sans" style={{ borderRight: '1px solid #000000', backgroundColor: '#ffffff', color: '#000000' }}>III</div>
-                        <div className="w-32 p-2 font-serif" style={{ borderRight: '1px solid #000000', backgroundColor: '#f9fafb', color: '#000000' }}>Semester</div>
-                        <div className="w-24 p-2 text-xl font-sans" style={{ color: '#000000' }}>{semNum}</div>
+                    <div className="flex font-bold text-center text-sm" style={{ border: '2px solid #000000', borderBottom: 'none', fontFamily: 'Arial, sans-serif' }}>
+                        <div className="w-20 p-1.5" style={{ borderRight: '1px solid #000000', backgroundColor: '#f3f4f6', color: '#000000' }}>Year</div>
+                        <div className="flex-grow p-1.5 text-lg" style={{ borderRight: '1px solid #000000', backgroundColor: '#ffffff', color: '#000000' }}>III</div>
+                        <div className="w-28 p-1.5" style={{ borderRight: '1px solid #000000', backgroundColor: '#f3f4f6', color: '#000000' }}>Semester</div>
+                        <div className="w-20 p-1.5 text-lg" style={{ color: '#000000' }}>{semNum}</div>
                     </div>
 
                     {/* Main Table */}
-                    <table className="w-full border-collapse text-xs" style={{ border: '2px solid #000000' }}>
+                    <table className="w-full border-collapse" style={{ border: '2px solid #000000', fontFamily: 'Arial, sans-serif', fontSize: '11px' }}>
                         <thead>
                             <tr>
-                                <th className="p-2 w-28 h-10 font-serif" style={{ border: '1px solid #000000', backgroundColor: '#f9fafb', color: '#000000' }}>Day / Period</th>
-                                {PERIODS.map((p, i) => (
-                                    <th key={i} className="p-2 h-10" style={{ border: '1px solid #000000', color: '#000000' }}>
-                                        <span className="font-serif text-sm">{p.name}</span><br />
-                                        <span className="font-normal text-[10px] font-sans">{p.time}</span>
-                                    </th>
-                                ))}
+                                <th style={{ border: '1px solid #000000', padding: '6px 4px', backgroundColor: '#f3f4f6', color: '#000000', width: '70px', textAlign: 'center' }}>Day</th>
+                                {(() => {
+                                    const headers = [];
+                                    PERIODS.forEach((p, i) => {
+                                        headers.push(
+                                            <th key={`p-${i}`} style={{ border: '1px solid #000000', padding: '4px 2px', textAlign: 'center', color: '#000000', minWidth: '90px' }}>
+                                                <div style={{ fontWeight: 'bold', fontSize: '12px' }}>{p.name}</div>
+                                                <div style={{ fontWeight: 'normal', fontSize: '9px', color: '#6b7280' }}>{p.time}</div>
+                                            </th>
+                                        );
+                                        const afterPeriod = i + 1;
+                                        const breakAfter = BREAKS.find((b, bi) => {
+                                            if (slots && slots.length > 0) {
+                                                const thisPeriodSlot = slots.find(s => s.day_of_week === 'Monday' && s.slot_type === 'REGULAR' && s.period_number === afterPeriod);
+                                                const nextBreak = slots.filter(s => s.day_of_week === 'Monday' && s.slot_type !== 'REGULAR').sort((a, b2) => a.start_time.localeCompare(b2.start_time))[bi];
+                                                return thisPeriodSlot && nextBreak && nextBreak.start_time === thisPeriodSlot.end_time;
+                                            }
+                                            return (bi === 0 && afterPeriod === 2) || (bi === 1 && afterPeriod === 4) || (bi === 2 && afterPeriod === 6);
+                                        });
+                                        if (breakAfter) {
+                                            headers.push(
+                                                <th key={`b-${i}`} style={{ border: '1px solid #000000', padding: '4px 2px', textAlign: 'center', backgroundColor: '#f3f4f6', color: '#6b7280', width: '55px', writingMode: 'vertical-rl', fontSize: '9px', fontWeight: 'bold' }}>
+                                                    {breakAfter.name}<br /><span style={{ fontSize: '8px', fontWeight: 'normal', writingMode: 'horizontal-tb' }}>{breakAfter.time}</span>
+                                                </th>
+                                            );
+                                        }
+                                    });
+                                    return headers;
+                                })()}
                             </tr>
                         </thead>
                         <tbody>
-                            {DAYS.map((day) => (
-                                <tr key={day} className="h-24">
-                                    <td className="font-bold text-center text-lg font-serif tracking-widest" style={{ border: '1px solid #000000', backgroundColor: '#f9fafb', color: '#000000' }}>{day}</td>
-                                    {PERIODS.map((p, i) => {
-                                        const cells = getCellsData(day, i);
-                                        const primaryCell = cells[0];
-                                        const isLab = primaryCell && (primaryCell.session_type === 'LAB' || primaryCell.session_type === 'Lab');
-                                        const isMentor = primaryCell && (primaryCell.session_type === 'MENTOR' || primaryCell.session_type === 'Mentor');
+                            {DAYS.map((day) => {
+                                let skipNext = false;
+                                const cells_row = [];
 
-                                        let bgStyle = { backgroundColor: '#ffffff' };
-                                        if (isLab) bgStyle = { backgroundColor: '#fefce8' };
-                                        if (isMentor) bgStyle = { backgroundColor: '#dbeafe' };
+                                PERIODS.forEach((p, i) => {
+                                    if (i > 0) {
+                                        const prevPeriodNum = i;
+                                        const breakHere = BREAKS.find((b, bi) => {
+                                            if (slots && slots.length > 0) {
+                                                const prevSlot = slots.find(s => s.day_of_week === 'Monday' && s.slot_type === 'REGULAR' && s.period_number === prevPeriodNum);
+                                                const nextBreak = slots.filter(s => s.day_of_week === 'Monday' && s.slot_type !== 'REGULAR').sort((a, b2) => a.start_time.localeCompare(b2.start_time))[bi];
+                                                return prevSlot && nextBreak && nextBreak.start_time === prevSlot.end_time;
+                                            }
+                                            return (bi === 0 && prevPeriodNum === 2) || (bi === 1 && prevPeriodNum === 4) || (bi === 2 && prevPeriodNum === 6);
+                                        });
+                                        if (breakHere) {
+                                            cells_row.push(
+                                                <td key={`br-${i}`} style={{ border: '1px solid #000000', backgroundColor: '#f9fafb', textAlign: 'center', verticalAlign: 'middle', width: '55px' }}>
+                                                    <span style={{ fontSize: '14px', color: '#9ca3af' }}>☕</span>
+                                                </td>
+                                            );
+                                        }
+                                    }
 
-                                        const uniqueCodes = [...new Set(cells.map(c => c.course_code))];
-                                        const isPaired = uniqueCodes.length > 1;
-                                        const hasMultiple = cells.length > 1;
+                                    if (skipNext) { skipNext = false; return; }
 
-                                        return (
-                                            <td key={i} className="p-1 text-center align-middle" style={{ border: '1px solid #000000', WebkitPrintColorAdjust: 'exact', ...bgStyle }}>
-                                                {cells.length > 0 ? (() => {
-                                                    const explicitOEEntries = cells.filter(e => e.session_type === 'OPEN_ELECTIVE' || e.course_code === 'OPEN_ELEC' || courses?.find(c => c.course_code === e.course_code)?.is_open_elective);
-                                                    const regularEntries = cells.filter(e => !explicitOEEntries.includes(e));
+                                    const cells = getCellsData(day, i);
+                                    const primaryCell = cells[0];
+                                    const isLab = primaryCell && (primaryCell.session_type === 'LAB' || primaryCell.session_type === 'Lab');
+                                    const isMentor = primaryCell && (primaryCell.session_type === 'MENTOR' || primaryCell.session_type === 'Mentor');
 
-                                                    const regularCodes = [...new Set(regularEntries.map(e => e.course_code))];
-                                                    const explicitOECodes = [...new Set(explicitOEEntries.map(e => e.course_code))];
-                                                    const isPaired = (regularCodes.length + explicitOECodes.length) > 1;
+                                    let colSpan = 1;
+                                    if (isLab && i < PERIODS.length - 1) {
+                                        const nextCells = getCellsData(day, i + 1);
+                                        if (nextCells.length > 0 && (nextCells[0].session_type === 'LAB' || nextCells[0].session_type === 'Lab')) {
+                                            const curCodes = [...new Set(cells.map(c => c.course_code))].sort().join(',');
+                                            const nxtCodes = [...new Set(nextCells.map(c => c.course_code))].sort().join(',');
+                                            if (curCodes === nxtCodes) { colSpan = 2; skipNext = true; }
+                                        }
+                                    }
 
-                                                    const hasImplicitOE = regularEntries.some(e => e.course_name && e.course_name.toLowerCase().includes('open elective'));
-                                                    const shouldShowOEPlaceholder = hasImplicitOE && explicitOECodes.length === 0;
+                                    let bgColor = '#ffffff';
+                                    if (isLab) bgColor = '#fefce8';
+                                    if (isMentor) bgColor = '#dbeafe';
 
-                                                    const renderBlock = (code, idx, isOEBlock, groupEntries) => {
-                                                        let groupName = groupEntries[0]?.course_name || '';
-                                                        groupName = groupName.replace(/\s*\/\s*OPEN\s*ELECTIVE\s*/gi, '').trim();
-                                                        const isMiniProject = groupName.toLowerCase().includes('mini project');
+                                    if (cells.length > 0) {
+                                        const explicitOEEntries = cells.filter(e => e.session_type === 'OPEN_ELECTIVE' || e.course_code === 'OPEN_ELEC' || courses?.find(c => c.course_code === e.course_code)?.is_open_elective);
+                                        const regularEntries = cells.filter(e => !explicitOEEntries.includes(e));
+                                        const regularCodes = [...new Set(regularEntries.map(e => e.course_code))];
+                                        const explicitOECodes = [...new Set(explicitOEEntries.map(e => e.course_code))];
+                                        const hasImplicitOE = regularEntries.some(e => e.course_name && e.course_name.toLowerCase().includes('open elective'));
+                                        const shouldShowOEPlaceholder = hasImplicitOE && explicitOECodes.length === 0;
 
-                                                        return (
-                                                            <div key={code + idx} className={`flex flex-col justify-center flex-grow py-1 ${idx > 0 || (isOEBlock && regularCodes.length > 0) ? 'border-t border-gray-300 mt-1' : ''} ${isOEBlock ? 'bg-teal-50/50' : ''}`}>
-                                                                <div className="font-bold text-[11px] font-sans tracking-tight flex justify-center items-center gap-1 leading-tight" style={{ color: isOEBlock ? '#0f766e' : '#000000' }}>
-                                                                    {showCourseCode && <span>{code}</span>}
-                                                                    {isOEBlock ? (
-                                                                        <span className="text-[7px] bg-teal-100 text-teal-700 px-1 py-0.5 rounded shadow-sm font-bold border border-teal-200 uppercase tracking-wider ml-1 align-middle whitespace-nowrap">Open Elec</span>
-                                                                    ) : getCourseBadge(code, false)}
-                                                                </div>
-                                                                <span className="text-[10.5px] font-semibold leading-tight block px-1 font-serif my-0.5" style={{ color: isOEBlock ? '#0d9488' : '#000000' }}>{groupName || (isOEBlock ? 'OPEN ELECTIVE' : '')}</span>
-
-                                                                {!isMiniProject && (
-                                                                    groupEntries.length > 1 && !isPaired ? (
-                                                                        <div className="flex flex-col gap-0.5 border-t border-gray-200/50 pt-1 mt-0.5">
-                                                                            {groupEntries.map((e, sIdx) => (
-                                                                                <div key={sIdx} className="flex flex-col items-center">
-                                                                                    {showFaculty && e.faculty_name && e.faculty_name !== 'Unassigned' && <span className="text-[8.5px] font-semibold italic font-serif opacity-80 whitespace-nowrap" style={{ color: isOEBlock ? '#0f766e' : '#4b5563' }}>{e.faculty_name}</span>}
-                                                                                    {showVenues && e.venue_name && <span className="text-[7.5px] px-1 rounded mt-0.5 font-sans font-bold shadow-sm whitespace-nowrap border" style={{ backgroundColor: isOEBlock ? '#ccfbf1' : '#e0e7ff', color: isOEBlock ? '#0f766e' : '#3730a3', borderColor: isOEBlock ? '#5eead4' : '#c7d2fe' }}>{e.venue_name}</span>}
-                                                                                </div>
-                                                                            ))}
-                                                                        </div>
-                                                                    ) : (
-                                                                        <>
-                                                                            {showFaculty && groupEntries[0]?.faculty_name && groupEntries[0]?.faculty_name !== 'Unassigned' && <span className="text-[9px] block italic font-serif mt-0.5 whitespace-nowrap" style={{ color: isOEBlock ? '#0f766e' : '#4b5563' }}>{groupEntries[0].faculty_name}</span>}
-                                                                            {showVenues && groupEntries[0]?.venue_name && <span className="text-[8.5px] px-1 rounded mx-auto mt-0.5 font-sans font-bold shadow-sm w-fit whitespace-nowrap border" style={{ backgroundColor: isOEBlock ? '#ccfbf1' : '#e0e7ff', color: isOEBlock ? '#0f766e' : '#3730a3', borderColor: isOEBlock ? '#5eead4' : '#c7d2fe' }}>{groupEntries[0].venue_name}</span>}
-                                                                        </>
-                                                                    )
-                                                                )}
-                                                            </div>
-                                                        );
-                                                    };
-
-                                                    return (
-                                                        <div className="flex flex-col gap-0.5 justify-center h-full">
-                                                            {regularCodes.map((code, idx) => renderBlock(code, idx, false, regularEntries.filter(c => c.course_code === code)))}
-                                                            {explicitOECodes.map((code, idx) => renderBlock(code, regularCodes.length + idx, true, explicitOEEntries.filter(c => c.course_code === code)))}
-
-                                                            {shouldShowOEPlaceholder && (
-                                                                <div className={`flex flex-col justify-center flex-grow py-2 ${regularCodes.length > 0 ? 'border-t-2 border-gray-300 mt-1' : ''} bg-teal-50/50`}>
-                                                                    <div className="flex justify-center items-center">
-                                                                        <span className="text-[9px] bg-teal-100 text-teal-700 px-2 py-0.5 rounded shadow-sm font-bold border border-teal-200 uppercase tracking-widest block whitespace-nowrap">OPEN ELECTIVE</span>
-                                                                    </div>
-                                                                </div>
-                                                            )}
-                                                            {isMasterView && <span className="text-[8px] px-1 rounded mx-auto mt-1 font-sans" style={{ backgroundColor: '#e5e7eb', color: '#000000' }}>{primaryCell.department_code}</span>}
+                                        const renderBlock = (code, idx, isOEBlock, groupEntries) => {
+                                            let groupName = groupEntries[0]?.course_name || '';
+                                            groupName = groupName.replace(/\s*\/\s*OPEN\s*ELECTIVE\s*/gi, '').trim();
+                                            const isMiniProject = groupName.toLowerCase().includes('mini project');
+                                            return (
+                                                <div key={code + idx} style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '2px 0', borderTop: idx > 0 || (isOEBlock && regularCodes.length > 0) ? '1px solid #d1d5db' : 'none', marginTop: idx > 0 ? '2px' : 0, flexGrow: 1 }}>
+                                                    {showCourseCode && <div style={{ fontWeight: 'bold', fontSize: '11px', color: isOEBlock ? '#0f766e' : '#000000' }}>{code}{getCourseBadge(code)}</div>}
+                                                    <div style={{ fontWeight: '600', fontSize: '10px', lineHeight: 1.2, color: isOEBlock ? '#0d9488' : '#000000' }}>{groupName || (isOEBlock ? 'OPEN ELECTIVE' : '')}</div>
+                                                    {!isMiniProject && groupEntries.map((e, sIdx) => (
+                                                        <div key={sIdx}>
+                                                            {showFaculty && e.faculty_name && e.faculty_name !== 'Unassigned' && <div style={{ fontSize: '9px', fontStyle: 'italic', color: '#4b5563' }}>{e.faculty_name}</div>}
+                                                            {showVenues && e.venue_name && <div style={{ fontSize: '8.5px', color: '#3730a3', background: '#e0e7ff', borderRadius: '3px', padding: '0 3px', display: 'inline-block', border: '1px solid #c7d2fe', marginTop: '1px' }}>{e.venue_name}</div>}
                                                         </div>
-                                                    );
-                                                })() : (
-                                                    <span style={{ color: '#e5e7eb' }}>-</span>
-                                                )}
+                                                    ))}
+                                                </div>
+                                            );
+                                        };
+
+                                        cells_row.push(
+                                            <td key={i} colSpan={colSpan} style={{ border: '1px solid #000000', padding: '2px', textAlign: 'center', verticalAlign: 'middle', backgroundColor: bgColor, height: '80px' }}>
+                                                <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100%' }}>
+                                                    {regularCodes.map((code, idx) => renderBlock(code, idx, false, regularEntries.filter(c => c.course_code === code)))}
+                                                    {explicitOECodes.map((code, idx) => renderBlock(code, regularCodes.length + idx, true, explicitOEEntries.filter(c => c.course_code === code)))}
+                                                    {shouldShowOEPlaceholder && <div style={{ fontSize: '9px', color: '#0f766e', background: '#ccfbf1', borderRadius: '4px', padding: '2px 6px', margin: '2px auto', fontWeight: 'bold', border: '1px solid #99f6e4' }}>OPEN ELECTIVE</div>}
+                                                    {isMasterView && primaryCell && <div style={{ fontSize: '8px', background: '#e5e7eb', borderRadius: '3px', padding: '0 3px', marginTop: '2px', display: 'inline-block' }}>{primaryCell.department_code}</div>}
+                                                </div>
                                             </td>
                                         );
-                                    })}
-                                </tr>
-                            ))}
+                                    } else {
+                                        cells_row.push(
+                                            <td key={i} colSpan={colSpan} style={{ border: '1px solid #000000', textAlign: 'center', verticalAlign: 'middle', backgroundColor: bgColor, height: '80px', color: '#d1d5db' }}>-</td>
+                                        );
+                                    }
+                                });
+
+                                return (
+                                    <tr key={day}>
+                                        <td style={{ border: '1px solid #000000', fontWeight: 'bold', textAlign: 'center', fontSize: '14px', backgroundColor: '#f3f4f6', color: '#000000', letterSpacing: '0.1em' }}>{day}</td>
+                                        {cells_row}
+                                    </tr>
+                                );
+                            })}
                         </tbody>
                     </table>
-                    <div className="mt-8 flex justify-between font-bold text-sm px-10 font-serif" style={{ color: '#000000' }}>
-                        <div>HoD</div>
-                        <div>PRINCIPAL</div>
-                    </div>
                 </div>
             </div>
         </div>

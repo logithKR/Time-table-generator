@@ -1331,8 +1331,8 @@ function App() {
                         {activeTab === 'subjects' && renderSubjectsPage()}
                         {activeTab === 'faculty' && renderFacultyPage()}
                         {activeTab === 'students' && <StudentRegistrations />}
-                        {activeTab === 'faculty_timetable' && <FacultyTimetable />}
-                        {activeTab === 'student_timetable' && <StudentTimetable />}
+                        {activeTab === 'faculty_timetable' && <FacultyTimetable slots={slots} />}
+                        {activeTab === 'student_timetable' && <StudentTimetable slots={slots} />}
                         {activeTab === 'mappings' && renderMappingsPage()}
                         {activeTab === 'timeslots' && renderSlotsPage()}
                         {activeTab === 'venues' && <Venues />}

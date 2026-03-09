@@ -43,10 +43,14 @@ const BITTimetable = ({ timetableData, department, semester, courses, slots, onR
             { name: 'Evening Break', time: '04.00 - 04.15' }
         ];
 
-    const uniqueDepts = [...new Set((timetableData || []).map(t => t.department_code))];
-    const isMasterView = uniqueDepts.length > 1 || (!department && (timetableData || []).length > 0);
-    const deptName = isMasterView ? "ALL DEPARTMENTS (MASTER VIEW)" : (department || (timetableData && timetableData[0]?.department_code) || "UNKNOWN");
-    const semNum = isMasterView ? "ALL" : (semester || (timetableData && timetableData[0]?.semester) || "UNKNOWN");
+    const uniqueDepts = [...new Set((timetableData || []).map(t => t.department_code).filter(Boolean))];
+    const uniqueSems = [...new Set((timetableData || []).map(t => t.semester).filter(Boolean))];
+    // Only true master view when the data genuinely covers multiple departments
+    const isMasterView = uniqueDepts.length > 1;
+    const deptName = department
+        || (uniqueDepts.length === 1 ? uniqueDepts[0] : (uniqueDepts.length > 1 ? 'ALL DEPARTMENTS' : 'UNKNOWN'));
+    const semNum = semester
+        || (uniqueSems.length === 1 ? uniqueSems[0] : (uniqueSems.length > 1 ? 'ALL' : 'UNKNOWN'));
 
     const getCellsData = useCallback((day, periodIndex) => {
         if (!timetableData) return [];

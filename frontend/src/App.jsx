@@ -420,6 +420,10 @@ function App() {
                                         return;
                                     }
 
+                                    // ── HONOURS / MINOR: treat as regular split sections (same as paired electives) ──
+                                    // No special rendering needed — fall through to standard renderCourseBlock below.
+                                    // HONOURS and MINOR session_types show with their respective course badges.
+
                                     // Separate regular courses from explicit OE slots
                                     const explicitOEEntries = cellEntries.filter(e => e.session_type === 'OPEN_ELECTIVE' || e.course_code === 'OPEN_ELEC' || allCourses.find(c => c.course_code === e.course_code)?.is_open_elective);
                                     const regularEntries = cellEntries.filter(e => !explicitOEEntries.includes(e));

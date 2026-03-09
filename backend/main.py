@@ -4,7 +4,7 @@ from typing import List, Optional
 import models, schemas
 from database import engine, get_db
 from fastapi.middleware.cors import CORSMiddleware
-import import_book1
+
 
 # Ensure tables exist
 models.Base.metadata.create_all(bind=engine)

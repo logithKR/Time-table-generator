@@ -95,6 +95,12 @@ const CellContent = ({ entry, sections, cellId, isLabStart, isSwapMode, isSelect
     if (entry.session_type === 'MENTOR') {
         bg = MENTOR_STYLE.bg; border = MENTOR_STYLE.border; text = MENTOR_STYLE.text;
     }
+    else if (entry.session_type === 'HONOURS') {
+        bg = 'bg-purple-50'; border = 'border-purple-300'; text = 'text-purple-800';
+    }
+    else if (entry.session_type === 'MINOR') {
+        bg = 'bg-indigo-50'; border = 'border-indigo-300'; text = 'text-indigo-800';
+    }
     else if (entry.session_type === 'OPEN_ELECTIVE' || entry.course_code === 'OPEN_ELEC') {
         bg = OE_STYLE.bg; border = OE_STYLE.border; text = OE_STYLE.text;
     }

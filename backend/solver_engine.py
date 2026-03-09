@@ -997,58 +997,131 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
     # 6. POST-SOLVE: Honours in P8, fill gaps
     # =========================================================
 
-    # --- Place HONOURS strictly in P8 ---
+    # --- Place HONOURS/MINOR in P8 with alternating-day groups ---
     if honours_courses:
-        p8_slots = [(day, 8) for day in all_days if (day, 8) in slot_lookup
-                    and (day, 8) not in filled_slots
-                    and not (day == mentor_day_clean and mentor_period == 8)]
-                    
-        # Group sessions by course code into 'queues'
-        course_queues = []
-        for c in honours_courses:
-            fids = course_faculty.get(c.course_code, [])
-            fid = fids[0][0] if fids else None
-            fname = fids[0][1] if fids else None
-            cname = course_names.get(c.course_code, c.course_code)
-            total = c.weekly_sessions or (course_theory_count.get(c.course_code, 3) + course_lab_blocks.get(c.course_code, 0) * 2)
-            
-            queue = []
-            for _ in range(total):
-                queue.append({
-                    'course_code': c.course_code, 'course_name': cname,
-                    'faculty_id': fid, 'faculty_name': fname,
-                    'session_type': 'THEORY'
-                })
-            if queue:
-                course_queues.append(queue)
+        # Day groups: odd-indexed courses → MWF, even-indexed → TuThSat
+        DAY_GROUP_A = ['Monday',    'Wednesday', 'Friday']
+        DAY_GROUP_B = ['Tuesday',   'Thursday',  'Saturday']
 
-        # Loop through P8 slots, picking from the front queue, then rotating it to the back
-        for day, period in p8_slots:
-            if not course_queues:
-                break
-                
-            current_queue = course_queues.pop(0)
-            hs = current_queue.pop(0)
-            
+        def get_p8_day_list(group_days):
+            """Return P8 slots for a given day group that aren't yet filled."""
+            result = []
+            for d in group_days:
+                if (d, 8) in slot_lookup \
+                   and (d, 8) not in filled_slots \
+                   and not (d == mentor_day_clean and mentor_period == 8):
+                    result.append((d, 8))
+            return result
+
+        def get_any_free_p8():
+            """Fallback: any free P8 across all days."""
+            return [(d, 8) for d in all_days
+                    if (d, 8) in slot_lookup
+                    and (d, 8) not in filled_slots
+                    and not (d == mentor_day_clean and mentor_period == 8)]
+
+        # Separate into actual honours vs actual minors
+        actual_honours = [c for c in honours_courses if c.is_honours]
+        actual_minors  = [c for c in honours_courses if c.is_minor and not c.is_honours]
+        # Fallback: if none properly flagged, treat all as honours
+        if not actual_honours and not actual_minors:
+            actual_honours = honours_courses
+
+        def get_faculty(c):
+            fids = course_faculty.get(c.course_code, [])
+            return (fids[0][0] if fids else None,
+                    fids[0][1] if fids else None)
+
+        def sessions_needed(c):
+            return c.weekly_sessions or (
+                course_theory_count.get(c.course_code, 3) +
+                course_lab_blocks.get(c.course_code, 0) * 2
+            )
+
+        def _write_entry(day, period, course, stype, sec_num):
+            nonlocal count
             slot_obj = slot_lookup[(day, period)]
-            c_venue = assign_venue(day, period, hs['course_code'], False, count)
-            entry = models.TimetableEntry(
+            fid, fname = get_faculty(course)
+            cname = course_names.get(course.course_code, course.course_code)
+            c_venue = assign_venue(day, period, course.course_code, False, count)
+            db.add(models.TimetableEntry(
                 department_code=department_code, semester=semester,
-                course_code=hs['course_code'], course_name=hs['course_name'],
-                faculty_id=hs['faculty_id'], faculty_name=hs['faculty_name'],
-                session_type=hs['session_type'],
+                course_code=course.course_code, course_name=cname,
+                faculty_id=fid, faculty_name=fname,
+                session_type=stype,
                 slot_id=slot_obj.slot_id,
                 day_of_week=day, period_number=period,
                 venue_name=c_venue,
-                section_number=1,
+                section_number=sec_num,
                 created_at="now"
-            )
-            db.add(entry)
+            ))
             filled_slots.add((day, period))
             count += 1
-            
-            if current_queue:
-                course_queues.append(current_queue)
+
+        # Assign Honours courses to alternating day groups
+        # hon_idx 0 → Group A (MWF), hon_idx 1 → Group B (TuThSat), etc.
+        hon_day_groups = []  # parallel to actual_honours: which day group each uses
+        for hon_idx, hc in enumerate(actual_honours):
+            group_days = DAY_GROUP_A if hon_idx % 2 == 0 else DAY_GROUP_B
+            needed = sessions_needed(hc)
+            # Collect P8 slots for this group, cycling if needed
+            group_p8  = get_p8_day_list(group_days)
+            # If not enough days in the group, supplement with the other group then any free P8
+            if len(group_p8) < needed:
+                other_group = DAY_GROUP_B if hon_idx % 2 == 0 else DAY_GROUP_A
+                group_p8 += get_p8_day_list(other_group)
+            if len(group_p8) < needed:
+                group_p8 += get_any_free_p8()
+            # Remove duplicates while preserving order
+            seen = set(); group_p8_dedup = []
+            for s in group_p8:
+                if s not in seen:
+                    seen.add(s); group_p8_dedup.append(s)
+            group_p8 = group_p8_dedup[:needed]
+            hon_day_groups.append(group_p8)
+            print(f"  🎓 H{hon_idx+1} {hc.course_code}: {needed} sessions → {group_p8}")
+
+        # Assign Minor courses:
+        # Minor 0 shares the same P8 slots as Honours 0
+        # Minor 1 shares the same P8 slots as Honours 1, etc.
+        min_day_groups = []
+        for min_idx, mc in enumerate(actual_minors):
+            needed = sessions_needed(mc)
+            # Preferred: same slots as the matching honour
+            if min_idx < len(hon_day_groups):
+                preferred_slots = hon_day_groups[min_idx]
+            else:
+                preferred_slots = []
+            # Among preferred slots, pick ones that have P8 *available* or already have its matching honour
+            # (We allow same-slot sharing — both entries written to same day+period)
+            # Supplement with any free P8 if needed
+            all_p8 = get_any_free_p8()
+            combined = preferred_slots + [s for s in all_p8 if s not in preferred_slots]
+            seen = set(); combined_dedup = []
+            for s in combined:
+                if s not in seen:
+                    seen.add(s); combined_dedup.append(s)
+            min_day_groups.append(combined_dedup[:needed])
+            print(f"  📚 M{min_idx+1} {mc.course_code}: {needed} sessions → {combined_dedup[:needed]}")
+
+        # Write Honours entries
+        for hon_idx, hc in enumerate(actual_honours):
+            for slot in hon_day_groups[hon_idx]:
+                day, period = slot
+                _write_entry(day, period, hc, 'HONOURS', 1)
+
+        # Write Minor entries (into the same slots as their paired Honours where possible)
+        for min_idx, mc in enumerate(actual_minors):
+            for slot in min_day_groups[min_idx]:
+                day, period = slot
+                # section_number=2 if this slot already has an honours entry, else 1
+                sec = 2 if (min_idx < len(hon_day_groups) and slot in hon_day_groups[min_idx]) else 1
+                _write_entry(day, period, mc, 'MINOR', sec)
+
+        # Write any Honours that have no minor pair (already handled above — just log)
+        print(f"  ✅ Honours/Minor scheduling complete")
+
+
 
     # --- MENTOR entry ---
     if (mentor_day_clean, mentor_period) in slot_lookup:

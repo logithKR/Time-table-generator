@@ -26,10 +26,12 @@ import {
     MapPin,
     Building2,
     LogOut,
-    Settings
+    Settings,
+    Link2
 } from 'lucide-react';
 import TimetableEditor from './components/TimetableEditor';
 import ConstraintsManager from './components/ConstraintsManager';
+import CommonCourses from './components/CommonCourses';
 import Venues from './components/Venues';
 import VenueMapping from './components/VenueMapping';
 import DepartmentsManager from './components/DepartmentsManager';
@@ -1295,7 +1297,8 @@ function App() {
                         { id: 'timeslots', icon: Clock, label: 'Time Slots' },
                         { id: 'venues', icon: MapPin, label: 'Venues' },
                         { id: 'venue_mappings', icon: Layers, label: 'Venue Mapping' },
-                        { id: 'constraints', icon: Settings, label: 'Constraints & Rules' }
+                        { id: 'constraints', icon: Settings, label: 'Constraints & Rules' },
+                        { id: 'common_courses', icon: Link2, label: 'Common Courses' }
                     ].map(item => (
                         <button key={item.id} onClick={() => switchTab(item.id)}
                             title={isCollapsed ? item.label : ''}
@@ -1342,6 +1345,12 @@ function App() {
                         {activeTab === 'venues' && <Venues />}
                         {activeTab === 'venue_mappings' && <VenueMapping />}
                         {activeTab === 'constraints' && <ConstraintsManager />}
+                        {activeTab === 'common_courses' && (
+                            <CommonCourses
+                                allCourses={allCourses}
+                                departments={departments}
+                            />
+                        )}
                         {/* New Print View Render */}
                         {activeTab === 'print' && renderPrintViewPage()}
                     </div>

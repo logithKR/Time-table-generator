@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 from typing import List, Optional
+from pydantic import BaseModel
 import models, schemas
 from database import engine, get_db
 from fastapi.middleware.cors import CORSMiddleware
@@ -1143,3 +1144,55 @@ def reset_scheduler_config(db: Session = Depends(get_db)):
         db.add(row)
     db.commit()
     return json.loads(row.config_json)
+
+
+# ============================================
+# COMMON COURSES
+# ============================================
+
+@app.get("/common-courses")
+def get_common_courses(db: Session = Depends(get_db)):
+    """Return all common course groups as a list of {course_code, semester, departments}."""
+    rows = db.query(models.CommonCourseMap).all()
+    # Group by course_code + semester
+    groups: dict = {}
+    for row in rows:
+        key = (row.course_code, row.semester)
+        if key not in groups:
+            groups[key] = {"course_code": row.course_code, "semester": row.semester, "departments": []}
+        groups[key]["departments"].append(row.department_code)
+    return list(groups.values())
+
+
+class CommonCourseRequest(BaseModel):
+    course_code: str
+    semester: int
+    department_codes: List[str]
+
+@app.post("/common-courses")
+def save_common_course(req: CommonCourseRequest, db: Session = Depends(get_db)):
+    """Create or replace the department list for a common course group."""
+    # Delete existing entries for this course+semester
+    db.query(models.CommonCourseMap).filter_by(
+        course_code=req.course_code, semester=req.semester
+    ).delete()
+    # Insert new entries
+    for dept in req.department_codes:
+        db.add(models.CommonCourseMap(
+            course_code=req.course_code,
+            semester=req.semester,
+            department_code=dept
+        ))
+    db.commit()
+    return {"status": "saved", "course_code": req.course_code, "semester": req.semester}
+
+
+@app.delete("/common-courses/{course_code}/{semester}")
+def delete_common_course(course_code: str, semester: int, db: Session = Depends(get_db)):
+    """Remove all department mappings for a common course."""
+    deleted = db.query(models.CommonCourseMap).filter_by(
+        course_code=course_code, semester=semester
+    ).delete()
+    db.commit()
+    return {"status": "deleted", "rows": deleted}
+

@@ -990,12 +990,125 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                             count += 1
                     mark_faculty_busy(fac_assigned[0], day, bs)
                     mark_faculty_busy(fac_assigned[0], day, bs+1)
+    # =========================================================
+    # 5.5 COMMON COURSES — schedule these FIRST (before Honours/Minor)
+    # If another dept already placed this course, reuse the same slot.
+    # If the slot is occupied here, split the cell (section_number 2).
+    # =========================================================
+    common_placed_codes = set()   # track codes handled here so Section 6 skips them
 
+    for c in honours_courses:
+        # Check if this course is registered as a common course
+        common_depts = db.query(models.CommonCourseMap).filter_by(
+            course_code=c.course_code, semester=semester
+        ).all()
+        if not common_depts:
+            continue  # not a common course — handled by Section 6 normally
 
+        dept_codes = [r.department_code for r in common_depts]
+        if len(dept_codes) < 2:
+            continue  # only one dept — not truly shared
+
+        # Look for an existing TimetableEntry for this course in ANY other dept
+        anchor_entry = db.query(models.TimetableEntry).filter(
+            models.TimetableEntry.course_code == c.course_code,
+            models.TimetableEntry.semester == semester,
+            models.TimetableEntry.department_code != department_code
+        ).first()
+
+        fids  = course_faculty.get(c.course_code, [])
+        fid   = fids[0][0] if fids else None
+        fname = fids[0][1] if fids else None
+        cname = course_names.get(c.course_code, c.course_code)
+        stype = 'HONOURS' if c.is_honours else 'MINOR'
+        needed = c.weekly_sessions or (
+            course_theory_count.get(c.course_code, 3) +
+            course_lab_blocks.get(c.course_code, 0) * 2
+        )
+
+        if anchor_entry:
+            # ── Sync mode: reuse existing slots from anchor dept ──
+            anchor_entries = db.query(models.TimetableEntry).filter(
+                models.TimetableEntry.course_code == c.course_code,
+                models.TimetableEntry.semester == semester,
+                models.TimetableEntry.department_code == anchor_entry.department_code
+            ).all()
+            # Deduplicate by (day, period)
+            seen_slots = set()
+            anchor_slots = []
+            for ae in anchor_entries:
+                key = (ae.day_of_week, ae.period_number)
+                if key not in seen_slots:
+                    seen_slots.add(key)
+                    anchor_slots.append((ae.day_of_week, ae.period_number))
+
+            for (day, period) in anchor_slots:
+                if (day, period) not in slot_lookup:
+                    continue
+                slot_obj = slot_lookup[(day, period)]
+                # Determine section_number: if slot already has an entry → section 2 (split)
+                already_there = (day, period) in filled_slots
+                sec_num = 2 if already_there else 1
+                c_venue = assign_venue(day, period, c.course_code, False, count)
+                db.add(models.TimetableEntry(
+                    department_code=department_code, semester=semester,
+                    course_code=c.course_code, course_name=cname,
+                    faculty_id=fid, faculty_name=fname,
+                    session_type=stype,
+                    slot_id=slot_obj.slot_id,
+                    day_of_week=day, period_number=period,
+                    venue_name=c_venue,
+                    section_number=sec_num,
+                    created_at="now"
+                ))
+                filled_slots.add((day, period))
+                count += 1
+            print(f"  🔗 Common course {c.course_code} synced to {len(anchor_slots)} slots from dept {anchor_entry.department_code}")
+        else:
+            # ── Anchor mode: this dept is first — schedule normally in P8 ──
+            # Use the standard day-group logic; other depts will sync later.
+            DAY_GROUP_A_CC = ['Monday', 'Wednesday', 'Friday']
+            DAY_GROUP_B_CC = ['Tuesday', 'Thursday', 'Saturday']
+            # Pick group based on position among common courses in this dept
+            cc_idx = honours_courses.index(c)
+            group_days_cc = DAY_GROUP_A_CC if cc_idx % 2 == 0 else DAY_GROUP_B_CC
+            free_p8 = [(d, 8) for d in group_days_cc
+                       if (d, 8) in slot_lookup
+                       and (d, 8) not in filled_slots
+                       and not (d == mentor_day_clean and mentor_period == 8)]
+            if len(free_p8) < needed:
+                other = DAY_GROUP_B_CC if cc_idx % 2 == 0 else DAY_GROUP_A_CC
+                free_p8 += [(d, 8) for d in other
+                            if (d, 8) in slot_lookup
+                            and (d, 8) not in filled_slots
+                            and not (d == mentor_day_clean and mentor_period == 8)]
+            for (day, period) in free_p8[:needed]:
+                slot_obj = slot_lookup[(day, period)]
+                c_venue = assign_venue(day, period, c.course_code, False, count)
+                db.add(models.TimetableEntry(
+                    department_code=department_code, semester=semester,
+                    course_code=c.course_code, course_name=cname,
+                    faculty_id=fid, faculty_name=fname,
+                    session_type=stype,
+                    slot_id=slot_obj.slot_id,
+                    day_of_week=day, period_number=period,
+                    venue_name=c_venue,
+                    section_number=1,
+                    created_at="now"
+                ))
+                filled_slots.add((day, period))
+                count += 1
+            print(f"  ⚓ Common course {c.course_code} anchored in {len(free_p8[:needed])} P8 slots (first dept)")
+
+        common_placed_codes.add(c.course_code)
+
+    # Remove already-placed common courses from honours_courses so Section 6 skips them
+    honours_courses = [c for c in honours_courses if c.course_code not in common_placed_codes]
 
     # =========================================================
     # 6. POST-SOLVE: Honours in P8, fill gaps
     # =========================================================
+
 
     # --- Place HONOURS/MINOR in P8 with alternating-day groups ---
     if honours_courses:

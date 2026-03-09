@@ -180,3 +180,20 @@ class SchedulerConfig(Base):
     id = Column(Integer, primary_key=True, default=1)
     config_json = Column(String, nullable=False)  # JSON blob with all constraint settings
 
+
+class CommonCourseMap(Base):
+    """Links a single course_code+semester to multiple departments.
+    All rows with the same course_code+semester must share the same timetable slot."""
+    __tablename__ = "common_course_map"
+
+    id              = Column(Integer, primary_key=True, autoincrement=True)
+    course_code     = Column(String, nullable=False)
+    semester        = Column(Integer, nullable=False)
+    department_code = Column(String, ForeignKey('department_master.department_code'), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint('course_code', 'semester', 'department_code', name='uix_common_course'),
+    )
+
+Index('idx_common_course', CommonCourseMap.course_code, CommonCourseMap.semester)
+

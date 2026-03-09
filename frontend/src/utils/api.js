@@ -119,3 +119,10 @@ export const checkConflicts = (data) => axios.post(`${API_URL}/check-conflicts`,
 export const getConfig = () => axios.get(`${API_URL}/api/config`);
 export const saveConfig = (data) => axios.put(`${API_URL}/api/config`, data);
 export const resetConfig = () => axios.post(`${API_URL}/api/config/reset`);
+
+// --- Common Courses ---
+export const getCommonCourses = () => axios.get(`${API_URL}/common-courses`);
+export const saveCommonCourse = (data) => axios.post(`${API_URL}/common-courses`, data);
+export const deleteCommonCourse = (courseCode, semester) =>
+    axios.delete(`${API_URL}/common-courses/${encodeURIComponent(courseCode)}/${semester}`);
+

@@ -338,7 +338,12 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
     # BATCH ROTATION LOGIC (MERGED LABS)
     # ---------------------------------------------------------
     mini_projects = [c for c in courses if "mini project" in (c.course_name or "").lower()]
-    core_lab_courses = [c for c in regular_courses if course_lab_blocks[c.course_code] > 0 and not c.is_elective and c not in mini_projects]
+    core_lab_courses = [
+        c for c in regular_courses 
+        if course_lab_blocks[c.course_code] > 0 
+        and (not c.is_elective or (c.course_category and "LANGUAGE" in c.course_category.upper()))
+        and c not in mini_projects
+    ]
     
     batch_rotation_needed = False
     merged_batch_count = 0
@@ -945,7 +950,7 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                             db.add(models.TimetableEntry(
                                 department_code=department_code, semester=semester,
                                 course_code=c.course_code,
-                                course_name=f"B{batch_idx+1}: {cname}",
+                                course_name=f"B{batch_idx+1}: {cname}" if merged_batch_count > 1 else cname,
                                 faculty_id=fac_assigned[0], faculty_name=fac_assigned[1],
                                 session_type='LAB',
                                 slot_id=slot_obj.slot_id,
@@ -977,7 +982,7 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                             db.add(models.TimetableEntry(
                                 department_code=department_code, semester=semester,
                                 course_code=c.course_code,
-                                course_name=f"B{batch_idx+1}: {cname} (Theory)",
+                                course_name=f"B{batch_idx+1}: {cname} (Theory)" if merged_batch_count > 1 else f"{cname} (Theory)",
                                 faculty_id=fac_assigned[0], faculty_name=fac_assigned[1],
                                 session_type='THEORY',
                                 slot_id=slot_obj.slot_id,

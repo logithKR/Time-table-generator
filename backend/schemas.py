@@ -255,3 +255,50 @@ class ConflictCheckRequest(BaseModel):
     department_code: str
     semester: int
     entries: List[ConflictCheckEntry]
+
+
+# --- User Constraints ---
+
+class UserConstraintCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+    enabled: bool = True
+    priority: str = "HARD"
+    soft_weight: int = 0
+    constraint_type: str
+    scope: dict
+    target: dict
+    rules: dict
+
+class UserConstraintUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    enabled: Optional[bool] = None
+    priority: Optional[str] = None
+    soft_weight: Optional[int] = None
+    constraint_type: Optional[str] = None
+    scope: Optional[dict] = None
+    target: Optional[dict] = None
+    rules: Optional[dict] = None
+
+class UserConstraintResponse(BaseModel):
+    id: int
+    uuid: str
+    name: str
+    description: Optional[str] = None
+    enabled: bool
+    priority: str
+    soft_weight: int
+    constraint_type: str
+    scope: dict
+    target: dict
+    rules: dict
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+    order_index: int
+
+    class Config:
+        orm_mode = True
+
+class UserConstraintReorderRequest(BaseModel):
+    order: List[str]   # list of UUIDs in desired order

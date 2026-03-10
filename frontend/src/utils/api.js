@@ -126,3 +126,19 @@ export const saveCommonCourse = (data) => axios.post(`${API_URL}/common-courses`
 export const deleteCommonCourse = (courseCode, semester) =>
     axios.delete(`${API_URL}/common-courses/${encodeURIComponent(courseCode)}/${semester}`);
 
+// --- User Constraints ---
+export const getUserConstraints = (dept, sem) => {
+    let url = `${API_URL}/api/user-constraints`;
+    const params = [];
+    if (dept) params.push(`dept=${dept}`);
+    if (sem) params.push(`sem=${sem}`);
+    if (params.length) url += `?${params.join('&')}`;
+    return axios.get(url);
+};
+export const createUserConstraint = (data) => axios.post(`${API_URL}/api/user-constraints`, data);
+export const updateUserConstraint = (uuid, data) => axios.put(`${API_URL}/api/user-constraints/${uuid}`, data);
+export const deleteUserConstraint = (uuid) => axios.delete(`${API_URL}/api/user-constraints/${uuid}`);
+export const toggleUserConstraint = (uuid) => axios.patch(`${API_URL}/api/user-constraints/${uuid}/toggle`);
+export const reorderUserConstraints = (order) => axios.post(`${API_URL}/api/user-constraints/reorder`, { order });
+export const validateUserConstraint = (data) => axios.post(`${API_URL}/api/user-constraints/validate`, data);
+

@@ -694,6 +694,27 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                 model.AddMultiplicationEquality(both, [lab_on_day, theory_on_day])
                 theory_lab_same_day_bonus.append(both)
 
+    # --- USER-DEFINED CONSTRAINTS (pre-solve) ---
+    from constraint_interpreter import ConstraintInterpreter
+    user_interpreter = ConstraintInterpreter(db, department_code, semester)
+    user_interpreter.load_constraints()
+    uc_warnings = user_interpreter.validate_constraints(
+        regular_courses, slots, all_days, day_periods, slot_lookup
+    )
+    generation_warnings.extend(uc_warnings)
+    user_interpreter.apply_to_model(
+        model=model,
+        theory_vars=theory_vars,
+        lab_vars=lab_vars,
+        merged_lab_vars=merged_lab_vars,
+        core_slot_fills=core_slot_fills,
+        objective_terms=[],  # will be populated below
+        all_days=all_days,
+        day_periods=day_periods,
+        slot_lookup=slot_lookup,
+        filled_slots=set()
+    )
+
     # --- OBJECTIVE ---
     objective_terms = []
     
@@ -1261,6 +1282,12 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
     # 7. EXTRA CREDIT: Free Periods -> Mini Projects & High Credit
     # =========================================================
     
+    # IMPORTANT: Mark user-constraint reserved slots as filled
+    # so the gap-filler doesn't place courses in them.
+    for uuid, reserved in user_interpreter.reserved_slots.items():
+        for slot in reserved:
+            filled_slots.add(slot)
+    
     # 1. Gather all empty periods and group them by day
     empty_by_day = {day: [] for day in all_days}
     for day in all_days:
@@ -1573,6 +1600,20 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                 if isinstance(entry, models.TimetableEntry) and entry.course_code == highest_elective.course_code:
                     if "OPEN ELECTIVE" not in str(entry.course_name).upper():
                         entry.course_name = f"{entry.course_name} / OPEN ELECTIVE"
+
+    # --- USER-DEFINED CONSTRAINTS (post-solve) ---
+    count = user_interpreter.apply_post_solve(
+        db=db,
+        department_code=department_code,
+        semester=semester,
+        filled_slots=filled_slots,
+        slot_lookup=slot_lookup,
+        assign_venue=assign_venue,
+        count=count,
+        all_days=all_days,
+        day_periods=day_periods
+    )
+    generation_warnings.extend(user_interpreter.warnings)
 
     # Print warnings before commit
     if generation_warnings:

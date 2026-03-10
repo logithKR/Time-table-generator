@@ -197,3 +197,27 @@ class CommonCourseMap(Base):
 
 Index('idx_common_course', CommonCourseMap.course_code, CommonCourseMap.semester)
 
+
+class UserConstraint(Base):
+    """Stores user-defined scheduling constraints as declarative JSON rules.
+    The solver interprets these at generation time via ConstraintInterpreter."""
+    __tablename__ = "user_constraints"
+
+    id              = Column(Integer, primary_key=True, autoincrement=True)
+    uuid            = Column(String, unique=True, nullable=False)
+    name            = Column(String, nullable=False)
+    description     = Column(String, nullable=True)
+    enabled         = Column(Boolean, default=True)
+    priority        = Column(String, default='HARD')       # HARD | SOFT | PREFERENCE
+    soft_weight     = Column(Integer, default=0)
+    constraint_type = Column(String, nullable=False)        # COURSE_INJECTION | SLOT_BLOCKING | FACULTY_RULE | SPACING_RULE | DISTRIBUTION_RULE
+    scope_json      = Column(String, nullable=False)        # JSON: {departments, semesters, sections}
+    target_json     = Column(String, nullable=False)        # JSON: {type, course_code, faculty_id, ...}
+    rules_json      = Column(String, nullable=False)        # JSON: {sessions_per_week, day_preference, ...}
+    created_at      = Column(String)
+    updated_at      = Column(String)
+    order_index     = Column(Integer, default=0)
+
+Index('idx_user_constraint_type', UserConstraint.constraint_type)
+Index('idx_user_constraint_enabled', UserConstraint.enabled)
+

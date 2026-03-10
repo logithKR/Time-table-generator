@@ -1196,3 +1196,240 @@ def delete_common_course(course_code: str, semester: int, db: Session = Depends(
     db.commit()
     return {"status": "deleted", "rows": deleted}
 
+
+# ============================================
+# USER-DEFINED CONSTRAINTS
+# ============================================
+import uuid as uuid_lib
+from datetime import datetime
+
+def _constraint_to_response(row: models.UserConstraint) -> dict:
+    """Convert a UserConstraint DB row to a response dict."""
+    return {
+        "id": row.id,
+        "uuid": row.uuid,
+        "name": row.name,
+        "description": row.description,
+        "enabled": row.enabled,
+        "priority": row.priority,
+        "soft_weight": row.soft_weight,
+        "constraint_type": row.constraint_type,
+        "scope": json.loads(row.scope_json),
+        "target": json.loads(row.target_json),
+        "rules": json.loads(row.rules_json),
+        "created_at": row.created_at,
+        "updated_at": row.updated_at,
+        "order_index": row.order_index,
+    }
+
+
+@app.get("/api/user-constraints")
+def list_user_constraints(
+    dept: Optional[str] = None,
+    sem: Optional[int] = None,
+    db: Session = Depends(get_db)
+):
+    """List all user constraints, optionally filtered by scope (department/semester)."""
+    rows = db.query(models.UserConstraint).order_by(
+        models.UserConstraint.priority.desc(),
+        models.UserConstraint.order_index
+    ).all()
+
+    results = []
+    for row in rows:
+        resp = _constraint_to_response(row)
+        # Optional filtering by scope
+        if dept or sem:
+            scope = resp["scope"]
+            scope_depts = scope.get("departments", ["*"])
+            scope_sems = scope.get("semesters", ["*"])
+            if dept and scope_depts != ["*"] and dept not in scope_depts:
+                continue
+            if sem is not None and scope_sems != ["*"] and sem not in scope_sems:
+                continue
+        results.append(resp)
+
+    return results
+
+
+@app.post("/api/user-constraints")
+def create_user_constraint(
+    data: schemas.UserConstraintCreate,
+    db: Session = Depends(get_db)
+):
+    """Create a new user-defined constraint."""
+    now = datetime.utcnow().isoformat()
+    max_order = db.query(models.UserConstraint).count()
+
+    row = models.UserConstraint(
+        uuid=str(uuid_lib.uuid4()),
+        name=data.name,
+        description=data.description,
+        enabled=data.enabled,
+        priority=data.priority,
+        soft_weight=data.soft_weight,
+        constraint_type=data.constraint_type,
+        scope_json=json.dumps(data.scope),
+        target_json=json.dumps(data.target),
+        rules_json=json.dumps(data.rules),
+        created_at=now,
+        updated_at=now,
+        order_index=max_order,
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return _constraint_to_response(row)
+
+
+@app.put("/api/user-constraints/{constraint_uuid}")
+def update_user_constraint(
+    constraint_uuid: str,
+    data: schemas.UserConstraintUpdate,
+    db: Session = Depends(get_db)
+):
+    """Update an existing user-defined constraint."""
+    row = db.query(models.UserConstraint).filter_by(uuid=constraint_uuid).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Constraint not found")
+
+    now = datetime.utcnow().isoformat()
+    if data.name is not None:
+        row.name = data.name
+    if data.description is not None:
+        row.description = data.description
+    if data.enabled is not None:
+        row.enabled = data.enabled
+    if data.priority is not None:
+        row.priority = data.priority
+    if data.soft_weight is not None:
+        row.soft_weight = data.soft_weight
+    if data.constraint_type is not None:
+        row.constraint_type = data.constraint_type
+    if data.scope is not None:
+        row.scope_json = json.dumps(data.scope)
+    if data.target is not None:
+        row.target_json = json.dumps(data.target)
+    if data.rules is not None:
+        row.rules_json = json.dumps(data.rules)
+    row.updated_at = now
+
+    db.commit()
+    db.refresh(row)
+    return _constraint_to_response(row)
+
+
+@app.delete("/api/user-constraints/{constraint_uuid}")
+def delete_user_constraint(
+    constraint_uuid: str,
+    db: Session = Depends(get_db)
+):
+    """Delete a user-defined constraint."""
+    deleted = db.query(models.UserConstraint).filter_by(uuid=constraint_uuid).delete()
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Constraint not found")
+    db.commit()
+    return {"status": "deleted", "uuid": constraint_uuid}
+
+
+@app.patch("/api/user-constraints/{constraint_uuid}/toggle")
+def toggle_user_constraint(
+    constraint_uuid: str,
+    db: Session = Depends(get_db)
+):
+    """Toggle the enabled status of a constraint."""
+    row = db.query(models.UserConstraint).filter_by(uuid=constraint_uuid).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Constraint not found")
+    row.enabled = not row.enabled
+    row.updated_at = datetime.utcnow().isoformat()
+    db.commit()
+    db.refresh(row)
+    return _constraint_to_response(row)
+
+
+@app.post("/api/user-constraints/reorder")
+def reorder_user_constraints(
+    data: schemas.UserConstraintReorderRequest,
+    db: Session = Depends(get_db)
+):
+    """Update the display/processing order of constraints."""
+    for idx, c_uuid in enumerate(data.order):
+        row = db.query(models.UserConstraint).filter_by(uuid=c_uuid).first()
+        if row:
+            row.order_index = idx
+    db.commit()
+    return {"status": "reordered"}
+
+
+@app.post("/api/user-constraints/validate")
+def validate_user_constraint(
+    data: schemas.UserConstraintCreate,
+    db: Session = Depends(get_db)
+):
+    """Validate a constraint definition: check for obvious issues without running the solver."""
+    warnings = []
+
+    # Basic validation
+    valid_types = ['COURSE_INJECTION', 'SLOT_BLOCKING', 'FACULTY_RULE',
+                   'SPACING_RULE', 'DISTRIBUTION_RULE', 'CAPACITY_RULE', 'CUSTOM_PLACEMENT']
+    if data.constraint_type not in valid_types:
+        warnings.append(f"Unknown constraint type: {data.constraint_type}")
+
+    valid_priorities = ['HARD', 'SOFT', 'PREFERENCE']
+    if data.priority not in valid_priorities:
+        warnings.append(f"Unknown priority: {data.priority}")
+
+    # Scope validation
+    scope = data.scope or {}
+    scope_depts = scope.get("departments", ["*"])
+    if scope_depts != ["*"]:
+        for dept in scope_depts:
+            if not db.query(models.DepartmentMaster).filter_by(department_code=dept).first():
+                warnings.append(f"Department '{dept}' not found")
+
+    # Target validation
+    target = data.target or {}
+    if target.get("type") == "COURSE" and target.get("course_code"):
+        if not target.get("create_if_missing"):
+            exists = db.query(models.CourseMaster).filter_by(
+                course_code=target["course_code"]
+            ).first()
+            if not exists:
+                warnings.append(f"Course '{target['course_code']}' not found. Enable 'create_if_missing' to auto-create.")
+
+    if target.get("type") == "FACULTY" and target.get("faculty_id"):
+        exists = db.query(models.FacultyMaster).filter_by(
+            faculty_id=target["faculty_id"]
+        ).first()
+        if not exists:
+            warnings.append(f"Faculty '{target['faculty_id']}' not found")
+
+    # Rules validation
+    rules = data.rules or {}
+    sessions = rules.get("sessions_per_week", {})
+    if sessions:
+        min_s = sessions.get("min", 0)
+        max_s = sessions.get("max", 99)
+        exact = sessions.get("exact")
+        if exact and exact > 7 * 8:  # 7 days * 8 periods max
+            warnings.append(f"Requested {exact} sessions/week exceeds maximum possible slots")
+        if min_s > max_s:
+            warnings.append(f"sessions_per_week min ({min_s}) > max ({max_s})")
+
+    # Visual slots validation
+    visual_slots = rules.get("visual_slots", [])
+    if visual_slots:
+        for vs in visual_slots:
+            slot = db.query(models.SlotMaster).filter_by(
+                day_of_week=vs.get("day"),
+                period_number=vs.get("period")
+            ).first()
+            if not slot:
+                warnings.append(f"Slot {vs.get('day')} P{vs.get('period')} does not exist")
+
+    return {
+        "valid": len(warnings) == 0,
+        "warnings": warnings
+    }
+

@@ -39,6 +39,7 @@ import StudentRegistrations from './components/StudentRegistrations';
 import FacultyTimetable from './components/FacultyTimetable';
 import StudentTimetable from './components/StudentTimetable';
 import BITTimetable from './components/BITTimetable';
+import UserConstraints from './components/UserConstraints';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as api from './utils/api';
@@ -1244,7 +1245,7 @@ function App() {
         </div>
     );
 
-    const pageTitle = { dashboard: 'Timetable Generator', editor: 'Timetable Editor', print: 'Print View', timeslots: 'Time Slots', departments: 'Departments Setup', subjects: 'Course / Subject Details', faculty: 'Faculty Details', mappings: 'Course-Faculty Mappings', venues: 'Venues & Classrooms', venue_mappings: 'Department Venues', students: 'Students & Registrations', faculty_timetable: 'Faculty Personal Timetable', student_timetable: 'Student Personal Timetable', constraints: 'Algorithm Constraints' };
+    const pageTitle = { dashboard: 'Timetable Generator', editor: 'Timetable Editor', print: 'Print View', timeslots: 'Time Slots', departments: 'Departments Setup', subjects: 'Course / Subject Details', faculty: 'Faculty Details', mappings: 'Course-Faculty Mappings', venues: 'Venues & Classrooms', venue_mappings: 'Department Venues', students: 'Students & Registrations', faculty_timetable: 'Faculty Personal Timetable', student_timetable: 'Student Personal Timetable', constraints: 'Algorithm Constraints', user_constraints: 'User Constraints' };
 
     const switchTab = (tab) => {
         setActiveTab(tab);
@@ -1298,6 +1299,7 @@ function App() {
                         { id: 'venues', icon: MapPin, label: 'Venues' },
                         { id: 'venue_mappings', icon: Layers, label: 'Venue Mapping' },
                         { id: 'constraints', icon: Settings, label: 'Constraints & Rules' },
+                        { id: 'user_constraints', icon: Filter, label: 'User Constraints' },
                         { id: 'common_courses', icon: Link2, label: 'Common Courses' }
                     ].map(item => (
                         <button key={item.id} onClick={() => switchTab(item.id)}
@@ -1345,6 +1347,7 @@ function App() {
                         {activeTab === 'venues' && <Venues />}
                         {activeTab === 'venue_mappings' && <VenueMapping />}
                         {activeTab === 'constraints' && <ConstraintsManager />}
+                        {activeTab === 'user_constraints' && <UserConstraints />}
                         {activeTab === 'common_courses' && (
                             <CommonCourses
                                 allCourses={allCourses}

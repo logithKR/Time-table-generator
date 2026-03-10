@@ -1,10 +1,10 @@
-import React, { useRef, useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { Printer, AlertCircle, RefreshCw, Download, Loader2 } from 'lucide-react';
-import html2canvas from 'html2canvas';
+import { toPng } from 'html-to-image';
 import jsPDF from 'jspdf';
 
 const BITTimetable = ({ timetableData, department, semester, courses, slots, onRefresh }) => {
-    const componentRef = useRef();
+    const componentRef = useRef(null);
     const [downloading, setDownloading] = useState(false);
 
     // Display Toggles
@@ -77,63 +77,43 @@ const BITTimetable = ({ timetableData, department, semester, courses, slots, onR
         return null;
     }, [courses, showLabels]);
 
-    // --- PDF Download: capture the on-screen timetable directly (screenshot quality) ---
+    // --- PDF Download relies on html-to-image for accurate screenshot capture ---
     const handleDownloadPDF = useCallback(async () => {
         if (!timetableData || timetableData.length === 0) return;
         if (!componentRef.current) return;
         setDownloading(true);
         try {
-            const canvas = await html2canvas(componentRef.current, {
-                scale: 3,
-                useCORS: true,
-                logging: false,
-                backgroundColor: '#ffffff',
-                scrollX: 0,
-                scrollY: -window.scrollY,
-                windowWidth: document.documentElement.scrollWidth,
-                windowHeight: document.documentElement.scrollHeight,
-                onclone: (_clonedDoc, clonedElement) => {
-                    // html2canvas reads computed styles — Tailwind v4 resolves color classes
-                    // like bg-white to oklch() which html2canvas can't parse.
-                    // Fix: read computed styles from ORIGINAL elements, copy safe hex values to clones.
-                    const origEl = componentRef.current;
-                    const origAll = Array.from(origEl.querySelectorAll('*'));
-                    const cloneAll = Array.from(clonedElement.querySelectorAll('*'));
-                    const colorProps = [
-                        'backgroundColor', 'color',
-                        'borderTopColor', 'borderRightColor', 'borderBottomColor', 'borderLeftColor',
-                    ];
-                    const oklchToSafe = (prop, _val) => {
-                        if (prop === 'color') return '#000000';
-                        if (prop === 'backgroundColor') return '#ffffff';
-                        return '#000000';
-                    };
-                    // Fix root cloned element itself
-                    const rootCs = window.getComputedStyle(origEl);
-                    colorProps.forEach(prop => {
-                        const val = rootCs[prop];
-                        if (val && val.includes('oklch')) clonedElement.style[prop] = oklchToSafe(prop, val);
-                    });
-                    // Fix all descendants
-                    origAll.forEach((orig, idx) => {
-                        const clone = cloneAll[idx];
-                        if (!clone) return;
-                        const cs = window.getComputedStyle(orig);
-                        colorProps.forEach(prop => {
-                            const val = cs[prop];
-                            if (val && val.includes('oklch')) clone.style[prop] = oklchToSafe(prop, val);
-                        });
-                    });
-                },
+            // Give react a moment to render the loading state
+            await new Promise(r => setTimeout(r, 100));
+
+            // toPng is vastly superior to html2canvas for Tailwind / modern CSS
+            const dataUrl = await toPng(componentRef.current, {
+                quality: 1.0,
+                pixelRatio: 3, // High-res capture
+                backgroundColor: '#ffffff'
             });
 
-            const imgData = canvas.toDataURL('image/png');
+            // A4 landscape sizing
             const pdf = new jsPDF({
-                orientation: canvas.width > canvas.height ? 'landscape' : 'portrait',
+                orientation: 'landscape',
                 unit: 'px',
-                format: [canvas.width, canvas.height]
+                format: 'a4'
             });
-            pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+
+            const pdfWidth = pdf.internal.pageSize.getWidth();
+            const pdfHeight = pdf.internal.pageSize.getHeight();
+
+            // Calculate aspect ratio fit
+            const imgProps = pdf.getImageProperties(dataUrl);
+            const ratio = Math.min(pdfWidth / imgProps.width, pdfHeight / imgProps.height);
+            const imgWidth = imgProps.width * ratio;
+            const imgHeight = imgProps.height * ratio;
+
+            // Center the image horizontally and vertically
+            const marginX = Math.max(0, (pdfWidth - imgWidth) / 2);
+            const marginY = Math.max(0, (pdfHeight - imgHeight) / 2);
+
+            pdf.addImage(dataUrl, 'PNG', marginX, marginY, imgWidth, imgHeight);
             pdf.save(`Timetable_${department || 'Master'}_${semester || 'All'}.pdf`);
         } catch (error) {
             console.error("PDF Generation failed:", error);
@@ -141,7 +121,7 @@ const BITTimetable = ({ timetableData, department, semester, courses, slots, onR
         } finally {
             setDownloading(false);
         }
-    }, [timetableData, department, semester, componentRef]);
+    }, [timetableData, department, semester]);
 
     // --- SAFETY CHECK ---
     if (!timetableData || timetableData.length === 0) {
@@ -161,23 +141,53 @@ const BITTimetable = ({ timetableData, department, semester, courses, slots, onR
 
     return (
         <div className="bg-white min-h-screen" style={{ fontFamily: 'Arial, sans-serif' }}>
-            {/* CSS for Print */}
+            {/* CSS for Print - Perfect Screenshot Look */}
             <style>{`
                 @media print {
-                    body * { visibility: hidden; }
-                    #printable-content, #printable-content * { visibility: visible; }
+                    body * { visibility: hidden !important; }
+                    /* Show only printable content and its children */
+                    #printable-content, #printable-content * { 
+                        visibility: visible !important; 
+                        /* Force background colors to print exactly as seen */
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
+                    
+                    /* Reset everything to let the table fill the page perfectly */
+                    /* Reset everything to let the table fill the page perfectly */
+                    body, html {
+                        margin: 0 !important;
+                        padding: 0 !important;
+                        background: #ffffff !important;
+                    }
+
                     #printable-content {
-                        position: fixed;
-                        inset: 0;
-                        width: 100vw !important;
-                        height: 100vh !important;
+                        position: absolute !important;
+                        left: 0 !important;
+                        top: 0 !important;
+                        /* The secret to making it fit: extend the width then scale it down! */
+                        width: 133% !important; 
                         max-width: none !important;
                         margin: 0 !important;
-                        padding: 4mm !important;
-                        box-sizing: border-box;
+                        padding: 8mm !important; 
+                        box-sizing: border-box !important;
+                        page-break-after: avoid !important;
+                        
+                        /* Scale down globally so the 1135px table fits onto the ~1050px landscape page */
+                        zoom: 0.75;
+                        /* Firefox fallback */
+                        transform: scale(0.75);
+                        transform-origin: top left;
                     }
-                    .no-print, button { display: none !important; }
-                    @page { size: landscape; margin: 0; }
+
+                    /* Hide UI elements */
+                    .no-print { display: none !important; }
+
+                    /* Enforce landscape and zero native margin */
+                    @page { 
+                        size: A4 landscape;
+                        margin: 0mm; 
+                    }
                 }
             `}</style>
 
@@ -203,18 +213,18 @@ const BITTimetable = ({ timetableData, department, semester, courses, slots, onR
                     </label>
                 </div>
                 <div className="flex gap-4">
-                    <button onClick={handleDownloadPDF} disabled={downloading} className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded shadow hover:bg-emerald-700 font-sans transition-all disabled:opacity-50">
+                    <button onClick={handleDownloadPDF} disabled={downloading} className="flex items-center gap-2 bg-emerald-600 text-white px-5 py-2.5 rounded-lg shadow-md hover:bg-emerald-700 font-sans font-bold transition-all disabled:opacity-70">
                         {downloading ? <Loader2 className="animate-spin" size={20} /> : <Download size={20} />}
-                        Download PDF
+                        {downloading ? 'Capturing Image...' : 'Download Image PDF'}
                     </button>
-                    <button onClick={handlePrint} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded shadow hover:bg-blue-700 font-sans transition-all">
-                        <Printer size={20} /> Print View
+                    <button onClick={handlePrint} className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-lg shadow-md hover:bg-blue-700 font-sans font-bold transition-all">
+                        <Printer size={20} /> Print Layout
                     </button>
                 </div>
             </div>
 
-            {/* Printable Content */}
-            <div className="w-full bg-white print:shadow-none">
+            {/* Printable Content - Now managed simply by browser scaling */}
+            <div className="w-full bg-white print:shadow-none bg-transparent">
                 <div id="printable-content" ref={componentRef} className="w-full" style={{ backgroundColor: '#ffffff', padding: '6mm' }}>
                     {/* Header */}
                     <div className="flex" style={{ border: '2px solid #000000', borderBottom: 'none' }}>

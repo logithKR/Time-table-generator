@@ -24,6 +24,24 @@ class CourseCreate(BaseModel):
     is_elective: bool = False
     is_open_elective: bool = False
     is_add_course: bool = False
+    common_departments: Optional[List[str]] = []
+
+class CourseUpdate(BaseModel):
+    course_name: Optional[str] = None
+    department_code: Optional[str] = None
+    semester: Optional[int] = None
+    lecture_hours: Optional[int] = None
+    tutorial_hours: Optional[int] = None
+    practical_hours: Optional[int] = None
+    credits: Optional[int] = None
+    weekly_sessions: Optional[int] = None
+    is_lab: Optional[bool] = None
+    is_honours: Optional[bool] = None
+    is_minor: Optional[bool] = None
+    is_elective: Optional[bool] = None
+    is_open_elective: Optional[bool] = None
+    is_add_course: Optional[bool] = None
+    common_departments: Optional[List[str]] = None
 
 class FacultyCreate(BaseModel):
     faculty_id: str

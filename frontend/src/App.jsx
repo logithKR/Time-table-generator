@@ -31,7 +31,7 @@ import {
 } from 'lucide-react';
 import TimetableEditor from './components/TimetableEditor';
 import ConstraintsManager from './components/ConstraintsManager';
-import CommonCourses from './components/CommonCourses';
+
 import Venues from './components/Venues';
 import VenueMapping from './components/VenueMapping';
 import DepartmentsManager from './components/DepartmentsManager';
@@ -65,6 +65,9 @@ function App() {
 
     // Show/hide add forms
     const [showAddCourse, setShowAddCourse] = useState(false);
+    const [editingCourse, setEditingCourse] = useState(null);
+    const [newCourseIsHonoursOrMinor, setNewCourseIsHonoursOrMinor] = useState(false);
+    const [newCourseCommonDepts, setNewCourseCommonDepts] = useState([]);
     const [showAddFaculty, setShowAddFaculty] = useState(false);
     const [showAddMapping, setShowAddMapping] = useState(false);
     const [editorDept, setEditorDept] = useState('');
@@ -142,13 +145,44 @@ function App() {
             is_honours: fd.get('is_honours') === 'on',
             is_minor: fd.get('is_minor') === 'on',
             is_elective: fd.get('is_elective') === 'on',
+            common_departments: newCourseCommonDepts
         };
         try {
             await api.createCourse(data);
             setShowAddCourse(false);
+            setNewCourseIsHonoursOrMinor(false);
+            setNewCourseCommonDepts([]);
             fetchCourses();
             fetchMasterData();
             e.target.reset();
+        } catch (err) { alert(err.response?.data?.detail || err.message); }
+    };
+
+    const handleUpdateCourse = async (e, originalCode) => {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        const data = {
+            course_name: fd.get('course_name'),
+            department_code: fd.get('department_code'),
+            semester: parseInt(fd.get('semester')),
+            lecture_hours: parseInt(fd.get('lecture_hours') || '0'),
+            tutorial_hours: parseInt(fd.get('tutorial_hours') || '0'),
+            practical_hours: parseInt(fd.get('practical_hours') || '0'),
+            credits: parseInt(fd.get('credits') || '0'),
+            weekly_sessions: parseInt(fd.get('weekly_sessions') || '1'),
+            is_lab: fd.get('is_lab') === 'on',
+            is_honours: fd.get('is_honours') === 'on',
+            is_minor: fd.get('is_minor') === 'on',
+            is_elective: fd.get('is_elective') === 'on',
+            common_departments: newCourseCommonDepts
+        };
+        try {
+            await api.updateCourse(originalCode, data);
+            setEditingCourse(null);
+            setNewCourseIsHonoursOrMinor(false);
+            setNewCourseCommonDepts([]);
+            fetchCourses();
+            fetchMasterData();
         } catch (err) { alert(err.response?.data?.detail || err.message); }
     };
 
@@ -563,30 +597,199 @@ function App() {
                     <div className="bg-white rounded-2xl border-2 border-violet-200 shadow-xl shadow-violet-100/50 p-6">
                         <h4 className="font-bold text-gray-800 mb-4 flex items-center gap-2"><Plus className="w-4 h-4 text-violet-600" /> Add New Course</h4>
                         <form onSubmit={handleAddCourse} className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                            <input name="course_code" placeholder="Course Code *" required className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
-                            <input name="course_name" placeholder="Course Name *" required className="p-2.5 border border-violet-200 rounded-xl text-sm col-span-2 focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
-                            <select name="department_code" required className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm">
-                                <option value="">Department *</option>
-                                {departments.map(d => <option key={d.department_code} value={d.department_code}>{d.department_code}</option>)}
-                            </select>
-                            <select name="semester" required className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm">
-                                <option value="">Semester *</option>
-                                {semesters.map(s => <option key={s.semester_number} value={s.semester_number}>Sem {s.semester_number}</option>)}
-                            </select>
-                            <input name="lecture_hours" type="number" placeholder="L hours" defaultValue="0" min="0" className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
-                            <input name="tutorial_hours" type="number" placeholder="T hours" defaultValue="0" min="0" className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
-                            <input name="practical_hours" type="number" placeholder="P hours" defaultValue="0" min="0" className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
-                            <input name="credits" type="number" placeholder="Credits" defaultValue="0" min="0" className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
-                            <input name="weekly_sessions" type="number" placeholder="Weekly Sessions *" defaultValue="1" min="1" required className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
-                            <div className="flex flex-wrap gap-4 items-center col-span-2">
+                            <div className="flex flex-col gap-1">
+                                <label className="text-xs font-semibold text-slate-500 uppercase">Course Code *</label>
+                                <input name="course_code" placeholder="e.g. 21CS101" required className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
+                            </div>
+                            <div className="flex flex-col gap-1 col-span-2">
+                                <label className="text-xs font-semibold text-slate-500 uppercase">Course Name *</label>
+                                <input name="course_name" placeholder="e.g. Data Structures" required className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <label className="text-xs font-semibold text-slate-500 uppercase">Department *</label>
+                                <select name="department_code" required className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm">
+                                    <option value="">Select Dept</option>
+                                    {departments.map(d => <option key={d.department_code} value={d.department_code}>{d.department_code}</option>)}
+                                </select>
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <label className="text-xs font-semibold text-slate-500 uppercase">Semester *</label>
+                                <select name="semester" required className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm">
+                                    <option value="">Select Sem</option>
+                                    {semesters.map(s => <option key={s.semester_number} value={s.semester_number}>Sem {s.semester_number}</option>)}
+                                </select>
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <label className="text-xs font-semibold text-slate-500 uppercase">L Hours</label>
+                                <input name="lecture_hours" type="number" defaultValue="0" min="0" className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <label className="text-xs font-semibold text-slate-500 uppercase">T Hours</label>
+                                <input name="tutorial_hours" type="number" defaultValue="0" min="0" className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <label className="text-xs font-semibold text-slate-500 uppercase">P Hours</label>
+                                <input name="practical_hours" type="number" defaultValue="0" min="0" className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <label className="text-xs font-semibold text-slate-500 uppercase">Credits</label>
+                                <input name="credits" type="number" defaultValue="0" min="0" className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <label className="text-xs font-semibold text-slate-500 uppercase">Weekly Sessions *</label>
+                                <input name="weekly_sessions" type="number" defaultValue="1" min="1" required className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
+                            </div>
+                            <div className="flex flex-wrap gap-4 items-center col-span-3">
                                 <label className="flex items-center gap-1.5 text-xs font-medium text-gray-600 cursor-pointer"><input name="is_lab" type="checkbox" className="rounded border-violet-300 text-violet-600 focus:ring-violet-400" /> Lab</label>
-                                <label className="flex items-center gap-1.5 text-xs font-medium text-gray-600 cursor-pointer"><input name="is_honours" type="checkbox" className="rounded border-violet-300 text-violet-600 focus:ring-violet-400" /> Honours</label>
-                                <label className="flex items-center gap-1.5 text-xs font-medium text-gray-600 cursor-pointer"><input name="is_minor" type="checkbox" className="rounded border-violet-300 text-violet-600 focus:ring-violet-400" /> Minor</label>
+                                <label className="flex items-center gap-1.5 text-xs font-medium text-gray-600 cursor-pointer">
+                                    <input name="is_honours" type="checkbox" className="rounded border-violet-300 text-violet-600 focus:ring-violet-400" onChange={(e) => {
+                                        const form = e.target.closest('form');
+                                        setNewCourseIsHonoursOrMinor(e.target.checked || form.elements['is_minor'].checked);
+                                    }} /> Honours
+                                </label>
+                                <label className="flex items-center gap-1.5 text-xs font-medium text-gray-600 cursor-pointer">
+                                    <input name="is_minor" type="checkbox" className="rounded border-violet-300 text-violet-600 focus:ring-violet-400" onChange={(e) => {
+                                        const form = e.target.closest('form');
+                                        setNewCourseIsHonoursOrMinor(e.target.checked || form.elements['is_honours'].checked);
+                                    }} /> Minor
+                                </label>
                                 <label className="flex items-center gap-1.5 text-xs font-medium text-gray-600 cursor-pointer"><input name="is_elective" type="checkbox" className="rounded border-violet-300 text-violet-600 focus:ring-violet-400" /> Elective</label>
                             </div>
+
+                            {newCourseIsHonoursOrMinor && (
+                                <div className="col-span-full space-y-2 p-4 bg-slate-50 border border-slate-200 rounded-xl mt-2">
+                                    <label className="text-sm font-semibold text-slate-700">Common across departments?</label>
+                                    <p className="text-xs text-slate-500 mb-2">Select other departments that share this course.</p>
+                                    <div className="flex flex-wrap gap-2">
+                                        {departments.map(dept => {
+                                            const isSelected = newCourseCommonDepts.includes(dept.department_code);
+                                            return (
+                                                <button
+                                                    key={dept.department_code}
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setNewCourseCommonDepts(prev =>
+                                                            isSelected ? prev.filter(c => c !== dept.department_code) : [...prev, dept.department_code]
+                                                        );
+                                                    }}
+                                                    className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-all ${isSelected
+                                                        ? 'bg-violet-100 text-violet-700 border-violet-200 shadow-sm'
+                                                        : 'bg-white text-slate-600 border-slate-200 hover:border-violet-300'
+                                                        }`}
+                                                >
+                                                    {dept.department_code}
+                                                </button>
+                                            );
+                                        })}
+                                        {departments.length === 0 && <p className="text-xs text-slate-400 italic">No departments available.</p>}
+                                    </div>
+                                </div>
+                            )}
                             <div className="flex gap-2">
                                 <button type="submit" className="bg-violet-600 hover:bg-violet-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-violet-200 transition-all">Save</button>
                                 <button type="button" onClick={() => setShowAddCourse(false)} className="bg-gray-100 hover:bg-gray-200 text-gray-600 px-4 py-2.5 rounded-xl text-sm font-medium transition-all">Cancel</button>
+                            </div>
+                        </form>
+                    </div>
+                )}
+
+                {editingCourse && (
+                    <div className="bg-white rounded-2xl border-2 border-violet-400 shadow-xl shadow-violet-200/50 p-6">
+                        <h4 className="font-bold text-gray-800 mb-4 flex items-center gap-2"><Pencil className="w-4 h-4 text-violet-600" /> Edit Course {editingCourse.course_code}</h4>
+                        <form onSubmit={(e) => handleUpdateCourse(e, editingCourse.course_code)} className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            <div className="flex flex-col gap-1">
+                                <label className="text-xs font-semibold text-slate-500 uppercase">Course Name</label>
+                                <input name="course_name" defaultValue={editingCourse.course_name} required className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <label className="text-xs font-semibold text-slate-500 uppercase">Department</label>
+                                <select name="department_code" defaultValue={editingCourse.department_code} required className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm">
+                                    <option value="">Department *</option>
+                                    {departments.map(d => <option key={d.department_code} value={d.department_code}>{d.department_code}</option>)}
+                                </select>
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <label className="text-xs font-semibold text-slate-500 uppercase">Semester</label>
+                                <select name="semester" defaultValue={editingCourse.semester} required className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm">
+                                    <option value="">Semester *</option>
+                                    {semesters.map(s => <option key={s.semester_number} value={s.semester_number}>Sem {s.semester_number}</option>)}
+                                </select>
+                            </div>
+
+                            <div className="flex flex-col gap-1">
+                                <label className="text-xs font-semibold text-slate-500 uppercase">L Hours</label>
+                                <input name="lecture_hours" type="number" defaultValue={editingCourse.lecture_hours} min="0" className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <label className="text-xs font-semibold text-slate-500 uppercase">T Hours</label>
+                                <input name="tutorial_hours" type="number" defaultValue={editingCourse.tutorial_hours} min="0" className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <label className="text-xs font-semibold text-slate-500 uppercase">P Hours</label>
+                                <input name="practical_hours" type="number" defaultValue={editingCourse.practical_hours} min="0" className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <label className="text-xs font-semibold text-slate-500 uppercase">Credits</label>
+                                <input name="credits" type="number" defaultValue={editingCourse.credits} min="0" className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <label className="text-xs font-semibold text-slate-500 uppercase">Weekly Sessions</label>
+                                <input name="weekly_sessions" type="number" defaultValue={editingCourse.weekly_sessions} min="1" required className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
+                            </div>
+
+                            <div className="flex flex-wrap gap-4 items-center col-span-3">
+                                <label className="flex items-center gap-1.5 text-xs font-medium text-gray-600 cursor-pointer">
+                                    <input name="is_lab" type="checkbox" defaultChecked={editingCourse.is_lab} className="rounded border-violet-300 text-violet-600 focus:ring-violet-400" /> Lab
+                                </label>
+                                <label className="flex items-center gap-1.5 text-xs font-medium text-gray-600 cursor-pointer">
+                                    <input name="is_honours" type="checkbox" defaultChecked={editingCourse.is_honours} className="rounded border-violet-300 text-violet-600 focus:ring-violet-400" onChange={(e) => {
+                                        const form = e.target.closest('form');
+                                        setNewCourseIsHonoursOrMinor(e.target.checked || form.elements['is_minor'].checked);
+                                    }} /> Honours
+                                </label>
+                                <label className="flex items-center gap-1.5 text-xs font-medium text-gray-600 cursor-pointer">
+                                    <input name="is_minor" type="checkbox" defaultChecked={editingCourse.is_minor} className="rounded border-violet-300 text-violet-600 focus:ring-violet-400" onChange={(e) => {
+                                        const form = e.target.closest('form');
+                                        setNewCourseIsHonoursOrMinor(e.target.checked || form.elements['is_honours'].checked);
+                                    }} /> Minor
+                                </label>
+                                <label className="flex items-center gap-1.5 text-xs font-medium text-gray-600 cursor-pointer">
+                                    <input name="is_elective" type="checkbox" defaultChecked={editingCourse.is_elective} className="rounded border-violet-300 text-violet-600 focus:ring-violet-400" /> Elective
+                                </label>
+                            </div>
+
+                            {newCourseIsHonoursOrMinor && (
+                                <div className="col-span-full space-y-2 p-4 bg-slate-50 border border-slate-200 rounded-xl mt-2">
+                                    <label className="text-sm font-semibold text-slate-700">Common across departments?</label>
+                                    <p className="text-xs text-slate-500 mb-2">Select other departments that share this course.</p>
+                                    <div className="flex flex-wrap gap-2">
+                                        {departments.map(dept => {
+                                            const isSelected = newCourseCommonDepts.includes(dept.department_code);
+                                            return (
+                                                <button
+                                                    key={dept.department_code}
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setNewCourseCommonDepts(prev =>
+                                                            isSelected ? prev.filter(c => c !== dept.department_code) : [...prev, dept.department_code]
+                                                        );
+                                                    }}
+                                                    className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-all ${isSelected
+                                                        ? 'bg-violet-100 text-violet-700 border-violet-200 shadow-sm'
+                                                        : 'bg-white text-slate-600 border-slate-200 hover:border-violet-300'
+                                                        }`}
+                                                >
+                                                    {dept.department_code}
+                                                </button>
+                                            );
+                                        })}
+                                        {departments.length === 0 && <p className="text-xs text-slate-400 italic">No departments available.</p>}
+                                    </div>
+                                </div>
+                            )}
+                            <div className="flex gap-2 col-span-full mt-2">
+                                <button type="submit" className="bg-violet-600 hover:bg-violet-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-violet-200 transition-all">Update</button>
+                                <button type="button" onClick={() => { setEditingCourse(null); setNewCourseIsHonoursOrMinor(false); setNewCourseCommonDepts([]); }} className="bg-gray-100 hover:bg-gray-200 text-gray-600 px-4 py-2.5 rounded-xl text-sm font-medium transition-all">Cancel</button>
                             </div>
                         </form>
                     </div>
@@ -640,7 +843,21 @@ function App() {
                                                     {!c.is_honours && !c.is_minor && !c.is_lab && !c.is_elective && !c.is_open_elective && <span className="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-lg text-[10px] font-medium">Regular</span>}
                                                 </div>
                                             </td>
-                                            <td className="p-3.5 text-center">
+                                            <td className="p-3.5 text-center flex gap-1 justify-center">
+                                                <button onClick={async () => {
+                                                    setEditingCourse(c);
+                                                    setNewCourseIsHonoursOrMinor(c.is_honours || c.is_minor);
+                                                    try {
+                                                        const { data: commonMap } = await api.getCommonCourses();
+                                                        const group = commonMap.find(g => g.course_code === c.course_code && g.semester === c.semester);
+                                                        if (group) {
+                                                            setNewCourseCommonDepts(group.departments.filter(d => d !== c.department_code));
+                                                        } else {
+                                                            setNewCourseCommonDepts([]);
+                                                        }
+                                                    } catch (e) { console.error("Could not load common departments", e); setNewCourseCommonDepts([]); }
+                                                    setShowAddCourse(false); // Close add if open
+                                                }} className="text-violet-400 hover:text-violet-700 transition-colors p-1 rounded-lg hover:bg-violet-50" title="Edit"><Pencil className="w-4 h-4" /></button>
                                                 <button onClick={() => handleDeleteCourse(c.course_code)} className="text-red-300 hover:text-red-600 transition-colors p-1 rounded-lg hover:bg-red-50" title="Delete"><Trash2 className="w-4 h-4" /></button>
                                             </td>
                                         </tr>
@@ -1297,8 +1514,7 @@ function App() {
                         { id: 'timeslots', icon: Clock, label: 'Time Slots' },
                         { id: 'venues', icon: MapPin, label: 'Venues' },
                         { id: 'venue_mappings', icon: Layers, label: 'Venue Mapping' },
-                        { id: 'constraints', icon: Settings, label: 'Constraints & Rules' },
-                        { id: 'common_courses', icon: Link2, label: 'Common Courses' }
+                        { id: 'constraints', icon: Settings, label: 'Constraints & Rules' }
                     ].map(item => (
                         <button key={item.id} onClick={() => switchTab(item.id)}
                             title={isCollapsed ? item.label : ''}
@@ -1345,12 +1561,6 @@ function App() {
                         {activeTab === 'venues' && <Venues />}
                         {activeTab === 'venue_mappings' && <VenueMapping />}
                         {activeTab === 'constraints' && <ConstraintsManager />}
-                        {activeTab === 'common_courses' && (
-                            <CommonCourses
-                                allCourses={allCourses}
-                                departments={departments}
-                            />
-                        )}
                         {/* New Print View Render */}
                         {activeTab === 'print' && renderPrintViewPage()}
                     </div>

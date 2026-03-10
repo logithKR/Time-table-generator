@@ -177,42 +177,147 @@ def get_courses(department_code: str = None, semester: int = None, db: Session =
 
 @app.post("/courses")
 def create_course(req: schemas.CourseCreate, db: Session = Depends(get_db)):
-    existing = db.query(models.CourseMaster).filter_by(course_code=req.course_code).first()
-    if existing:
-        raise HTTPException(status_code=400, detail=f"Course {req.course_code} already exists")
-    dept = db.query(models.DepartmentMaster).filter_by(department_code=req.department_code).first()
-    if not dept:
-        raise HTTPException(status_code=400, detail=f"Department {req.department_code} does not exist")
-    # Auto-detect honours from course code
-    is_honours = req.is_honours or ('H' in req.course_code[-3:].upper())
-    course = models.CourseMaster(
-        course_code=req.course_code,
-        course_name=req.course_name,
-        department_code=req.department_code,
-        semester=req.semester,
-        lecture_hours=req.lecture_hours,
-        tutorial_hours=req.tutorial_hours,
-        practical_hours=req.practical_hours,
-        credits=req.credits,
-        weekly_sessions=req.weekly_sessions,
-        is_lab=req.is_lab,
-        is_honours=is_honours,
-        is_minor=req.is_minor,
-        is_elective=req.is_elective,
-        is_open_elective=req.is_open_elective
-    )
-    db.add(course)
-    db.commit()
-    return {"status": "success", "course_code": req.course_code}
+    target_depts = [req.department_code]
+    if getattr(req, 'common_departments', None):
+        for d in req.common_departments:
+            if d not in target_depts:
+                target_depts.append(d)
 
-@app.delete("/courses/{code}")
-def delete_course(code: str, db: Session = Depends(get_db)):
-    course = db.query(models.CourseMaster).filter_by(course_code=code).first()
-    if not course:
+    for d_code in target_depts:
+        dept = db.query(models.DepartmentMaster).filter_by(department_code=d_code).first()
+        if not dept:
+            raise HTTPException(status_code=400, detail=f"Department {d_code} does not exist")
+
+    is_honours = req.is_honours or ('H' in req.course_code[-3:].upper())
+    
+    created_count = 0
+    for d_code in target_depts:
+        existing = db.query(models.CourseMaster).filter_by(
+            course_code=req.course_code, department_code=d_code
+        ).first()
+        
+        if existing:
+            if d_code == req.department_code:
+                raise HTTPException(status_code=400, detail=f"Course {req.course_code} already exists in {d_code}")
+            continue
+
+        course = models.CourseMaster(
+            course_code=req.course_code,
+            course_name=req.course_name,
+            department_code=d_code,
+            semester=req.semester,
+            lecture_hours=req.lecture_hours,
+            tutorial_hours=req.tutorial_hours,
+            practical_hours=req.practical_hours,
+            credits=req.credits,
+            weekly_sessions=req.weekly_sessions,
+            is_lab=req.is_lab,
+            is_honours=is_honours,
+            is_minor=req.is_minor,
+            is_elective=req.is_elective,
+            is_open_elective=req.is_open_elective
+        )
+        db.add(course)
+        created_count += 1
+
+    if len(target_depts) > 1:
+        db.query(models.CommonCourseMap).filter_by(
+            course_code=req.course_code, semester=req.semester
+        ).delete()
+        for d_code in target_depts:
+            db.add(models.CommonCourseMap(
+                course_code=req.course_code,
+                semester=req.semester,
+                department_code=d_code
+            ))
+
+    db.commit()
+    return {"status": "success", "course_code": req.course_code, "created_records": created_count}
+
+@app.put("/courses/{code:path}")
+def update_course(code: str, req: schemas.CourseUpdate, db: Session = Depends(get_db)):
+    print(f"DEBUG PUT COURSE: received code={repr(code)}")
+    # Find all course masters with this code
+    existing_courses = db.query(models.CourseMaster).filter_by(course_code=code).all()
+    print(f"DEBUG PUT COURSE: found existing: {existing_courses}")
+    if not existing_courses:
         raise HTTPException(status_code=404, detail="Course not found")
+        
+    base_course = existing_courses[0]
+    primary_dept = req.department_code if req.department_code is not None else base_course.department_code
+    semester = req.semester if req.semester is not None else base_course.semester
+    
+    target_depts = [primary_dept]
+    if hasattr(req, 'common_departments') and req.common_departments is not None:
+        for d in req.common_departments:
+            if d not in target_depts:
+                target_depts.append(d)
+    else:
+        # If common_departments wasn't sent, keep existing mappings
+        common_maps = db.query(models.CommonCourseMap).filter_by(course_code=code).all()
+        for cm in common_maps:
+            if cm.department_code not in target_depts:
+                target_depts.append(cm.department_code)
+
+    # Validate DEPARTMENTS
+    for d_code in target_depts:
+        if not db.query(models.DepartmentMaster).filter_by(department_code=d_code).first():
+            raise HTTPException(status_code=400, detail=f"Department {d_code} does not exist")
+
+    is_honours = req.is_honours if req.is_honours is not None else base_course.is_honours
+    # Auto-detect honours if changed course code ends in H? (course code edit not supported via PUT right now)
+    
+    # 1. DELETE course masters that are no longer in target_depts
+    for existing in existing_courses:
+        if existing.department_code not in target_depts:
+            db.delete(existing)
+            
+    # 2. UPDATE/CREATE target_depts
+    for d_code in target_depts:
+        course = db.query(models.CourseMaster).filter_by(course_code=code, department_code=d_code).first()
+        if not course:
+            course = models.CourseMaster(course_code=code, department_code=d_code)
+            db.add(course)
+            
+        if req.course_name is not None: course.course_name = req.course_name
+        if req.semester is not None: course.semester = req.semester
+        if req.lecture_hours is not None: course.lecture_hours = req.lecture_hours
+        if req.tutorial_hours is not None: course.tutorial_hours = req.tutorial_hours
+        if req.practical_hours is not None: course.practical_hours = req.practical_hours
+        if req.credits is not None: course.credits = req.credits
+        if req.weekly_sessions is not None: course.weekly_sessions = req.weekly_sessions
+        if req.is_lab is not None: course.is_lab = req.is_lab
+        if req.is_honours is not None: course.is_honours = req.is_honours
+        if req.is_minor is not None: course.is_minor = req.is_minor
+        if req.is_elective is not None: course.is_elective = req.is_elective
+        if req.is_open_elective is not None: course.is_open_elective = req.is_open_elective
+
+    # 3. Rebuild CommonCourseMap if more than 1 dept
+    db.query(models.CommonCourseMap).filter_by(course_code=code).delete()
+    if len(target_depts) > 1:
+        for d_code in target_depts:
+            db.add(models.CommonCourseMap(
+                course_code=code,
+                semester=semester,
+                department_code=d_code
+            ))
+            
+    db.commit()
+    return {"status": "success", "course_code": code}
+
+@app.delete("/courses/{code:path}")
+def delete_course(code: str, db: Session = Depends(get_db)):
+    courses = db.query(models.CourseMaster).filter_by(course_code=code).all()
+    if not courses:
+        raise HTTPException(status_code=404, detail="Course not found")
+    
     # Remove course-faculty mappings
     db.query(models.CourseFacultyMap).filter_by(course_code=code).delete()
-    db.delete(course)
+    # Remove common course mapping
+    db.query(models.CommonCourseMap).filter_by(course_code=code).delete()
+    
+    for c in courses:
+        db.delete(c)
     db.commit()
     return {"status": "deleted"}
 
@@ -1187,7 +1292,7 @@ def save_common_course(req: CommonCourseRequest, db: Session = Depends(get_db)):
     return {"status": "saved", "course_code": req.course_code, "semester": req.semester}
 
 
-@app.delete("/common-courses/{course_code}/{semester}")
+@app.delete("/common-courses/{course_code:path}/{semester}")
 def delete_common_course(course_code: str, semester: int, db: Session = Depends(get_db)):
     """Remove all department mappings for a common course."""
     deleted = db.query(models.CommonCourseMap).filter_by(

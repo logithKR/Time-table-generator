@@ -29,6 +29,7 @@ export const getCourseFaculty = (deptCode) => {
 export const createDepartment = (data) => axios.post(`${API_URL}/departments`, data);
 export const createFaculty = (data) => axios.post(`${API_URL}/faculty`, data);
 export const createCourse = (data) => axios.post(`${API_URL}/courses`, data);
+export const updateCourse = (code, data) => axios.put(`${API_URL}/courses/${code}`, data);
 export const createCourseFaculty = (data) => axios.post(`${API_URL}/course-faculty`, data);
 export const createSlot = (data) => axios.post(`${API_URL}/slots`, data);
 
@@ -124,7 +125,7 @@ export const resetConfig = () => axios.post(`${API_URL}/api/config/reset`);
 export const getCommonCourses = () => axios.get(`${API_URL}/common-courses`);
 export const saveCommonCourse = (data) => axios.post(`${API_URL}/common-courses`, data);
 export const deleteCommonCourse = (courseCode, semester) =>
-    axios.delete(`${API_URL}/common-courses/${encodeURIComponent(courseCode)}/${semester}`);
+    axios.delete(`${API_URL}/common-courses/${courseCode}/${semester}`);
 
 // --- User Constraints ---
 export const getUserConstraints = (dept, sem) => {

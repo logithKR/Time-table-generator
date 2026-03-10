@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { getCourses, createCourse } from '../utils/api';
+import { getCourses, createCourse, getDepartments } from '../utils/api';
 import { Plus, BookOpen, Search, Filter } from 'lucide-react';
 
 const SubjectManager = () => {
     const [subjects, setSubjects] = useState([]);
+    const [departments, setDepartments] = useState([]);
     const [isAdding, setIsAdding] = useState(false);
 
     // Filters
@@ -13,12 +13,23 @@ const SubjectManager = () => {
     const [filterType, setFilterType] = useState('All');
 
     const [newSubject, setNewSubject] = useState({
-        course_code: '', course_name: '', semester: 1, department_code: '', weekly_sessions: 3, credits: 3, course_category: 'Core'
+        course_code: '', course_name: '', semester: 1, department_code: '', weekly_sessions: 3, credits: 3, course_category: 'Core',
+        is_honours: false, is_minor: false, common_departments: []
     });
 
     useEffect(() => {
         fetchSubjects();
+        fetchDepartments();
     }, []);
+
+    const fetchDepartments = async () => {
+        try {
+            const res = await getDepartments();
+            setDepartments(res.data);
+        } catch (err) {
+            console.error(err);
+        }
+    };
 
     const fetchSubjects = async () => {
         try {
@@ -34,6 +45,10 @@ const SubjectManager = () => {
         try {
             await createCourse(newSubject);
             setIsAdding(false);
+            setNewSubject({
+                course_code: '', course_name: '', semester: 1, department_code: '', weekly_sessions: 3, credits: 3, course_category: 'Core',
+                is_honours: false, is_minor: false, common_departments: []
+            });
             fetchSubjects();
         } catch (err) {
             console.error(err);
@@ -224,9 +239,59 @@ const SubjectManager = () => {
                                 placeholder="Department Code (e.g. CSE)"
                                 className="input-field"
                                 value={newSubject.department_code}
-                                onChange={e => setNewSubject({ ...newSubject, department_code: e.target.value })}
+                                onChange={e => setNewSubject({ ...newSubject, department_code: e.target.value.toUpperCase() })}
                                 required
                             />
+
+                            <div className="flex gap-4 items-center px-1">
+                                <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                                    <input type="checkbox" className="w-4 h-4 text-violet-600 rounded border-gray-300 focus:ring-violet-500"
+                                        checked={newSubject.is_honours}
+                                        onChange={e => setNewSubject({ ...newSubject, is_honours: e.target.checked })} />
+                                    Honours Course
+                                </label>
+                                <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                                    <input type="checkbox" className="w-4 h-4 text-violet-600 rounded border-gray-300 focus:ring-violet-500"
+                                        checked={newSubject.is_minor}
+                                        onChange={e => setNewSubject({ ...newSubject, is_minor: e.target.checked })} />
+                                    Minor Course
+                                </label>
+                            </div>
+
+                            {(newSubject.is_honours || newSubject.is_minor) && (
+                                <div className="space-y-2 p-4 bg-slate-50 border border-slate-200 rounded-xl">
+                                    <label className="text-sm font-semibold text-slate-700">Common across departments?</label>
+                                    <p className="text-xs text-slate-500 mb-2">Select other departments that share this course.</p>
+                                    <div className="flex flex-wrap gap-2">
+                                        {departments.filter(d => d.department_code !== newSubject.department_code).map(dept => {
+                                            const isSelected = newSubject.common_departments.includes(dept.department_code);
+                                            return (
+                                                <button
+                                                    key={dept.department_code}
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const current = newSubject.common_departments;
+                                                        setNewSubject({
+                                                            ...newSubject,
+                                                            common_departments: isSelected
+                                                                ? current.filter(c => c !== dept.department_code)
+                                                                : [...current, dept.department_code]
+                                                        });
+                                                    }}
+                                                    className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-all ${isSelected
+                                                        ? 'bg-violet-100 text-violet-700 border-violet-200 shadow-sm'
+                                                        : 'bg-white text-slate-600 border-slate-200 hover:border-violet-300'
+                                                        }`}
+                                                >
+                                                    {dept.department_code}
+                                                </button>
+                                            );
+                                        })}
+                                        {departments.length <= 1 && <p className="text-xs text-slate-400 italic">No other departments available.</p>}
+                                    </div>
+                                </div>
+                            )}
+
                             <div className="flex gap-3 pt-4">
                                 <button type="button" onClick={() => setIsAdding(false)} className="flex-1 py-3 text-slate-500 font-medium">Cancel</button>
                                 <button type="submit" className="flex-1 btn-primary">Save Subject</button>

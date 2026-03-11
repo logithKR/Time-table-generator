@@ -301,7 +301,7 @@ const DroppableGridCellSpan = ({ id, colSpan, entry, sections, isLabStart, onDel
     );
 };
 
-const ManualEntryModal = ({ isOpen, onClose, onSave, initialData, allSections, allCourses, department, semester, day, period }) => {
+const ManualEntryModal = ({ isOpen, onClose, onSave, initialData, allSections, initialSpan = 1, allCourses, department, semester, day, period, gridMap, validPeriods }) => {
     if (!isOpen) return null;
     const [formData, setFormData] = useState(initialData || { course_code: '', course_name: '', faculty_name: '', venue_name: '' });
     const [sectionEdits, setSectionEdits] = useState([]);
@@ -311,6 +311,10 @@ const ManualEntryModal = ({ isOpen, onClose, onSave, initialData, allSections, a
     const [manualMode, setManualMode] = useState({});
     const [activeTab, setActiveTab] = useState(0);
     const [isAddingCourse, setIsAddingCourse] = useState(false);
+    const [currentSpan, setCurrentSpan] = useState(initialSpan);
+    const [isExtending, setIsExtending] = useState(false);
+
+    React.useEffect(() => { setCurrentSpan(initialSpan); }, [initialSpan, isOpen]);
 
     // Group sections by course_code for multi-course editing (Fix 3)
     const courseGroups = React.useMemo(() => {
@@ -367,7 +371,7 @@ const ManualEntryModal = ({ isOpen, onClose, onSave, initialData, allSections, a
     const handleSubmit = (e) => {
         e.preventDefault();
         // Pass ALL sectionEdits (including deleted) so handleManualSave can remove originals
-        onSave(formData, sectionEdits);
+        onSave(formData, sectionEdits, currentSpan);
         onClose();
     };
 
@@ -631,15 +635,82 @@ const ManualEntryModal = ({ isOpen, onClose, onSave, initialData, allSections, a
                         </div>
                     )}
 
-                    <div className="flex items-center gap-2 text-[10px] text-gray-400 font-medium">
-                        <span className="bg-gray-100 px-2 py-0.5 rounded">{day}</span>
-                        <span className="bg-gray-100 px-2 py-0.5 rounded">Period {period}</span>
-                        <span className="bg-gray-100 px-2 py-0.5 rounded">{department} - Sem {semester}</span>
-                    </div>
+                    <div className="flex justify-between items-center gap-2 mt-2 border-t border-gray-100 pt-3">
+                        <div className="flex flex-col gap-1.5">
+                            <div className="flex items-center gap-2 text-[10px] text-gray-500 font-bold uppercase tracking-wider">
+                                <span className="bg-gray-100 px-2 py-0.5 rounded border border-gray-200">{day}</span>
+                                <span className="bg-gray-100 px-2 py-0.5 rounded border border-gray-200">
+                                    Period {period} {currentSpan > 1 ? `to ${period + currentSpan - 1}` : ''}
+                                </span>
+                                <span className="bg-gray-100 px-2 py-0.5 rounded border border-gray-200">{department} - Sem {semester}</span>
+                            </div>
 
-                    <div className="flex justify-end gap-2">
-                        <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-bold text-gray-500 hover:bg-gray-100 rounded-lg">Cancel</button>
-                        <button type="submit" className="px-4 py-2 text-sm font-bold text-white bg-violet-600 hover:bg-violet-700 rounded-lg shadow-lg hover:shadow-violet-200">Save</button>
+                            <div className="flex items-center gap-2 flex-wrap">
+                                {(sectionEdits[0]?.session_type || formData.session_type) !== 'LAB' && (
+                                    <button type="button" onClick={() => {
+                                        setSectionEdits(prev => prev.map(s => ({ ...s, session_type: 'LAB' })));
+                                        setFormData(prev => ({ ...prev, session_type: 'LAB' }));
+                                    }}
+                                        className="text-[10px] px-2.5 py-1 font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg transition-all flex items-center gap-1" title="Convert to Lab Slot">
+                                        <FlaskConical className="w-3 h-3" /> Convert to Lab Slot
+                                    </button>
+                                )}
+                                {(sectionEdits[0]?.session_type || formData.session_type) === 'LAB' && (
+                                    <button type="button" onClick={() => {
+                                        setSectionEdits(prev => prev.map(s => ({ ...s, session_type: 'THEORY' })));
+                                        setFormData(prev => ({ ...prev, session_type: 'THEORY' }));
+                                    }}
+                                        className="text-[10px] px-2.5 py-1 font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition-all flex items-center gap-1" title="Convert to Theory Slot">
+                                        Convert to Theory Slot
+                                    </button>
+                                )}
+
+                                <button type="button" disabled={isExtending} onClick={async () => {
+                                    const targetP = period + currentSpan;
+                                    if (validPeriods && !validPeriods.has(targetP)) {
+                                        alert("Cannot extend beyond valid periods for the day."); return;
+                                    }
+                                    const existing = gridMap[`${day}-${targetP}`];
+                                    if (existing) {
+                                        alert(`Period ${targetP} is already occupied by ${existing.course_code}. Please clear it first before extending.`); return;
+                                    }
+                                    setIsExtending(true);
+                                    try {
+                                        const [facRes, venRes] = await Promise.all([
+                                            api.getAvailableFaculty(department, day, targetP).catch(() => ({ data: [] })),
+                                            api.getAvailableVenues(department, semester, day, targetP).catch(() => ({ data: [] }))
+                                        ]);
+                                        const availFacs = facRes.data || [];
+                                        const availVens = venRes.data || [];
+                                        for (const sec of sectionEdits.filter(s => !s._deleted)) {
+                                            if (sec.faculty_name && sec.faculty_name.trim().toLowerCase() !== 'unassigned') {
+                                                const fa = availFacs.find(f => f.faculty_name === sec.faculty_name);
+                                                if (!fa || !fa.is_available) {
+                                                    alert(`Cannot extend: Faculty '${sec.faculty_name}' is not available in Period ${targetP}.`);
+                                                    setIsExtending(false); return;
+                                                }
+                                            }
+                                            if (sec.venue_name && sec.venue_name.trim().toLowerCase() !== 'unassigned') {
+                                                const va = availVens.find(v => v.venue_name === sec.venue_name);
+                                                if (!va || !va.is_available) {
+                                                    alert(`Cannot extend: Venue '${sec.venue_name}' is not available in Period ${targetP}.`);
+                                                    setIsExtending(false); return;
+                                                }
+                                            }
+                                        }
+                                        setCurrentSpan(prev => prev + 1);
+                                    } finally { setIsExtending(false); }
+                                }}
+                                    className={`text-[10px] px-2.5 py-1 font-bold text-blue-700 bg-blue-50 border border-blue-200 rounded-lg transition-all flex items-center gap-1 ${isExtending ? 'opacity-50 cursor-wait' : 'hover:bg-blue-100'}`} title="Extend block by 1 more period">
+                                    {isExtending ? 'Checking Availability...' : '+ Extend Period'}
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="flex justify-end gap-2 shrink-0">
+                            <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-bold text-gray-500 hover:bg-gray-100 rounded-lg">Cancel</button>
+                            <button type="submit" className="px-4 py-2 text-sm font-bold text-white bg-violet-600 hover:bg-violet-700 rounded-lg shadow-lg hover:shadow-violet-200">Save</button>
+                        </div>
                     </div>
                 </form>
             </div>
@@ -948,10 +1019,8 @@ export default function TimetableEditor({ department, semester, onSave, onExport
             day_of_week: day, period_number: period
         };
 
-        // Simple insert: delete what's at target, place new (Fix 2)
         const newEntries = simpleInsert(newEntry, isLab ? 2 : 1, entries);
 
-        // Conflict check (Fix 7)
         const insertedEntries = isLab
             ? [{ ...newEntry }, { ...newEntry, period_number: period + 1 }]
             : [newEntry];
@@ -970,34 +1039,37 @@ export default function TimetableEditor({ department, semester, onSave, onExport
             if (!isValidPeriod(newDay, newPeriod)) return;
         }
 
-        // Collect ALL entries at the source slot (not just the primary)
         const sourceKey = `${entry.day_of_week}-${entry.period_number}`;
         const allSourceEntries = sectionsMap[sourceKey] || [entry];
 
-        // For labs, also get entries at period+1 or period-1
         let fullSource = [...allSourceEntries];
-        if (isLab) {
-            const adjacentPeriod = isLabBlockStart(entry.day_of_week, entry.period_number)
-                ? entry.period_number + 1
-                : entry.period_number - 1;
-            const adjKey = `${entry.day_of_week}-${adjacentPeriod}`;
+
+        let headP = entry.period_number;
+        while (headP > 1) {
+            const prevE = gridMap[`${entry.day_of_week}-${headP - 1}`];
+            if (prevE && prevE.course_code === entry.course_code && prevE.session_type === entry.session_type) headP--;
+            else break;
+        }
+        const blockSpan = getBlockSpan(entry.day_of_week, headP, entry.course_code, entry.session_type);
+        for (let i = 0; i < blockSpan; i++) {
+            const adjKey = `${entry.day_of_week}-${headP + i}`;
             const adjEntries = sectionsMap[adjKey] || [];
             adjEntries.forEach(e => {
-                if (e.course_code === entry.course_code && e.session_type === 'LAB' && !fullSource.includes(e)) {
+                if (e.course_code === entry.course_code && e.session_type === entry.session_type && !fullSource.includes(e)) {
                     fullSource.push(e);
                 }
             });
         }
 
-        // Remove source entries
         let tempEntries = entries.filter(e => !fullSource.includes(e));
 
-        // Simple insert at target: remove whatever is at target (Fix 2)
-        const targetPeriods = isLab ? [newPeriod, newPeriod + 1] : [newPeriod];
+        const sourceStartP = Math.min(...fullSource.map(e => e.period_number));
+
+        const targetPeriods = [];
+        for (let i = 0; i < blockSpan; i++) targetPeriods.push(newPeriod + i);
+
         tempEntries = tempEntries.filter(e => !(e.day_of_week === newDay && targetPeriods.includes(e.period_number)));
 
-        // Place all source entries at the new position
-        const sourceStartP = Math.min(...fullSource.map(e => e.period_number));
         const movedEntries = fullSource.map(e => ({
             ...e,
             day_of_week: newDay,
@@ -1055,14 +1127,19 @@ export default function TimetableEditor({ department, semester, onSave, onExport
         const entry = gridMap[`${day}-${period}`];
         if (!entry) return;
 
-        if (entry.session_type === 'LAB') {
-            setEntries(prev => prev.filter(e => !(
-                e.day_of_week === day && e.course_code === entry.course_code && e.session_type === 'LAB' &&
-                Math.abs(e.period_number - period) <= 1
-            )));
-        } else {
-            setEntries(prev => prev.filter(e => !(e.day_of_week === day && e.period_number === period)));
+        let headP = period;
+        while (headP > 1) {
+            const prevE = gridMap[`${day}-${headP - 1}`];
+            if (prevE && prevE.course_code === entry.course_code && prevE.session_type === entry.session_type) headP--;
+            else break;
         }
+        const blockSpan = getBlockSpan(day, headP, entry.course_code, entry.session_type);
+        const periodsToRemove = Array.from({ length: blockSpan }, (_, i) => headP + i);
+
+        setEntries(prev => prev.filter(e => !(
+            e.day_of_week === day && e.course_code === entry.course_code && e.session_type === entry.session_type &&
+            periodsToRemove.includes(e.period_number)
+        )));
     };
 
     const handleSave = async () => {
@@ -1074,19 +1151,32 @@ export default function TimetableEditor({ department, semester, onSave, onExport
         }
     };
 
-    const isLabBlockStart = (day, period) => {
+    const isBlockStart = (day, period) => {
         const entry = gridMap[`${day}-${period}`];
-        if (!entry || entry.session_type !== 'LAB') return false;
+        if (!entry) return false;
         const prevEntry = gridMap[`${day}-${period - 1}`];
-        if (prevEntry && prevEntry.course_code === entry.course_code && prevEntry.session_type === 'LAB') return false;
+        if (prevEntry && prevEntry.course_code === entry.course_code && prevEntry.session_type === entry.session_type) return false;
         return true;
     };
 
-    const isLabBlockTail = (day, period) => {
+    const getBlockSpan = useCallback((day, period, courseCode, sessionType) => {
+        let span = 1;
+        let currP = period + 1;
+        while (currP <= 8) {
+            const e = gridMap[`${day}-${currP}`];
+            if (e && e.course_code === courseCode && e.session_type === sessionType) {
+                span++;
+                currP++;
+            } else break;
+        }
+        return span;
+    }, [gridMap]);
+
+    const isBlockTail = (day, period) => {
         const entry = gridMap[`${day}-${period}`];
-        if (!entry || entry.session_type !== 'LAB') return false;
+        if (!entry) return false;
         const prevEntry = gridMap[`${day}-${period - 1}`];
-        return prevEntry && prevEntry.course_code === entry.course_code && prevEntry.session_type === 'LAB';
+        return prevEntry && prevEntry.course_code === entry.course_code && prevEntry.session_type === entry.session_type;
     };
 
     const handleSwapClick = (day, period, entry) => {
@@ -1125,18 +1215,23 @@ export default function TimetableEditor({ department, semester, onSave, onExport
         const getSlotEntries = (refEntry, d, p) => {
             const key = `${d}-${p}`;
             let group = [...(sectionsMap[key] || [])];
-            // For labs, also include adjacent period entries
-            if (refEntry.session_type === 'LAB') {
-                const isStart = isLabBlockStart(d, p);
-                const adjP = isStart ? p + 1 : p - 1;
-                const adjKey = `${d}-${adjP}`;
+            let headP = p;
+            while (headP > 1) {
+                const prevE = gridMap[`${d}-${headP - 1}`];
+                if (prevE && prevE.course_code === refEntry.course_code && prevE.session_type === refEntry.session_type) headP--;
+                else break;
+            }
+            const blockSpan = getBlockSpan(d, headP, refEntry.course_code, refEntry.session_type);
+            for (let i = 0; i < blockSpan; i++) {
+                const adjKey = `${d}-${headP + i}`;
                 const adjEntries = sectionsMap[adjKey] || [];
                 adjEntries.forEach(e => {
-                    if (e.course_code === refEntry.course_code && e.session_type === 'LAB' && !group.includes(e)) {
+                    if (e.course_code === refEntry.course_code && e.session_type === refEntry.session_type && !group.includes(e)) {
                         group.push(e);
                     }
                 });
             }
+
             return group;
         };
 
@@ -1179,12 +1274,34 @@ export default function TimetableEditor({ department, semester, onSave, onExport
         }
         const key = `${day}-${period}`;
         const allSectionsForSlot = sectionsMap[key] || [];
+
+        let initialSpan = 1;
+        if (entry) {
+            if (isBlockStart(day, period)) {
+                initialSpan = getBlockSpan(day, period, entry.course_code, entry.session_type);
+            } else {
+                // If they click on a tail, default to 1 for this individual editor isolated view or maybe re-route to head
+                // Re-routing to head makes more sense for UX 
+                let headP = period;
+                while (headP > 1) {
+                    const prevE = gridMap[`${day}-${headP - 1}`];
+                    if (prevE && prevE.course_code === entry.course_code && prevE.session_type === entry.session_type) headP--;
+                    else break;
+                }
+                initialSpan = getBlockSpan(day, headP, entry.course_code, entry.session_type);
+                // Auto-adjust modal to open the head of the block logically
+                handleCellClick(day, headP, gridMap[`${day}-${headP}`]);
+                return;
+            }
+        }
+
         setEditModalData({
             isOpen: true,
             day,
             period,
             entry,
             allSections: allSectionsForSlot,
+            initialSpan,
             initialData: entry ? {
                 course_code: entry.course_code,
                 course_name: entry.course_name,
@@ -1229,13 +1346,18 @@ export default function TimetableEditor({ department, semester, onSave, onExport
         // Collect full source group (including lab adjacent periods)
         let fullSourceEntries = [...sourceEntries];
         sourceEntries.forEach(se => {
-            if (se.session_type === 'LAB') {
-                const adjP = isLabBlockStart(source.day, source.period)
-                    ? source.period + 1 : source.period - 1;
-                const adjKey = `${source.day}-${adjP}`;
+            let headP = source.period;
+            while (headP > 1) {
+                const prevE = gridMap[`${source.day}-${headP - 1}`];
+                if (prevE && prevE.course_code === se.course_code && prevE.session_type === se.session_type) headP--;
+                else break;
+            }
+            const blockSpan = getBlockSpan(source.day, headP, se.course_code, se.session_type);
+            for (let i = 0; i < blockSpan; i++) {
+                const adjKey = `${source.day}-${headP + i}`;
                 const adjEntries = sectionsMap[adjKey] || [];
                 adjEntries.forEach(e => {
-                    if (e.course_code === se.course_code && e.session_type === 'LAB' && !fullSourceEntries.includes(e)) {
+                    if (e.course_code === se.course_code && e.session_type === se.session_type && !fullSourceEntries.includes(e)) {
                         fullSourceEntries.push(e);
                     }
                 });
@@ -1268,7 +1390,7 @@ export default function TimetableEditor({ department, semester, onSave, onExport
         checkConflictsForEntries(movedEntries, () => { }, prevEntries);
     };
 
-    const handleManualSave = (formData, sectionEdits = []) => {
+    const handleManualSave = (formData, sectionEdits = [], spanCount = 1) => {
         const { day, period, entry, allSections } = editModalData;
         pushHistory();
 
@@ -1312,23 +1434,22 @@ export default function TimetableEditor({ department, semester, onSave, onExport
                 };
                 currentEntries.push(newEntry);
 
-                // For LAB entries, also create entry at period+1
-                if ((s.session_type || '').toUpperCase() === 'LAB') {
+                for (let i = 1; i < spanCount; i++) {
+                    const nextP = period + i;
                     currentEntries = currentEntries.filter(e =>
-                        !(e.day_of_week === day && e.period_number === period + 1 &&
+                        !(e.day_of_week === day && e.period_number === nextP &&
                             e.course_code === s.course_code && e.section_number === s.section_number)
                     );
-                    currentEntries.push({ ...newEntry, period_number: period + 1 });
+                    currentEntries.push({ ...newEntry, period_number: nextP });
                 }
             });
         } else {
             // Single-section edit / new entry (original logic)
-            const isLab = entry?.session_type === 'LAB';
             const newEntry = {
                 department_code: department, semester: parseInt(semester),
                 course_code: formData.course_code || 'CUSTOM',
                 course_name: formData.course_name,
-                session_type: isLab ? 'LAB' : 'THEORY',
+                session_type: formData.session_type || 'THEORY',
                 faculty_id: null,
                 faculty_name: cleanFaculty(formData.faculty_name),
                 venue_name: formData.venue_name || '',
@@ -1340,7 +1461,7 @@ export default function TimetableEditor({ department, semester, onSave, onExport
             if (entry) {
                 currentEntries = currentEntries.map(e => {
                     if (e === entry) return { ...e, ...newEntry };
-                    if (isLab && e.day_of_week === day && e.course_code === entry.course_code && e.session_type === 'LAB' && Math.abs(e.period_number - period) === 1) {
+                    if (e.day_of_week === day && e.course_code === entry.course_code && e.session_type === entry.session_type && Math.abs(e.period_number - period) === 1) {
                         return { ...e, ...newEntry, period_number: e.period_number };
                     }
                     return e;
@@ -1349,10 +1470,11 @@ export default function TimetableEditor({ department, semester, onSave, onExport
                 currentEntries = currentEntries.filter(e => !(e.day_of_week === day && e.period_number === period));
                 currentEntries.push(newEntry);
 
-                // For LAB, also place at period+1
-                if (isLab) {
-                    currentEntries = currentEntries.filter(e => !(e.day_of_week === day && e.period_number === period + 1));
-                    currentEntries.push({ ...newEntry, period_number: period + 1 });
+                // Place for spanCount universally
+                for (let i = 1; i < spanCount; i++) {
+                    const nextP = period + i;
+                    currentEntries = currentEntries.filter(e => !(e.day_of_week === day && e.period_number === nextP));
+                    currentEntries.push({ ...newEntry, period_number: nextP });
                 }
             }
         }
@@ -1471,33 +1593,34 @@ export default function TimetableEditor({ department, semester, onSave, onExport
                             </thead>
                             <tbody>
                                 {activeDays.map((day, dayIdx) => {
-                                    let skipNext = false;
+                                    let skipCount = 0;
 
                                     return (
                                         <tr key={day} className={`border-b border-gray-50 last:border-b-0 hover:bg-slate-50/50 transition-colors duration-300 ${dayIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'}`}>
                                             <td className="py-6 px-6 font-bold text-xs text-gray-500 border-r border-gray-100 bg-gray-50/50 uppercase tracking-widest">{day.slice(0, 3)}</td>
                                             {periodColumns.filter(col => col.type === 'PERIOD').map((col, colIdx) => {
-                                                if (skipNext) { skipNext = false; return null; }
+                                                if (skipCount > 0) { skipCount--; return null; }
 
                                                 const p = col.period;
                                                 const key = `${day}-${p}`;
                                                 const entry = gridMap[key];
 
-                                                const labStart = isLabBlockStart(day, p);
-                                                const periodCols = periodColumns.filter(c => c.type === 'PERIOD');
-                                                const nextPeriodCol = periodCols[colIdx + 1];
-                                                const spanTwo = labStart && nextPeriodCol && nextPeriodCol.type === 'PERIOD';
+                                                const isBlockStartP = isBlockStart(day, p);
+                                                let cellSpan = 1;
 
-                                                if (spanTwo) skipNext = true;
+                                                if (isBlockStartP && entry) {
+                                                    cellSpan = getBlockSpan(day, p, entry.course_code, entry.session_type);
+                                                    skipCount = cellSpan - 1;
+                                                }
 
                                                 return (
                                                     <DroppableGridCellSpan
                                                         key={key}
                                                         id={key}
-                                                        colSpan={spanTwo ? 2 : 1}
+                                                        colSpan={cellSpan}
                                                         entry={entry}
                                                         sections={sectionsMap[key]}
-                                                        isLabStart={labStart}
+                                                        isLabStart={isBlockStartP}
                                                         onDelete={() => handleDeleteEntry(day, p)}
                                                         isSwapMode={isSwapMode || isMergeMode}
                                                         isSelected={
@@ -1565,11 +1688,14 @@ export default function TimetableEditor({ department, semester, onSave, onExport
                 onSave={handleManualSave}
                 initialData={editModalData?.initialData}
                 allSections={editModalData?.allSections}
+                initialSpan={editModalData?.initialSpan}
                 allCourses={allCourses}
                 department={department}
                 semester={semester}
                 day={editModalData?.day}
                 period={editModalData?.period}
+                gridMap={gridMap}
+                validPeriods={validPeriods}
             />
         </DndContext >
     );

@@ -1205,28 +1205,26 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
             filled_slots.add((day, period))
             count += 1
 
-        # Assign Honours courses to alternating day groups
-        # hon_idx 0 → Group A (MWF), hon_idx 1 → Group B (TuThSat), etc.
-        hon_day_groups = []  # parallel to actual_honours: which day group each uses
+        # Assign Honours courses sequentially using Round-Robin
+        available_p8 = get_any_free_p8()
+        hon_day_groups = [[] for _ in actual_honours]
+        sessions_needed_list = [sessions_needed(hc) for hc in actual_honours]
+        
+        slot_idx = 0
+        while slot_idx < len(available_p8):
+            assigned_in_round = False
+            for hon_idx, hc in enumerate(actual_honours):
+                if slot_idx >= len(available_p8):
+                    break
+                if len(hon_day_groups[hon_idx]) < sessions_needed_list[hon_idx]:
+                    hon_day_groups[hon_idx].append(available_p8[slot_idx])
+                    slot_idx += 1
+                    assigned_in_round = True
+            if not assigned_in_round:
+                break # All courses have their needed sessions
+                
         for hon_idx, hc in enumerate(actual_honours):
-            group_days = DAY_GROUP_A if hon_idx % 2 == 0 else DAY_GROUP_B
-            needed = sessions_needed(hc)
-            # Collect P8 slots for this group, cycling if needed
-            group_p8  = get_p8_day_list(group_days)
-            # If not enough days in the group, supplement with the other group then any free P8
-            if len(group_p8) < needed:
-                other_group = DAY_GROUP_B if hon_idx % 2 == 0 else DAY_GROUP_A
-                group_p8 += get_p8_day_list(other_group)
-            if len(group_p8) < needed:
-                group_p8 += get_any_free_p8()
-            # Remove duplicates while preserving order
-            seen = set(); group_p8_dedup = []
-            for s in group_p8:
-                if s not in seen:
-                    seen.add(s); group_p8_dedup.append(s)
-            group_p8 = group_p8_dedup[:needed]
-            hon_day_groups.append(group_p8)
-            print(f"  🎓 H{hon_idx+1} {hc.course_code}: {needed} sessions → {group_p8}")
+            print(f"  🎓 H{hon_idx+1} {hc.course_code}: {sessions_needed_list[hon_idx]} sessions requested → {hon_day_groups[hon_idx]}")
 
         # Assign Minor courses:
         # Minor 0 shares the same P8 slots as Honours 0

@@ -1385,9 +1385,25 @@ function App() {
             <div className="bg-white rounded-2xl shadow-lg shadow-violet-50/50 border border-violet-100 overflow-hidden">
                 <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-white">
                     <h3 className="font-bold text-gray-700">{selectedDept && selectedSem ? `${selectedDept} - Semester ${selectedSem} ` : 'Timetable Preview'}</h3>
-                    <button onClick={handleDownloadPDF} className="flex items-center space-x-2 text-sm text-violet-700 hover:text-violet-900 border border-violet-200 px-4 py-1.5 rounded-xl bg-white shadow-sm hover:shadow-md hover:border-violet-300 font-semibold transition-all">
-                        <Download className="w-4 h-4" /><span>Export PDF</span>
-                    </button>
+                    <div className="flex items-center space-x-2">
+                        <button 
+                            onClick={() => {
+                                if (selectedDept && selectedSem) {
+                                    setEditorDept(selectedDept);
+                                    setEditorSem(selectedSem);
+                                    setActiveTab('editor');
+                                } else {
+                                    alert('Please select a department and semester first.');
+                                }
+                            }}
+                            className="flex items-center space-x-2 text-sm text-blue-700 hover:text-blue-900 border border-blue-200 px-4 py-1.5 rounded-xl bg-white shadow-sm hover:shadow-md hover:border-blue-300 font-semibold transition-all"
+                        >
+                            <Edit2 className="w-4 h-4" /><span>Edit Timetable</span>
+                        </button>
+                        <button onClick={handleDownloadPDF} className="flex items-center space-x-2 text-sm text-violet-700 hover:text-violet-900 border border-violet-200 px-4 py-1.5 rounded-xl bg-white shadow-sm hover:shadow-md hover:border-violet-300 font-semibold transition-all">
+                            <Download className="w-4 h-4" /><span>Export PDF</span>
+                        </button>
+                    </div>
                 </div>
                 <div className="p-4">{renderTimetable()}</div>
             </div>

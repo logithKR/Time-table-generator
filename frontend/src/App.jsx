@@ -31,7 +31,6 @@ import {
 } from 'lucide-react';
 import TimetableEditor from './components/TimetableEditor';
 import ConstraintsManager from './components/ConstraintsManager';
-import UserConstraints from './components/UserConstraints';
 
 import Venues from './components/Venues';
 import VenueMapping from './components/VenueMapping';

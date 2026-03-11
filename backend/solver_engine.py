@@ -847,7 +847,7 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                             c_venue = assign_venue(day, period, gc.course_code, False, count + sec)
                             
                             total_secs = get_course_sections(gc.course_code, False)
-                            display_name = f"B{sec+1}: {gc_name}" if total_secs > 1 else gc_name
+                            display_name = gc_name
                             
                             entry = models.TimetableEntry(
                                 department_code=department_code, semester=semester,
@@ -907,7 +907,7 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                                 slot_obj = slot_lookup.get((day, p))
                                 if slot_obj:
                                     total_secs = get_course_sections(gc.course_code, True)
-                                    display_name = f"B{sec+1}: {gc_name}" if total_secs > 1 else gc_name
+                                    display_name = gc_name
                                     
                                     entry = models.TimetableEntry(
                                         department_code=department_code, semester=semester,
@@ -971,7 +971,7 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                             db.add(models.TimetableEntry(
                                 department_code=department_code, semester=semester,
                                 course_code=c.course_code,
-                                course_name=f"B{batch_idx+1}: {cname}" if merged_batch_count > 1 else cname,
+                                course_name=f"B{batch_idx+1}: {cname}" if len(core_lab_courses_to_merge) > 1 else cname,
                                 faculty_id=fac_assigned[0], faculty_name=fac_assigned[1],
                                 session_type='LAB',
                                 slot_id=slot_obj.slot_id,
@@ -1003,7 +1003,7 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                             db.add(models.TimetableEntry(
                                 department_code=department_code, semester=semester,
                                 course_code=c.course_code,
-                                course_name=f"B{batch_idx+1}: {cname} (Theory)" if merged_batch_count > 1 else f"{cname} (Theory)",
+                                course_name=f"{cname} (Theory)",
                                 faculty_id=fac_assigned[0], faculty_name=fac_assigned[1],
                                 session_type='THEORY',
                                 slot_id=slot_obj.slot_id,

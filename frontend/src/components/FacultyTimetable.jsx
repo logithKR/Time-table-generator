@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { Printer, AlertCircle, Loader2, Download, Search, AlertTriangle, Layers } from 'lucide-react';
-import html2canvas from 'html2canvas';
+import { toPng } from 'html-to-image';
 import jsPDF from 'jspdf';
 import { getFaculty, getFacultyTimetable, getDepartments } from '../utils/api';
 
@@ -18,6 +18,12 @@ const FacultyTimetable = ({ slots }) => {
     // Filter states
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedDeptFilter, setSelectedDeptFilter] = useState('');
+
+    // View Options
+    const [showLabels, setShowLabels] = useState(true);
+    const [showCourseCode, setShowCourseCode] = useState(true);
+    const [showFaculty, setShowFaculty] = useState(true);
+    const [showVenues, setShowVenues] = useState(true);
 
     useEffect(() => {
         getFaculty().then(res => setFaculties(res.data)).catch(console.error);
@@ -79,25 +85,39 @@ const FacultyTimetable = ({ slots }) => {
 
     const handleDownloadPDF = async () => {
         if (!timetableData || timetableData.length === 0) return;
+        if (!componentRef.current) return;
         setDownloading(true);
         try {
-            const captureElement = componentRef.current;
-            const canvas = await html2canvas(captureElement, {
-                scale: 2,
-                useCORS: true,
-                logging: false,
-                backgroundColor: '#ffffff'
+            await new Promise(r => setTimeout(r, 100));
+
+            const dataUrl = await toPng(componentRef.current, {
+                quality: 1.0,
+                pixelRatio: 3,
+                backgroundColor: '#ffffff',
+                fontEmbedCSS: ''
             });
 
-            const imgData = canvas.toDataURL('image/png');
             const pdf = new jsPDF({
                 orientation: 'landscape',
                 unit: 'px',
-                format: [canvas.width, canvas.height]
+                format: 'a4'
             });
-            pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+
+            const pdfWidth = pdf.internal.pageSize.getWidth();
+            const pdfHeight = pdf.internal.pageSize.getHeight();
+
+            const imgProps = pdf.getImageProperties(dataUrl);
+            const ratio = Math.min(pdfWidth / imgProps.width, pdfHeight / imgProps.height);
+            const imgWidth = imgProps.width * ratio;
+            const imgHeight = imgProps.height * ratio;
+
+            const marginX = Math.max(0, (pdfWidth - imgWidth) / 2);
+            const marginY = Math.max(0, (pdfHeight - imgHeight) / 2);
+
+            pdf.addImage(dataUrl, 'PNG', marginX, marginY, imgWidth, imgHeight);
             pdf.save(`Faculty_Timetable_${selectedFacultyId}.pdf`);
         } catch (error) {
+            console.error("PDF Generation failed:", error);
             alert(`Failed to generate PDF: ${error.message}`);
         } finally {
             setDownloading(false);
@@ -119,16 +139,35 @@ const FacultyTimetable = ({ slots }) => {
         <div className="space-y-4">
             <style>{`
                 @media print {
-                    body * { visibility: hidden; }
-                    #printable-content, #printable-content * { visibility: visible; }
-                    #printable-content { 
-                        position: absolute; 
-                        left: 0; 
-                        top: 0; 
-                        width: 100% !important; 
-                        margin: 0; 
-                        padding: 5mm;
+                    body * { visibility: hidden !important; }
+                    #printable-content, #printable-content * { 
+                        visibility: visible !important; 
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
                     }
+                    
+                    body, html {
+                        margin: 0 !important;
+                        padding: 0 !important;
+                        background: #ffffff !important;
+                    }
+
+                    #printable-content {
+                        position: absolute !important;
+                        left: 0 !important;
+                        top: 0 !important;
+                        width: 133% !important; 
+                        max-width: none !important;
+                        margin: 0 !important;
+                        padding: 8mm !important; 
+                        box-sizing: border-box !important;
+                        page-break-after: avoid !important;
+                        
+                        zoom: 0.75;
+                        transform: scale(0.75);
+                        transform-origin: top left;
+                    }
+
                     .no-print { display: none !important; }
                     @page { size: landscape; margin: 0; }
                 }
@@ -182,6 +221,26 @@ const FacultyTimetable = ({ slots }) => {
                 {/* Count */}
                 <div className="text-xs text-violet-600 font-semibold bg-white px-4 py-2.5 rounded-xl border border-violet-100 shadow-sm">
                     {filteredFaculties.length} Faculty
+                </div>
+
+                {/* View Toggles */}
+                <div className="flex flex-wrap items-center gap-4 bg-white px-4 py-2 rounded-xl border border-violet-200 shadow-sm ml-auto">
+                    <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-gray-700 hover:text-violet-600 transition-colors">
+                        <input type="checkbox" checked={showLabels} onChange={e => setShowLabels(e.target.checked)} className="rounded text-violet-600 focus:ring-violet-500 w-4 h-4 cursor-pointer" />
+                        Labels
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-gray-700 hover:text-violet-600 transition-colors">
+                        <input type="checkbox" checked={showCourseCode} onChange={e => setShowCourseCode(e.target.checked)} className="rounded text-violet-600 focus:ring-violet-500 w-4 h-4 cursor-pointer" />
+                        Course
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-gray-700 hover:text-violet-600 transition-colors">
+                        <input type="checkbox" checked={showFaculty} onChange={e => setShowFaculty(e.target.checked)} className="rounded text-violet-600 focus:ring-violet-500 w-4 h-4 cursor-pointer" />
+                        Faculty
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-gray-700 hover:text-violet-600 transition-colors">
+                        <input type="checkbox" checked={showVenues} onChange={e => setShowVenues(e.target.checked)} className="rounded text-violet-600 focus:ring-violet-500 w-4 h-4 cursor-pointer" />
+                        Venues
+                    </label>
                 </div>
 
                 {selectedFacultyId && timetableData && timetableData.length > 0 && (
@@ -247,47 +306,76 @@ const FacultyTimetable = ({ slots }) => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {DAYS.map(day => (
-                                    <tr key={day}>
-                                        <td className="font-bold text-center text-lg tracking-widest border-2 border-gray-800 bg-gray-50 text-gray-800 h-24">
-                                            {day}
-                                        </td>
-                                        {PERIODS.map((p, i) => {
+                                {DAYS.map(day => {
+                                    const cells_row = [];
+                                    let skipNext = false;
+
+                                    {
+                                        PERIODS.map((p, i) => {
+                                            if (skipNext) { skipNext = false; return; }
+
                                             const cells = getCellsData(day, i);
                                             const hasClass = cells.length > 0;
                                             const isLab = hasClass && (cells[0].session_type === 'LAB' || cells[0].session_type === 'Lab');
 
-                                            return (
-                                                <td key={i} className={`p-2 text-center align-middle border-2 border-gray-800 ${isLab ? 'bg-amber-50' : hasClass ? 'bg-white' : 'bg-gray-50 text-gray-300'}`}>
+                                            let colSpan = 1;
+                                            if (isLab && i < PERIODS.length - 1) {
+                                                const nextCells = getCellsData(day, i + 1);
+                                                if (nextCells.length > 0 && (nextCells[0].session_type === 'LAB' || nextCells[0].session_type === 'Lab')) {
+                                                    const curCodes = [...new Set(cells.map(c => c.course_code))].sort().join(',');
+                                                    const nxtCodes = [...new Set(nextCells.map(c => c.course_code))].sort().join(',');
+                                                    if (curCodes === nxtCodes) { colSpan = 2; skipNext = true; }
+                                                }
+                                            }
+
+                                            cells_row.push(
+                                                <td key={i} colSpan={colSpan} className={`p-2 text-center align-middle border-2 border-gray-800 ${isLab ? 'bg-amber-50' : hasClass ? 'bg-white' : 'bg-gray-50 text-gray-300'}`}>
                                                     {hasClass ? (
                                                         <div className="flex flex-col gap-2 h-full justify-center">
                                                             {cells.map((c, idx) => (
                                                                 <div key={idx} className={`flex flex-col justify-center ${idx > 0 ? 'border-t border-gray-300 pt-2' : ''}`}>
-                                                                    <div className="font-bold text-[13px] text-gray-900 leading-tight">
-                                                                        {c.course_code}
-                                                                        {c.department_code && <span className="ml-1 text-[9px] bg-gray-200 text-gray-700 px-1.5 py-0.5 rounded uppercase">{c.department_code}</span>}
-                                                                    </div>
+                                                                    {showCourseCode && (
+                                                                        <div className="font-bold text-[13px] text-gray-900 leading-tight">
+                                                                            {c.course_code}
+                                                                            {showLabels && c.is_honours && <span className="ml-1 text-[9px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded uppercase">Honours</span>}
+                                                                            {showLabels && c.is_minor && <span className="ml-1 text-[9px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded uppercase">Minor</span>}
+                                                                        </div>
+                                                                    )}
                                                                     {c.course_name && !c.course_name.toLowerCase().includes('mini project') && (
                                                                         <div className="text-[11px] font-semibold text-gray-700 mt-1 px-1 leading-snug">
                                                                             {c.course_name}
                                                                         </div>
                                                                     )}
-                                                                    {c.venue_name && (
-                                                                        <div className="mt-1.5">
+                                                                    <div className="flex flex-row items-center justify-center mt-1.5 gap-1.5 flex-wrap">
+                                                                        {showFaculty && c.faculty_name && c.faculty_name !== 'Unassigned' && (
+                                                                            <span className="text-[10px] italic font-serif text-gray-600">
+                                                                                {c.faculty_name}
+                                                                            </span>
+                                                                        )}
+                                                                        {showVenues && c.venue_name && (
                                                                             <span className="text-[10px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-200 px-2 py-0.5 rounded shadow-sm whitespace-nowrap">
                                                                                 {c.venue_name}
                                                                             </span>
-                                                                        </div>
-                                                                    )}
+                                                                        )}
+                                                                    </div>
                                                                 </div>
                                                             ))}
                                                         </div>
                                                     ) : '-'}
                                                 </td>
                                             );
-                                        })}
-                                    </tr>
-                                ))}
+                                        })
+                                    }
+
+                                    return (
+                                        <tr key={day}>
+                                            <td className="font-bold text-center text-lg tracking-widest border-2 border-gray-800 bg-gray-50 text-gray-800 h-24">
+                                                {day}
+                                            </td>
+                                            {cells_row}
+                                        </tr>
+                                    );
+                                })}
                             </tbody>
                         </table>
 

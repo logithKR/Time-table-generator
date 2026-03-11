@@ -90,7 +90,8 @@ const BITTimetable = ({ timetableData, department, semester, courses, slots, onR
             const dataUrl = await toPng(componentRef.current, {
                 quality: 1.0,
                 pixelRatio: 3, // High-res capture
-                backgroundColor: '#ffffff'
+                backgroundColor: '#ffffff',
+                fontEmbedCSS: '' // bypass cross-origin font fetching errors
             });
 
             // A4 landscape sizing
@@ -357,6 +358,7 @@ const BITTimetable = ({ timetableData, department, semester, courses, slots, onR
                                         const renderBlock = (code, idx, isOEBlock, groupEntries) => {
                                             let groupName = groupEntries[0]?.course_name || '';
                                             groupName = groupName.replace(/\s*\/\s*OPEN\s*ELECTIVE\s*/gi, '').trim();
+
                                             const isMiniProject = groupName.toLowerCase().includes('mini project');
                                             return (
                                                 <div key={code + idx} style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '2px 0', borderTop: idx > 0 || (isOEBlock && regularCodes.length > 0) ? '1px solid #d1d5db' : 'none', marginTop: idx > 0 ? '2px' : 0, flexGrow: 1 }}>

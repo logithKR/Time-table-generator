@@ -70,12 +70,14 @@ class SlotCreate(BaseModel):
     end_time: str
     slot_type: str = "REGULAR"
     is_active: bool = True
+    semester_ids: Optional[List[int]] = []
 
 class SlotUpdate(BaseModel):
     start_time: Optional[str] = None
     end_time: Optional[str] = None
     slot_type: Optional[str] = None
     is_active: Optional[bool] = None
+    semester_ids: Optional[List[int]] = None
 
 # --- Responses ---
 
@@ -122,6 +124,7 @@ class Slot(BaseModel):
     end_time: str
     slot_type: str
     is_active: bool = True
+    semester_ids: Optional[List[int]] = []
     class Config:
         orm_mode = True
 

@@ -63,13 +63,21 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
     courses = db.query(models.CourseMaster).filter_by(
         department_code=department_code, semester=semester, is_open_elective=False
     ).all()
-    slots = db.query(models.SlotMaster).filter_by(is_active=True).all()
+    raw_slots = db.query(models.SlotMaster).filter_by(is_active=True).all()
+    slots = []
+    for s in raw_slots:
+        try:
+            s_ids = json.loads(s.semester_ids) if s.semester_ids else []
+        except:
+            s_ids = []
+        if not s_ids or semester in s_ids:
+            slots.append(s)
 
     if not courses:
         print("❌ No courses found.")
         return False
     if not slots:
-        print("❌ No active slots found.")
+        print("❌ No active slots found for this semester.")
         return False
 
     # Faculty lookups — now with delivery_type for priority sorting

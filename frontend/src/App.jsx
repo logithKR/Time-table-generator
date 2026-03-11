@@ -63,6 +63,7 @@ function App() {
     const [filterDept, setFilterDept] = useState('');
     const [filterSem, setFilterSem] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
+    const [slotFilterSem, setSlotFilterSem] = useState('');
 
     // Show/hide add forms
     const [showAddCourse, setShowAddCourse] = useState(false);
@@ -1172,6 +1173,11 @@ function App() {
     const handleAddSlot = async (e) => {
         e.preventDefault();
         const form = e.target;
+        
+        // Extract selected semesters
+        const checkboxes = form.querySelectorAll('input[name="semesters"]:checked');
+        const selectedSems = Array.from(checkboxes).map(cb => parseInt(cb.value));
+        
         try {
             await api.createSlot({
                 day_of_week: form.day_of_week.value,
@@ -1179,7 +1185,8 @@ function App() {
                 start_time: form.start_time.value,
                 end_time: form.end_time.value,
                 slot_type: form.slot_type.value,
-                is_active: true
+                is_active: true,
+                semester_ids: selectedSems.length > 0 ? selectedSems : []
             });
             form.reset();
             setShowAddSlot(false);
@@ -1196,7 +1203,8 @@ function App() {
             start_time: slot.start_time,
             end_time: slot.end_time,
             slot_type: slot.slot_type,
-            is_active: slot.is_active
+            is_active: slot.is_active,
+            semester_ids: slot.semester_ids || []
         });
     };
 
@@ -1204,21 +1212,36 @@ function App() {
         const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
         const grouped = {};
         slots.forEach(s => {
+            if (slotFilterSem) {
+                const targetSem = parseInt(slotFilterSem);
+                const sids = s.semester_ids || [];
+                if (sids.length > 0 && !sids.includes(targetSem)) return;
+            }
             if (!grouped[s.day_of_week]) grouped[s.day_of_week] = [];
             grouped[s.day_of_week].push(s);
         });
         Object.values(grouped).forEach(arr => arr.sort((a, b) => a.period_number - b.period_number));
-        const sortedDays = dayOrder.filter(d => grouped[d]);
+        const sortedDays = dayOrder.filter(d => grouped[d] && grouped[d].length > 0);
 
         return (
             <div className="space-y-6">
-                <div className="flex justify-between items-center">
+                <div className="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-violet-100">
                     <div>
-                        <p className="text-sm text-gray-500 mt-1">Manage period timings, types, and active status for each day of the week.</p>
+                        <p className="text-sm font-semibold text-gray-700">Manage period timings across specific semesters.</p>
                     </div>
-                    <button onClick={() => setShowAddSlot(!showAddSlot)} className="flex items-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-bold shadow-lg shadow-violet-200 hover:shadow-violet-300 transition-all hover:-translate-y-0.5 active:scale-95">
-                        <Plus className="w-4 h-4" /> Add Slot
-                    </button>
+                    <div className="flex items-center gap-4">
+                        <select 
+                            value={slotFilterSem} 
+                            onChange={e => setSlotFilterSem(e.target.value)}
+                            className="p-2 border border-violet-200 rounded-xl text-sm font-semibold text-gray-700 bg-gray-50 focus:ring-2 focus:ring-violet-400 focus:outline-none"
+                        >
+                            <option value="">All Semesters (Raw View)</option>
+                            {[1,2,3,4,5,6,7,8].map(s => <option key={s} value={s}>Semester {s}</option>)}
+                        </select>
+                        <button onClick={() => setShowAddSlot(!showAddSlot)} className="flex items-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-bold shadow-lg shadow-violet-200 hover:shadow-violet-300 transition-all hover:-translate-y-0.5 active:scale-95">
+                            <Plus className="w-4 h-4" /> Add Slot
+                        </button>
+                    </div>
                 </div>
 
                 {showAddSlot && (
@@ -1238,7 +1261,18 @@ function App() {
                                 <option value="LUNCH">Lunch</option>
                                 <option value="SPECIAL">Special</option>
                             </select>
-                            <div className="flex gap-2">
+                            <div className="col-span-2 md:col-span-6 mt-2">
+                                <label className="block text-sm font-semibold text-gray-700 mb-2">Apply to Semesters (Leave all unchecked to apply globally)</label>
+                                <div className="flex flex-wrap gap-3">
+                                    {[1,2,3,4,5,6,7,8].map(sem => (
+                                        <label key={sem} className="flex items-center gap-1.5 text-sm bg-gray-50 border border-gray-200 px-3 py-1.5 rounded-lg cursor-pointer hover:bg-violet-50 hover:border-violet-200 transition-colors">
+                                            <input type="checkbox" name="semesters" value={sem} className="w-4 h-4 text-violet-600 rounded border-gray-300 focus:ring-violet-500" />
+                                            Sem {sem}
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="col-span-2 md:col-span-6 flex gap-2 mt-2">
                                 <button type="submit" className="bg-violet-600 hover:bg-violet-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-violet-200 transition-all">Save</button>
                                 <button type="button" onClick={() => setShowAddSlot(false)} className="bg-gray-100 hover:bg-gray-200 text-gray-600 px-4 py-2.5 rounded-xl text-sm font-medium transition-all">Cancel</button>
                             </div>
@@ -1263,6 +1297,7 @@ function App() {
                                         <th className="px-4 py-3 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">Start Time</th>
                                         <th className="px-4 py-3 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">End Time</th>
                                         <th className="px-4 py-3 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">Type</th>
+                                        <th className="px-4 py-3 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">Semesters</th>
                                         <th className="px-4 py-3 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">Status</th>
                                         <th className="px-4 py-3 text-right font-semibold text-gray-500 text-xs uppercase tracking-wider">Actions</th>
                                     </tr>
@@ -1301,6 +1336,39 @@ function App() {
                                                     <span className={`px-2 py-0.5 rounded text-xs font-medium ${slot.slot_type === 'REGULAR' ? 'bg-green-100 text-green-700' : slot.slot_type === 'BREAK' ? 'bg-orange-100 text-orange-700' : slot.slot_type === 'LUNCH' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
                                                         {slot.slot_type}
                                                     </span>
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-3 text-xs w-48">
+                                                {editingSlotId === slot.slot_id ? (
+                                                    <div className="flex flex-wrap gap-1">
+                                                        {[1,2,3,4,5,6,7,8].map(sem => (
+                                                            <label key={sem} className="flex items-center gap-1 bg-gray-50 px-1.5 py-0.5 rounded cursor-pointer border border-gray-200 shadow-sm hover:bg-gray-100">
+                                                                <input 
+                                                                    type="checkbox" 
+                                                                    checked={(editingSlotData.semester_ids || []).includes(sem)}
+                                                                    onChange={e => {
+                                                                        const current = editingSlotData.semester_ids || [];
+                                                                        const updated = e.target.checked ? [...current, sem] : current.filter(s => s !== sem);
+                                                                        setEditingSlotData(prev => ({ ...prev, semester_ids: updated }));
+                                                                    }}
+                                                                    className="w-3 h-3 text-violet-600 rounded" 
+                                                                />
+                                                                <span className="text-[10px] whitespace-nowrap">S{sem}</span>
+                                                            </label>
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex flex-wrap gap-1">
+                                                        {(!slot.semester_ids || slot.semester_ids.length === 0) ? (
+                                                            <span className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-xs font-semibold">Global</span>
+                                                        ) : (
+                                                            slot.semester_ids.sort().map(s => (
+                                                                <span key={s} className="px-1.5 py-0.5 bg-blue-50 text-blue-700 border border-blue-100 rounded text-[10px] font-bold">
+                                                                    S{s}
+                                                                </span>
+                                                            ))
+                                                        )}
+                                                    </div>
                                                 )}
                                             </td>
                                             <td className="px-4 py-3">

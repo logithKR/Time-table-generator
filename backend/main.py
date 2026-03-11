@@ -2,6 +2,7 @@ from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from pydantic import BaseModel
+import json
 import models, schemas
 from database import engine, get_db
 from fastapi.middleware.cors import CORSMiddleware
@@ -389,7 +390,25 @@ def delete_course_faculty(mid: int, db: Session = Depends(get_db)):
 
 @app.get("/slots", response_model=List[schemas.Slot])
 def get_slots(db: Session = Depends(get_db)):
-    return db.query(models.SlotMaster).order_by(models.SlotMaster.day_of_week, models.SlotMaster.period_number).all()
+    slots = db.query(models.SlotMaster).order_by(models.SlotMaster.day_of_week, models.SlotMaster.period_number).all()
+    out = []
+    for s in slots:
+        try:
+            parsed_ids = json.loads(s.semester_ids) if s.semester_ids else []
+        except:
+            parsed_ids = []
+            
+        out.append(schemas.Slot(
+            slot_id=s.slot_id,
+            day_of_week=s.day_of_week,
+            period_number=s.period_number,
+            start_time=s.start_time,
+            end_time=s.end_time,
+            slot_type=s.slot_type,
+            is_active=s.is_active,
+            semester_ids=parsed_ids
+        ))
+    return out
 
 @app.post("/slots", response_model=schemas.Slot)
 def create_slot(req: schemas.SlotCreate, db: Session = Depends(get_db)):
@@ -404,12 +423,26 @@ def create_slot(req: schemas.SlotCreate, db: Session = Depends(get_db)):
         start_time=req.start_time,
         end_time=req.end_time,
         slot_type=req.slot_type,
-        is_active=req.is_active
+        is_active=req.is_active,
+        semester_ids=json.dumps(req.semester_ids) if req.semester_ids is not None else "[]"
     )
     db.add(slot)
     db.commit()
     db.refresh(slot)
-    return slot
+    
+    try: parsed_ids = json.loads(slot.semester_ids)
+    except: parsed_ids = []
+    
+    return schemas.Slot(
+        slot_id=slot.slot_id,
+        day_of_week=slot.day_of_week,
+        period_number=slot.period_number,
+        start_time=slot.start_time,
+        end_time=slot.end_time,
+        slot_type=slot.slot_type,
+        is_active=slot.is_active,
+        semester_ids=parsed_ids
+    )
 
 @app.put("/slots/{slot_id}", response_model=schemas.Slot)
 def update_slot(slot_id: int, req: schemas.SlotUpdate, db: Session = Depends(get_db)):
@@ -424,9 +457,25 @@ def update_slot(slot_id: int, req: schemas.SlotUpdate, db: Session = Depends(get
         slot.slot_type = req.slot_type
     if req.is_active is not None:
         slot.is_active = req.is_active
+    if req.semester_ids is not None:
+        slot.semester_ids = json.dumps(req.semester_ids)
+        
     db.commit()
     db.refresh(slot)
-    return slot
+    
+    try: parsed_ids = json.loads(slot.semester_ids)
+    except: parsed_ids = []
+    
+    return schemas.Slot(
+        slot_id=slot.slot_id,
+        day_of_week=slot.day_of_week,
+        period_number=slot.period_number,
+        start_time=slot.start_time,
+        end_time=slot.end_time,
+        slot_type=slot.slot_type,
+        is_active=slot.is_active,
+        semester_ids=parsed_ids
+    )
 
 @app.delete("/slots/{slot_id}")
 def delete_slot(slot_id: int, db: Session = Depends(get_db)):

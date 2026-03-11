@@ -99,6 +99,7 @@ class SlotMaster(Base):
     end_time = Column(String, nullable=False)  # e.g., "09:50"
     slot_type = Column(String, default='REGULAR')  # REGULAR, LUNCH, BREAK
     is_active = Column(Boolean, default=True)
+    semester_ids = Column(String, default="[]")  # JSON encoded list of ints e.g. [4, 6]
 
 
 # Composite index for day + period lookup

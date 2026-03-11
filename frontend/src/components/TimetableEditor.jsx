@@ -1047,10 +1047,14 @@ export default function TimetableEditor({ department, semester, onSave, onExport
         let headP = entry.period_number;
         while (headP > 1) {
             const prevE = gridMap[`${entry.day_of_week}-${headP - 1}`];
-            if (prevE && prevE.course_code === entry.course_code && prevE.session_type === entry.session_type) headP--;
+            if (prevE &&
+                prevE.course_code === entry.course_code &&
+                prevE.session_type === entry.session_type &&
+                prevE.faculty_name === entry.faculty_name &&
+                prevE.venue_name === entry.venue_name) headP--;
             else break;
         }
-        const blockSpan = getBlockSpan(entry.day_of_week, headP, entry.course_code, entry.session_type);
+        const blockSpan = getBlockSpan(entry.day_of_week, headP, entry.course_code, entry.session_type, entry.faculty_name, entry.venue_name);
         for (let i = 0; i < blockSpan; i++) {
             const adjKey = `${entry.day_of_week}-${headP + i}`;
             const adjEntries = sectionsMap[adjKey] || [];
@@ -1130,10 +1134,14 @@ export default function TimetableEditor({ department, semester, onSave, onExport
         let headP = period;
         while (headP > 1) {
             const prevE = gridMap[`${day}-${headP - 1}`];
-            if (prevE && prevE.course_code === entry.course_code && prevE.session_type === entry.session_type) headP--;
+            if (prevE &&
+                prevE.course_code === entry.course_code &&
+                prevE.session_type === entry.session_type &&
+                prevE.faculty_name === entry.faculty_name &&
+                prevE.venue_name === entry.venue_name) headP--;
             else break;
         }
-        const blockSpan = getBlockSpan(day, headP, entry.course_code, entry.session_type);
+        const blockSpan = getBlockSpan(day, headP, entry.course_code, entry.session_type, entry.faculty_name, entry.venue_name);
         const periodsToRemove = Array.from({ length: blockSpan }, (_, i) => headP + i);
 
         setEntries(prev => prev.filter(e => !(
@@ -1155,16 +1163,24 @@ export default function TimetableEditor({ department, semester, onSave, onExport
         const entry = gridMap[`${day}-${period}`];
         if (!entry) return false;
         const prevEntry = gridMap[`${day}-${period - 1}`];
-        if (prevEntry && prevEntry.course_code === entry.course_code && prevEntry.session_type === entry.session_type) return false;
+        if (prevEntry &&
+            prevEntry.course_code === entry.course_code &&
+            prevEntry.session_type === entry.session_type &&
+            prevEntry.faculty_name === entry.faculty_name &&
+            prevEntry.venue_name === entry.venue_name) return false;
         return true;
     };
 
-    const getBlockSpan = useCallback((day, period, courseCode, sessionType) => {
+    const getBlockSpan = useCallback((day, period, courseCode, sessionType, facultyName, venueName) => {
         let span = 1;
         let currP = period + 1;
         while (currP <= 8) {
             const e = gridMap[`${day}-${currP}`];
-            if (e && e.course_code === courseCode && e.session_type === sessionType) {
+            if (e &&
+                e.course_code === courseCode &&
+                e.session_type === sessionType &&
+                e.faculty_name === facultyName &&
+                e.venue_name === venueName) {
                 span++;
                 currP++;
             } else break;
@@ -1176,7 +1192,11 @@ export default function TimetableEditor({ department, semester, onSave, onExport
         const entry = gridMap[`${day}-${period}`];
         if (!entry) return false;
         const prevEntry = gridMap[`${day}-${period - 1}`];
-        return prevEntry && prevEntry.course_code === entry.course_code && prevEntry.session_type === entry.session_type;
+        return prevEntry &&
+            prevEntry.course_code === entry.course_code &&
+            prevEntry.session_type === entry.session_type &&
+            prevEntry.faculty_name === entry.faculty_name &&
+            prevEntry.venue_name === entry.venue_name;
     };
 
     const handleSwapClick = (day, period, entry) => {
@@ -1218,10 +1238,14 @@ export default function TimetableEditor({ department, semester, onSave, onExport
             let headP = p;
             while (headP > 1) {
                 const prevE = gridMap[`${d}-${headP - 1}`];
-                if (prevE && prevE.course_code === refEntry.course_code && prevE.session_type === refEntry.session_type) headP--;
+                if (prevE &&
+                    prevE.course_code === refEntry.course_code &&
+                    prevE.session_type === refEntry.session_type &&
+                    prevE.faculty_name === refEntry.faculty_name &&
+                    prevE.venue_name === refEntry.venue_name) headP--;
                 else break;
             }
-            const blockSpan = getBlockSpan(d, headP, refEntry.course_code, refEntry.session_type);
+            const blockSpan = getBlockSpan(d, headP, refEntry.course_code, refEntry.session_type, refEntry.faculty_name, refEntry.venue_name);
             for (let i = 0; i < blockSpan; i++) {
                 const adjKey = `${d}-${headP + i}`;
                 const adjEntries = sectionsMap[adjKey] || [];
@@ -1278,17 +1302,21 @@ export default function TimetableEditor({ department, semester, onSave, onExport
         let initialSpan = 1;
         if (entry) {
             if (isBlockStart(day, period)) {
-                initialSpan = getBlockSpan(day, period, entry.course_code, entry.session_type);
+                initialSpan = getBlockSpan(day, period, entry.course_code, entry.session_type, entry.faculty_name, entry.venue_name);
             } else {
                 // If they click on a tail, default to 1 for this individual editor isolated view or maybe re-route to head
                 // Re-routing to head makes more sense for UX 
                 let headP = period;
                 while (headP > 1) {
                     const prevE = gridMap[`${day}-${headP - 1}`];
-                    if (prevE && prevE.course_code === entry.course_code && prevE.session_type === entry.session_type) headP--;
+                    if (prevE &&
+                        prevE.course_code === entry.course_code &&
+                        prevE.session_type === entry.session_type &&
+                        prevE.faculty_name === entry.faculty_name &&
+                        prevE.venue_name === entry.venue_name) headP--;
                     else break;
                 }
-                initialSpan = getBlockSpan(day, headP, entry.course_code, entry.session_type);
+                initialSpan = getBlockSpan(day, headP, entry.course_code, entry.session_type, entry.faculty_name, entry.venue_name);
                 // Auto-adjust modal to open the head of the block logically
                 handleCellClick(day, headP, gridMap[`${day}-${headP}`]);
                 return;
@@ -1349,10 +1377,14 @@ export default function TimetableEditor({ department, semester, onSave, onExport
             let headP = source.period;
             while (headP > 1) {
                 const prevE = gridMap[`${source.day}-${headP - 1}`];
-                if (prevE && prevE.course_code === se.course_code && prevE.session_type === se.session_type) headP--;
+                if (prevE &&
+                    prevE.course_code === se.course_code &&
+                    prevE.session_type === se.session_type &&
+                    prevE.faculty_name === se.faculty_name &&
+                    prevE.venue_name === se.venue_name) headP--;
                 else break;
             }
-            const blockSpan = getBlockSpan(source.day, headP, se.course_code, se.session_type);
+            const blockSpan = getBlockSpan(source.day, headP, se.course_code, se.session_type, se.faculty_name, se.venue_name);
             for (let i = 0; i < blockSpan; i++) {
                 const adjKey = `${source.day}-${headP + i}`;
                 const adjEntries = sectionsMap[adjKey] || [];
@@ -1609,7 +1641,7 @@ export default function TimetableEditor({ department, semester, onSave, onExport
                                                 let cellSpan = 1;
 
                                                 if (isBlockStartP && entry) {
-                                                    cellSpan = getBlockSpan(day, p, entry.course_code, entry.session_type);
+                                                    cellSpan = getBlockSpan(day, p, entry.course_code, entry.session_type, entry.faculty_name, entry.venue_name);
                                                     skipCount = cellSpan - 1;
                                                 }
 

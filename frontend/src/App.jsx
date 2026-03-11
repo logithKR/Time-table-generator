@@ -39,7 +39,6 @@ import StudentRegistrations from './components/StudentRegistrations';
 import FacultyTimetable from './components/FacultyTimetable';
 import StudentTimetable from './components/StudentTimetable';
 import BITTimetable from './components/BITTimetable';
-import UserConstraints from './components/UserConstraints';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as api from './utils/api';

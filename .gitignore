@@ -8,7 +8,7 @@ venv2/
 ttvenv/
 node_modules/
 __pycache__/
-
+*.db
 # Logs & temp output
 *.log
 *.txt

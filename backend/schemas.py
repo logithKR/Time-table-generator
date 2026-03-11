@@ -128,6 +128,28 @@ class Slot(BaseModel):
     class Config:
         orm_mode = True
 
+class BreakConfigCreate(BaseModel):
+    break_type: str
+    start_time: str
+    end_time: str
+    semester_ids: Optional[List[int]] = []
+
+class BreakConfigUpdate(BaseModel):
+    break_type: Optional[str] = None
+    start_time: Optional[str] = None
+    end_time: Optional[str] = None
+    semester_ids: Optional[List[int]] = None
+
+class BreakConfig(BaseModel):
+    id: int
+    break_type: str
+    start_time: str
+    end_time: str
+    semester_ids: Optional[List[int]] = []
+    
+    class Config:
+        orm_mode = True
+
 class VenueCreate(BaseModel):
     venue_name: str
     block: Optional[str] = None

@@ -102,6 +102,16 @@ class SlotMaster(Base):
     semester_ids = Column(String, default="[]")  # JSON encoded list of ints e.g. [4, 6]
 
 
+class BreakConfigMaster(Base):
+    __tablename__ = "break_config_master"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    break_type = Column(String, nullable=False)  # FN, LUNCH, AN
+    start_time = Column(String, nullable=False)
+    end_time = Column(String, nullable=False)
+    semester_ids = Column(String, default="[]")  # JSON encoded list of ints [4, 6]
+
+
 # Composite index for day + period lookup
 Index('idx_slot_day_period', SlotMaster.day_of_week, SlotMaster.period_number)
 

@@ -6,6 +6,7 @@ const API_URL = 'http://127.0.0.1:8000';
 export const getDepartments = () => axios.get(`${API_URL}/departments`);
 export const getSemesters = () => axios.get(`${API_URL}/semesters`);
 export const getSlots = () => axios.get(`${API_URL}/slots`);
+export const getBreaks = () => axios.get(`${API_URL}/breaks`);
 export const getCourses = (deptCode, sem) => {
     let url = `${API_URL}/courses`;
     const params = [];
@@ -32,10 +33,12 @@ export const createCourse = (data) => axios.post(`${API_URL}/courses`, data);
 export const updateCourse = (code, data) => axios.put(`${API_URL}/courses/${code}`, data);
 export const createCourseFaculty = (data) => axios.post(`${API_URL}/course-faculty`, data);
 export const createSlot = (data) => axios.post(`${API_URL}/slots`, data);
+export const createBreak = (data) => axios.post(`${API_URL}/breaks`, data);
 
 // --- PUT (Update) ---
 export const updateDepartment = (code, data) => axios.put(`${API_URL}/departments/${code}`, data);
 export const updateSlot = (slotId, data) => axios.put(`${API_URL}/slots/${slotId}`, data);
+export const updateBreak = (breakId, data) => axios.put(`${API_URL}/breaks/${breakId}`, data);
 
 // --- DELETE ---
 export const deleteDepartment = (code) => axios.delete(`${API_URL}/departments/${code}`);
@@ -43,6 +46,7 @@ export const deleteFaculty = (fid) => axios.delete(`${API_URL}/faculty/${fid}`);
 export const deleteCourse = (code) => axios.delete(`${API_URL}/courses/${code}`);
 export const deleteCourseFaculty = (mid) => axios.delete(`${API_URL}/course-faculty/${mid}`);
 export const deleteSlot = (slotId) => axios.delete(`${API_URL}/slots/${slotId}`);
+export const deleteBreak = (breakId) => axios.delete(`${API_URL}/breaks/${breakId}`);
 
 // --- Timetable ---
 export const generateTimetable = (data) => axios.post(`${API_URL}/generate`, data);

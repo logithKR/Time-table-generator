@@ -2,7 +2,8 @@ import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { Printer, AlertCircle, Loader2, Download, Search, AlertTriangle, Layers } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import jsPDF from 'jspdf';
-import { getDepartments, getStudents, getStudentTimetable } from '../utils/api';
+import { getDepartments, getStudents, getStudentTimetable, getBreaks } from '../utils/api';
+import { formatTime } from '../utils/timeFormat';
 
 const StudentTimetable = ({ slots }) => {
     const componentRef = useRef();
@@ -10,6 +11,7 @@ const StudentTimetable = ({ slots }) => {
 
     const [departments, setDepartments] = useState([]);
     const [selectedDept, setSelectedDept] = useState('');
+    const [breakConfigs, setBreakConfigs] = useState([]);
 
     const [students, setStudents] = useState([]);
     const [selectedStudentId, setSelectedStudentId] = useState('');
@@ -32,6 +34,7 @@ const StudentTimetable = ({ slots }) => {
         getDepartments().then(res => {
             setDepartments(res.data);
         }).catch(console.error);
+        getBreaks().then(res => setBreakConfigs(res.data)).catch(console.error);
     }, []);
 
     useEffect(() => {
@@ -69,7 +72,7 @@ const StudentTimetable = ({ slots }) => {
     const PERIODS = slots && slots.length > 0
         ? slots.filter(s => s.day_of_week === 'Monday' && s.slot_type === 'REGULAR')
             .sort((a, b) => a.period_number - b.period_number)
-            .map((s, i) => ({ name: ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'][i] || `${i + 1}`, time: `${s.start_time} - ${s.end_time}` }))
+            .map((s, i) => ({ name: ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'][i] || `${i + 1}`, time: `${formatTime(s.start_time)} - ${formatTime(s.end_time)}` }))
         : [
             { name: 'I', time: '08.45 - 09.45 am' },
             { name: 'II', time: '09.45 - 10.45 am' },
@@ -81,6 +84,15 @@ const StudentTimetable = ({ slots }) => {
             { name: 'VIII', time: '05.15 - 06.15 pm' }
         ];
     const DAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+
+    // For Student timetable, display all configured breaks (optionally you could filter by the student's semester if known)
+    const BREAKS = breakConfigs.length > 0
+        ? breakConfigs.map(b => ({ name: b.break_type, time: `${formatTime(b.start_time)} - ${formatTime(b.end_time)}` }))
+        : [
+            { name: 'Morning Break', time: '10:45 - 11:00' },
+            { name: 'Lunch Break', time: '13:00 - 14:00' },
+            { name: 'Evening Break', time: '16:00 - 16:15' }
+        ];
 
     const getCellsData = useCallback((day, periodIndex) => {
         if (!timetableData) return [];

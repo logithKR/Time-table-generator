@@ -2,8 +2,9 @@ import React, { useState, useCallback, useRef } from 'react';
 import { Printer, AlertCircle, RefreshCw, Download, Loader2 } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import jsPDF from 'jspdf';
+import { formatTime } from '../utils/timeFormat';
 
-const BITTimetable = ({ timetableData, department, semester, courses, slots, onRefresh }) => {
+const BITTimetable = ({ timetableData, department, semester, courses, slots, breakConfigs, onRefresh }) => {
     const componentRef = useRef(null);
     const [downloading, setDownloading] = useState(false);
 
@@ -21,7 +22,7 @@ const BITTimetable = ({ timetableData, department, semester, courses, slots, onR
     const PERIODS = slots && slots.length > 0
         ? slots.filter(s => s.day_of_week === 'Monday' && s.slot_type === 'REGULAR')
             .sort((a, b) => a.period_number - b.period_number)
-            .map((s, i) => ({ name: ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'][i] || `${i + 1}`, time: `${s.start_time} - ${s.end_time}` }))
+            .map((s, i) => ({ name: ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'][i] || `${i + 1}`, time: `${formatTime(s.start_time)} - ${formatTime(s.end_time)}` }))
         : [
             { name: 'I', time: '08.45 - 09.45' },
             { name: 'II', time: '09.45 - 10.45' },
@@ -33,15 +34,17 @@ const BITTimetable = ({ timetableData, department, semester, courses, slots, onR
             { name: 'VIII', time: '05.15 - 06.15' }
         ];
     const DAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
-    const BREAKS = slots && slots.length > 0
-        ? slots.filter(s => s.day_of_week === 'Monday' && s.slot_type !== 'REGULAR')
-            .sort((a, b) => a.start_time.localeCompare(b.start_time))
-            .map(s => ({ name: s.slot_type === 'LUNCH' ? 'Lunch Break' : s.slot_type || 'Break', time: `${s.start_time} - ${s.end_time}` }))
-        : [
-            { name: 'Morning Break', time: '10.45 - 11.00' },
-            { name: 'Lunch Break', time: '01.00 - 02.00' },
-            { name: 'Evening Break', time: '04.00 - 04.15' }
-        ];
+
+    // Filter break configurations based on the current semester
+    const activeBreaks = (breakConfigs || [])
+        .filter(b => (!b.semester_ids || b.semester_ids.length === 0) || b.semester_ids.includes(parseInt(semester)))
+        .map(b => ({ name: b.break_type, time: `${formatTime(b.start_time)} - ${formatTime(b.end_time)}` }));
+
+    const BREAKS = activeBreaks.length > 0 ? activeBreaks : [
+        { name: 'Morning Break', time: '10:45 - 11:00' },
+        { name: 'Lunch Break', time: '13:00 - 14:00' },
+        { name: 'Evening Break', time: '16:00 - 16:15' }
+    ];
 
     const uniqueDepts = [...new Set((timetableData || []).map(t => t.department_code).filter(Boolean))];
     const uniqueSems = [...new Set((timetableData || []).map(t => t.semester).filter(Boolean))];

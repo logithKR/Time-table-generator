@@ -2,7 +2,8 @@ import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { Printer, AlertCircle, Loader2, Download, Search, AlertTriangle, Layers } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import jsPDF from 'jspdf';
-import { getFaculty, getFacultyTimetable, getDepartments } from '../utils/api';
+import { getFaculty, getFacultyTimetable, getDepartments, getBreaks } from '../utils/api';
+import { formatTime } from '../utils/timeFormat';
 
 const FacultyTimetable = ({ slots }) => {
     const componentRef = useRef();
@@ -10,6 +11,7 @@ const FacultyTimetable = ({ slots }) => {
 
     const [faculties, setFaculties] = useState([]);
     const [departments, setDepartments] = useState([]);
+    const [breakConfigs, setBreakConfigs] = useState([]);
     const [selectedFacultyId, setSelectedFacultyId] = useState('');
     const [timetableData, setTimetableData] = useState(null);
     const [conflicts, setConflicts] = useState([]);
@@ -28,6 +30,7 @@ const FacultyTimetable = ({ slots }) => {
     useEffect(() => {
         getFaculty().then(res => setFaculties(res.data)).catch(console.error);
         getDepartments().then(res => setDepartments(res.data)).catch(console.error);
+        getBreaks().then(res => setBreakConfigs(res.data)).catch(console.error);
     }, []);
 
     const fetchTimetable = async () => {
@@ -53,10 +56,15 @@ const FacultyTimetable = ({ slots }) => {
         window.print();
     };
 
+    // For Faculty timetable, show all breaks regardless of semester
+    const BREAKS = breakConfigs.length > 0
+        ? breakConfigs.map(b => ({ name: b.break_type, time: `${formatTime(b.start_time)} - ${formatTime(b.end_time)}` }))
+        : [];
+
     const PERIODS = slots && slots.length > 0
         ? slots.filter(s => s.day_of_week === 'Monday' && s.slot_type === 'REGULAR')
             .sort((a, b) => a.period_number - b.period_number)
-            .map((s, i) => ({ name: ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'][i] || `${i + 1}`, time: `${s.start_time} - ${s.end_time}` }))
+            .map((s, i) => ({ name: ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'][i] || `${i + 1}`, time: `${formatTime(s.start_time)} - ${formatTime(s.end_time)}` }))
         : [
             { name: 'I', time: '08.45 - 09.45 am' },
             { name: 'II', time: '09.45 - 10.45 am' },

@@ -43,6 +43,7 @@ import BITTimetable from './components/BITTimetable';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as api from './utils/api';
+import { formatTime } from './utils/timeFormat';
 
 function App() {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -53,6 +54,7 @@ function App() {
     const [departments, setDepartments] = useState([]);
     const [semesters, setSemesters] = useState([]);
     const [slots, setSlots] = useState([]);
+    const [breakConfigs, setBreakConfigs] = useState([]);
 
     // Data pages
     const [allCourses, setAllCourses] = useState([]);
@@ -78,6 +80,11 @@ function App() {
     const [editingSlotId, setEditingSlotId] = useState(null);
     const [editingSlotData, setEditingSlotData] = useState({});
     const [showAddSlot, setShowAddSlot] = useState(false);
+    
+    // Break timings state
+    const [editingBreakId, setEditingBreakId] = useState(null);
+    const [editingBreakData, setEditingBreakData] = useState({});
+    const [showAddBreak, setShowAddBreak] = useState(false);
 
     // Lookups
     const [coursesMap, setCoursesMap] = useState({});
@@ -109,10 +116,11 @@ function App() {
 
     const fetchMasterData = async () => {
         try {
-            const [d, s, sl] = await Promise.all([api.getDepartments(), api.getSemesters(), api.getSlots()]);
+            const [d, s, sl, brks] = await Promise.all([api.getDepartments(), api.getSemesters(), api.getSlots(), api.getBreaks()]);
             setDepartments(d.data);
             setSemesters(s.data);
             setSlots(sl.data);
+            setBreakConfigs(brks.data);
         } catch (err) { console.error("Failed to load master data", err); }
     };
 
@@ -1170,6 +1178,29 @@ function App() {
         }
     };
 
+    const handleUpdateBreak = async (breakId) => {
+        try {
+            await api.updateBreak(breakId, editingBreakData);
+            setEditingBreakId(null);
+            setEditingBreakData({});
+            const res = await api.getBreaks();
+            setBreakConfigs(res.data);
+        } catch (err) {
+            alert('Failed to update break: ' + (err.response?.data?.detail || err.message));
+        }
+    };
+
+    const handleDeleteBreak = async (breakId) => {
+        if (!confirm('Delete this Break format?')) return;
+        try {
+            await api.deleteBreak(breakId);
+            const res = await api.getBreaks();
+            setBreakConfigs(res.data);
+        } catch (err) {
+            alert('Failed to delete break: ' + (err.response?.data?.detail || err.message));
+        }
+    };
+
     const handleAddSlot = async (e) => {
         e.preventDefault();
         const form = e.target;
@@ -1194,6 +1225,28 @@ function App() {
             setSlots(res.data);
         } catch (err) {
             alert('Failed to add slot: ' + (err.response?.data?.detail || err.message));
+        }
+    };
+
+    const handleAddBreak = async (e) => {
+        e.preventDefault();
+        const form = e.target;
+        const checkboxes = form.querySelectorAll('input[name="break_semesters"]:checked');
+        const selectedSems = Array.from(checkboxes).map(cb => parseInt(cb.value));
+        
+        try {
+            await api.createBreak({
+                break_type: form.break_type.value,
+                start_time: form.start_time.value,
+                end_time: form.end_time.value,
+                semester_ids: selectedSems.length > 0 ? selectedSems : []
+            });
+            form.reset();
+            setShowAddBreak(false);
+            const res = await api.getBreaks();
+            setBreakConfigs(res.data);
+        } catch (err) {
+            alert('Failed to add break: ' + (err.response?.data?.detail || err.message));
         }
     };
 
@@ -1222,9 +1275,138 @@ function App() {
         });
         Object.values(grouped).forEach(arr => arr.sort((a, b) => a.period_number - b.period_number));
         const sortedDays = dayOrder.filter(d => grouped[d] && grouped[d].length > 0);
+        
+        const filteredBreaks = breakConfigs.filter(b => {
+             if (!slotFilterSem) return true;
+             const targetSem = parseInt(slotFilterSem);
+             const sids = b.semester_ids || [];
+             return sids.length === 0 || sids.includes(targetSem);
+        });
 
         return (
             <div className="space-y-6">
+                {/* --- BREAK TIMINGS PANEL --- */}
+                <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-2xl border border-orange-200 shadow-md shadow-orange-100/50 p-6 overflow-hidden">
+                    <div className="flex justify-between items-center mb-6">
+                        <div>
+                            <h3 className="text-lg font-bold text-orange-900 flex items-center gap-2">
+                                <Clock className="w-5 h-5 text-orange-600" /> Break Configuration
+                            </h3>
+                            <p className="text-sm text-orange-700/80 mt-1">Configure FN, Lunch, and AN break timings specifically rendered into Timetables.</p>
+                        </div>
+                        <button onClick={() => setShowAddBreak(!showAddBreak)} className="flex items-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-bold shadow-lg shadow-orange-200 hover:-translate-y-0.5 transition-all text-sm">
+                            <Plus className="w-4 h-4" /> Add Break
+                        </button>
+                    </div>
+
+                    {showAddBreak && (
+                        <div className="bg-white/80 backdrop-blur-sm rounded-xl border border-orange-200 p-5 mb-6 shadow-sm">
+                            <form onSubmit={handleAddBreak} className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                <select name="break_type" required className="p-2.5 border border-orange-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-orange-200 outline-none">
+                                    <option value="">Select Break Type *</option>
+                                    <option value="FN Break">FN Break (Morning)</option>
+                                    <option value="Lunch Break">Lunch Break</option>
+                                    <option value="AN Break">AN Break (Afternoon)</option>
+                                </select>
+                                <input name="start_time" type="time" required className="p-2.5 border border-orange-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-orange-200 outline-none" />
+                                <input name="end_time" type="time" required className="p-2.5 border border-orange-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-orange-200 outline-none" />
+                                
+                                <div className="md:col-span-4 mt-2">
+                                    <label className="block text-xs font-bold text-orange-800 uppercase tracking-widest mb-2">Apply To Semesters (Leave empty for Global)</label>
+                                    <div className="flex flex-wrap gap-2">
+                                        {[1,2,3,4,5,6,7,8].map(sem => (
+                                            <label key={sem} className="flex items-center gap-1.5 text-sm bg-white border border-orange-200 px-3 py-1.5 rounded-lg cursor-pointer hover:bg-orange-50 hover:border-orange-300">
+                                                <input type="checkbox" name="break_semesters" value={sem} className="w-4 h-4 text-orange-600 rounded border-orange-300 focus:ring-orange-500" />
+                                                Sem {sem}
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div className="md:col-span-4 flex gap-2 pt-2">
+                                    <button type="submit" className="bg-orange-600 hover:bg-orange-700 text-white px-5 py-2 rounded-lg text-sm font-bold shadow-md shadow-orange-200 transition-all">Save Break</button>
+                                    <button type="button" onClick={() => setShowAddBreak(false)} className="bg-white border border-gray-200 text-gray-600 px-4 py-2 rounded-lg text-sm font-bold hover:bg-gray-50">Cancel</button>
+                                </div>
+                            </form>
+                        </div>
+                    )}
+
+                    {filteredBreaks.length > 0 ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {filteredBreaks.map(b => (
+                                <div key={b.id} className="bg-white rounded-xl border border-orange-100 p-4 shadow-sm relative group overflow-hidden">
+                                    <div className="absolute top-0 left-0 w-1 h-full bg-orange-400"></div>
+                                    <div className="pl-2">
+                                        {editingBreakId === b.id ? (
+                                            <div className="flex flex-col gap-2">
+                                                <select value={editingBreakData.break_type || ''} onChange={e => setEditingBreakData(prev => ({ ...prev, break_type: e.target.value }))} className="text-sm p-1 border rounded bg-gray-50 text-gray-900 border-gray-200 font-bold mb-1">
+                                                    <option value="FN Break">FN Break (Morning)</option>
+                                                    <option value="Lunch Break">Lunch Break</option>
+                                                    <option value="AN Break">AN Break (Afternoon)</option>
+                                                </select>
+                                                <div className="flex gap-2">
+                                                    <input type="time" value={editingBreakData.start_time || ''} onChange={e => setEditingBreakData(prev => ({ ...prev, start_time: e.target.value }))} className="p-1 border border-gray-200 rounded text-xs w-full bg-gray-50" />
+                                                    <span className="text-gray-400 self-center">-</span>
+                                                    <input type="time" value={editingBreakData.end_time || ''} onChange={e => setEditingBreakData(prev => ({ ...prev, end_time: e.target.value }))} className="p-1 border border-gray-200 rounded text-xs w-full bg-gray-50" />
+                                                </div>
+                                                <div className="flex flex-wrap gap-1 mt-2">
+                                                    {[1,2,3,4,5,6,7,8].map(sem => (
+                                                        <label key={sem} className="flex items-center gap-1 bg-gray-50 px-1.5 py-0.5 rounded cursor-pointer border border-gray-200 shadow-sm hover:bg-gray-100">
+                                                            <input 
+                                                                type="checkbox" 
+                                                                checked={(editingBreakData.semester_ids || []).includes(sem)}
+                                                                onChange={e => {
+                                                                    const current = editingBreakData.semester_ids || [];
+                                                                    const updated = e.target.checked ? [...current, sem] : current.filter(s => s !== sem);
+                                                                    setEditingBreakData(prev => ({ ...prev, semester_ids: updated }));
+                                                                }}
+                                                                className="w-3 h-3 text-orange-600 rounded" 
+                                                            />
+                                                            <span className="text-[10px] whitespace-nowrap">S{sem}</span>
+                                                        </label>
+                                                    ))}
+                                                </div>
+                                                <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100">
+                                                    <button onClick={() => handleUpdateBreak(b.id)} className="flex-1 bg-green-50 hover:bg-green-100 text-green-700 py-1.5 rounded text-xs font-bold transition-colors">Save</button>
+                                                    <button onClick={() => { setEditingBreakId(null); setEditingBreakData({}); }} className="flex-1 bg-gray-50 hover:bg-gray-100 text-gray-600 py-1.5 rounded text-xs font-bold transition-colors">Cancel</button>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <>
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <h4 className="font-extrabold text-orange-900">{b.break_type}</h4>
+                                                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <button onClick={() => { setEditingBreakId(b.id); setEditingBreakData({...b, semester_ids: b.semester_ids || []}); }} className="p-1 text-gray-400 hover:text-blue-600 rounded bg-gray-50 hover:bg-blue-50 transition-colors"><Pencil className="w-3 h-3" /></button>
+                                                        <button onClick={() => handleDeleteBreak(b.id)} className="p-1 text-gray-400 hover:text-red-500 rounded bg-gray-50 hover:bg-red-50 transition-colors"><Trash2 className="w-3 h-3" /></button>
+                                                    </div>
+                                                </div>
+                                                
+                                                <p className="font-mono text-gray-700 bg-orange-50 tracking-wider inline-block px-2 py-1 rounded text-sm mb-3 font-semibold border border-orange-100">{formatTime(b.start_time)} - {formatTime(b.end_time)}</p>
+                                                
+                                                <div className="flex flex-wrap gap-1 mt-auto">
+                                                    {(!b.semester_ids || b.semester_ids.length === 0) ? (
+                                                        <span className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-xs font-semibold">Global Allocation</span>
+                                                    ) : (
+                                                        b.semester_ids.sort().map(s => (
+                                                            <span key={s} className="px-1.5 py-0.5 bg-blue-50 text-blue-700 border border-blue-100 rounded text-[10px] font-bold">
+                                                                Sem {s}
+                                                            </span>
+                                                        ))
+                                                    )}
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="text-center p-8 bg-white/50 rounded-xl border border-dashed border-orange-200 text-orange-600/60 font-medium text-sm">
+                            No break timings configured. Click "Add Break" to allocate formatting.
+                        </div>
+                    )}
+                </div>
+                
+                {/* --- TIME SLOTS SYSTEM --- */}
                 <div className="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-violet-100">
                     <div>
                         <p className="text-sm font-semibold text-gray-700">Manage period timings across specific semesters.</p>
@@ -1314,14 +1496,14 @@ function App() {
                                                 {editingSlotId === slot.slot_id ? (
                                                     <input type="time" value={editingSlotData.start_time || ''} onChange={e => setEditingSlotData(prev => ({ ...prev, start_time: e.target.value }))} className="p-1 border rounded text-sm w-28" />
                                                 ) : (
-                                                    <span className="font-mono text-gray-800">{slot.start_time}</span>
+                                                    <span className="font-mono text-gray-800">{formatTime(slot.start_time)}</span>
                                                 )}
                                             </td>
                                             <td className="px-4 py-3">
                                                 {editingSlotId === slot.slot_id ? (
                                                     <input type="time" value={editingSlotData.end_time || ''} onChange={e => setEditingSlotData(prev => ({ ...prev, end_time: e.target.value }))} className="p-1 border rounded text-sm w-28" />
                                                 ) : (
-                                                    <span className="font-mono text-gray-800">{slot.end_time}</span>
+                                                    <span className="font-mono text-gray-800">{formatTime(slot.end_time)}</span>
                                                 )}
                                             </td>
                                             <td className="px-4 py-3">
@@ -1538,6 +1720,7 @@ function App() {
                         slots={slots}
                         courses={allCourses}
                         faculty={allFaculty}
+                        breakConfigs={breakConfigs}
                         // Pass the refresh handler to the component
                         onRefresh={() => fetchPrintData(editorDept, editorSem)}
                     />

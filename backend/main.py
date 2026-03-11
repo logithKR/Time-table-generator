@@ -487,6 +487,90 @@ def delete_slot(slot_id: int, db: Session = Depends(get_db)):
     return {"status": "deleted", "slot_id": slot_id}
 
 # ============================================
+# BREAK CONFIGS
+# ============================================
+
+@app.get("/breaks", response_model=List[schemas.BreakConfig])
+def get_breaks(db: Session = Depends(get_db)):
+    breaks = db.query(models.BreakConfigMaster).all()
+    out = []
+    for b in breaks:
+        try:
+            parsed_ids = json.loads(b.semester_ids) if b.semester_ids else []
+        except:
+            parsed_ids = []
+            
+        out.append(schemas.BreakConfig(
+            id=b.id,
+            break_type=b.break_type,
+            start_time=b.start_time,
+            end_time=b.end_time,
+            semester_ids=parsed_ids
+        ))
+    return out
+
+@app.post("/breaks", response_model=schemas.BreakConfig)
+def create_break(req: schemas.BreakConfigCreate, db: Session = Depends(get_db)):
+    b = models.BreakConfigMaster(
+        break_type=req.break_type,
+        start_time=req.start_time,
+        end_time=req.end_time,
+        semester_ids=json.dumps(req.semester_ids) if req.semester_ids is not None else "[]"
+    )
+    db.add(b)
+    db.commit()
+    db.refresh(b)
+    
+    try: parsed_ids = json.loads(b.semester_ids)
+    except: parsed_ids = []
+    
+    return schemas.BreakConfig(
+        id=b.id,
+        break_type=b.break_type,
+        start_time=b.start_time,
+        end_time=b.end_time,
+        semester_ids=parsed_ids
+    )
+
+@app.put("/breaks/{break_id}", response_model=schemas.BreakConfig)
+def update_break(break_id: int, req: schemas.BreakConfigUpdate, db: Session = Depends(get_db)):
+    b = db.query(models.BreakConfigMaster).filter_by(id=break_id).first()
+    if not b:
+        raise HTTPException(status_code=404, detail="Break config not found")
+        
+    if req.break_type is not None:
+        b.break_type = req.break_type
+    if req.start_time is not None:
+        b.start_time = req.start_time
+    if req.end_time is not None:
+        b.end_time = req.end_time
+    if req.semester_ids is not None:
+        b.semester_ids = json.dumps(req.semester_ids)
+        
+    db.commit()
+    db.refresh(b)
+    
+    try: parsed_ids = json.loads(b.semester_ids)
+    except: parsed_ids = []
+    
+    return schemas.BreakConfig(
+        id=b.id,
+        break_type=b.break_type,
+        start_time=b.start_time,
+        end_time=b.end_time,
+        semester_ids=parsed_ids
+    )
+
+@app.delete("/breaks/{break_id}")
+def delete_break(break_id: int, db: Session = Depends(get_db)):
+    b = db.query(models.BreakConfigMaster).filter_by(id=break_id).first()
+    if not b:
+        raise HTTPException(status_code=404, detail="Break config not found")
+    db.delete(b)
+    db.commit()
+    return {"status": "deleted", "id": break_id}
+
+# ============================================
 # GENERATION & TIMETABLE
 # ============================================
 

@@ -1,6 +1,92 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { getDepartments, getVenues, getDepartmentVenues, mapVenueToDepartment, removeVenueMapping, getCourses, getCourseVenues, mapVenueToCourse, removeCourseVenueMapping } from '../utils/api';
-import { MapPin, Plus, Trash2, Building2, BookOpen } from 'lucide-react';
+import { MapPin, Plus, Trash2, Building2, BookOpen, Search, ChevronDown } from 'lucide-react';
+
+const SearchableSelect = ({ options, value, onChange, placeholder, icon: Icon, required, accentColor = "violet" }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const wrapperRef = useRef(null);
+
+    useEffect(() => {
+        function handleClickOutside(event) {
+            if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
+                setIsOpen(false);
+            }
+        }
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, [wrapperRef]);
+
+    const filteredOptions = options.filter(opt => 
+        (opt.label || "").toLowerCase().includes(searchQuery.toLowerCase()) || 
+        (opt.value?.toString() || "").toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
+    const selectedOption = options.find(opt => opt.value === value);
+
+    const ringClass = `ring-${accentColor}-500`;
+    const borderClass = `border-${accentColor}-500`;
+    const bgHoverClass = `hover:bg-${accentColor}-50`;
+    const bgSelectedClass = `bg-${accentColor}-50 text-${accentColor}-700`;
+
+    return (
+        <div ref={wrapperRef} className="relative w-full">
+            <div 
+                className={`w-full p-2.5 border rounded-xl flex items-center justify-between cursor-pointer bg-slate-50 transition-all ${isOpen ? `ring-2 ${ringClass} ${borderClass}` : 'border-slate-200 hover:border-slate-300'}`}
+                onClick={() => {
+                    setIsOpen(!isOpen);
+                    if (!isOpen) setSearchQuery('');
+                }}
+            >
+                <div className="flex items-center gap-2 overflow-hidden">
+                    {Icon && <Icon size={16} className="text-slate-400 flex-shrink-0" />}
+                    <span className={`truncate ${!selectedOption ? 'text-slate-400' : 'text-slate-800 font-medium'}`}>
+                        {selectedOption ? selectedOption.label : placeholder} 
+                        {required && !selectedOption && <span className="text-red-500 ml-1">*</span>}
+                    </span>
+                </div>
+                <ChevronDown size={16} className={`text-slate-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+            </div>
+
+            {isOpen && (
+                <div className="absolute z-[60] min-w-full w-[max-content] max-w-[90vw] mt-2 bg-white border border-slate-100 rounded-xl shadow-xl shadow-slate-200/50 max-h-64 overflow-hidden flex flex-col transform opacity-100 scale-100 transition-all origin-top">
+                    <div className="p-2 border-b border-slate-100 flex-shrink-0 bg-slate-50/50">
+                        <div className="relative">
+                            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                            <input 
+                                type="text"
+                                className={`w-full pl-8 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 ${ringClass} transition-all`}
+                                placeholder="Search by name, code..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                onClick={(e) => e.stopPropagation()}
+                                autoFocus
+                            />
+                        </div>
+                    </div>
+                    <div className="overflow-y-auto p-1.5 flex-1 select-none">
+                        {filteredOptions.length === 0 ? (
+                            <div className="p-3 text-sm text-slate-500 text-center font-medium">No results found</div>
+                        ) : (
+                            filteredOptions.map(opt => (
+                                <div 
+                                    key={opt.value}
+                                    className={`p-2.5 text-sm rounded-lg cursor-pointer transition-colors break-words whitespace-normal ${value === opt.value ? `${bgSelectedClass} font-semibold` : `text-slate-700 ${bgHoverClass}`}`}
+                                    onClick={() => {
+                                        onChange(opt.value);
+                                        setIsOpen(false);
+                                    }}
+                                >
+                                    {opt.label}
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
 
 const VenueMapping = () => {
     const [departments, setDepartments] = useState([]);
@@ -141,6 +227,39 @@ const VenueMapping = () => {
     const mappedLabs = departmentVenues.filter(v => v.is_lab);
     const mappedClassrooms = departmentVenues.filter(v => !v.is_lab);
 
+    const handleRemoveAllLabs = async () => {
+        if (!window.confirm(`Are you sure you want to remove all ${mappedLabs.length} laboratory mappings for ${selectedDept}?`)) return;
+        try {
+            await Promise.all(mappedLabs.map(map => removeVenueMapping(map.id)));
+            await fetchDepartmentData(selectedDept, selectedSemester);
+        } catch (err) {
+            console.error(err);
+            alert("Error removing laboratory mappings.");
+        }
+    };
+
+    const handleRemoveAllClassrooms = async () => {
+        if (!window.confirm(`Are you sure you want to remove all ${mappedClassrooms.length} classroom mappings for ${selectedDept}?`)) return;
+        try {
+            await Promise.all(mappedClassrooms.map(map => removeVenueMapping(map.id)));
+            await fetchDepartmentData(selectedDept, selectedSemester);
+        } catch (err) {
+            console.error(err);
+            alert("Error removing classroom mappings.");
+        }
+    };
+
+    const handleRemoveAllCourseVenues = async () => {
+        if (!window.confirm(`Are you sure you want to remove all ${courseVenues.length} course-specific venue mappings?`)) return;
+        try {
+            await Promise.all(courseVenues.map(map => removeCourseVenueMapping(map.id)));
+            await fetchDepartmentData(selectedDept, selectedSemester);
+        } catch (err) {
+            console.error(err);
+            alert("Error removing course-specific mappings.");
+        }
+    };
+
     return (
         <div className="space-y-6 max-w-5xl mx-auto">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -151,7 +270,7 @@ const VenueMapping = () => {
 
                 <div className="w-full md:w-auto flex flex-col sm:flex-row gap-3">
                     <select
-                        className="w-full sm:w-48 p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none bg-white font-medium"
+                        className="w-full sm:w-48 p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 outline-none bg-white font-medium"
                         value={selectedSemester}
                         onChange={(e) => setSelectedSemester(e.target.value)}
                     >
@@ -164,16 +283,15 @@ const VenueMapping = () => {
                         <option value="7">Semester 7</option>
                         <option value="8">Semester 8</option>
                     </select>
-                    <select
-                        className="w-full sm:w-64 p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none bg-white font-medium"
-                        value={selectedDept}
-                        onChange={(e) => setSelectedDept(e.target.value)}
-                    >
-                        <option value="" disabled>Select Department</option>
-                        {departments.map(d => (
-                            <option key={d.department_code} value={d.department_code}>{d.department_code}</option>
-                        ))}
-                    </select>
+                    <div className="w-full sm:w-64">
+                        <SearchableSelect 
+                            options={departments.map(d => ({ value: d.department_code, label: d.department_code }))}
+                            value={selectedDept}
+                            onChange={(val) => setSelectedDept(val)}
+                            placeholder="Select Department"
+                            accentColor="violet"
+                        />
+                    </div>
                 </div>
             </div>
 
@@ -184,29 +302,27 @@ const VenueMapping = () => {
                         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 sticky top-6 space-y-8">
                             <div>
                                 <h4 className="font-bold text-slate-800 flex items-center gap-2 mb-4">
-                                    <Plus size={18} className="text-primary-500" /> Map New Venue
+                                    <Plus size={18} className="text-violet-500" /> Map New Venue
                                 </h4>
                                 <form onSubmit={handleMapVenue} className="space-y-4">
                                     <div>
-                                        <label className="block text-sm font-medium text-slate-700 mb-1">Select Venue</label>
-                                        <select
-                                            className="w-full p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none bg-slate-50"
+                                        <label className="block text-sm font-bold text-slate-700 mb-1.5 uppercase tracking-wider text-[11px]">Select Venue</label>
+                                        <SearchableSelect 
+                                            options={availableDeptVenues.map(v => ({
+                                                value: v.venue_id,
+                                                label: `${v.venue_name} ${v.is_lab ? '(Lab)' : '(Classroom)'} - Cap: ${v.capacity}`
+                                            }))}
                                             value={selectedVenue}
-                                            onChange={(e) => setSelectedVenue(e.target.value)}
-                                            required
-                                        >
-                                            <option value="" disabled>Choose a venue...</option>
-                                            {availableDeptVenues.map(v => (
-                                                <option key={v.venue_id} value={v.venue_id}>
-                                                    {v.venue_name} {v.is_lab ? '(Lab)' : '(Classroom)'} - Cap: {v.capacity}
-                                                </option>
-                                            ))}
-                                        </select>
+                                            onChange={(val) => setSelectedVenue(val)}
+                                            placeholder="Choose a venue..."
+                                            required={true}
+                                            accentColor="violet"
+                                        />
                                     </div>
                                     <button
                                         type="submit"
                                         disabled={!selectedVenue || isMapping}
-                                        className="w-full btn-primary py-2.5 flex justify-center items-center gap-2 disabled:opacity-50"
+                                        className="w-full bg-violet-600 hover:bg-violet-700 text-white font-bold rounded-xl py-3 flex justify-center items-center gap-2 disabled:opacity-50 transition-all shadow-md shadow-violet-200"
                                     >
                                         {isMapping ? 'Mapping...' : 'Assign to Department'}
                                     </button>
@@ -221,41 +337,37 @@ const VenueMapping = () => {
                                 </h4>
                                 <form onSubmit={handleMapCourseVenue} className="space-y-4">
                                     <div>
-                                        <label className="block text-sm font-medium text-slate-700 mb-1">Select Course</label>
-                                        <select
-                                            className="w-full p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none bg-slate-50"
+                                        <label className="block text-sm font-bold text-slate-700 mb-1.5 uppercase tracking-wider text-[11px]">Select Course</label>
+                                        <SearchableSelect 
+                                            options={courses.map(c => ({
+                                                value: c.course_code,
+                                                label: `${c.course_code} - ${c.course_name}`
+                                            }))}
                                             value={selectedCourse}
-                                            onChange={(e) => setSelectedCourse(e.target.value)}
-                                            required
-                                        >
-                                            <option value="" disabled>Choose a course...</option>
-                                            {courses.map(c => (
-                                                <option key={c.course_code} value={c.course_code}>
-                                                    {c.course_code} - {c.course_name}
-                                                </option>
-                                            ))}
-                                        </select>
+                                            onChange={(val) => setSelectedCourse(val)}
+                                            placeholder="Choose a course..."
+                                            required={true}
+                                            accentColor="amber"
+                                        />
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-slate-700 mb-1">Select Venue</label>
-                                        <select
-                                            className="w-full p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none bg-slate-50"
+                                        <label className="block text-sm font-bold text-slate-700 mb-1.5 uppercase tracking-wider text-[11px]">Select Venue</label>
+                                        <SearchableSelect 
+                                            options={availableCourseVenues.map(v => ({
+                                                value: v.venue_id,
+                                                label: `${v.venue_name} ${v.is_lab ? '(Lab)' : '(Classroom)'} - Cap: ${v.capacity}`
+                                            }))}
                                             value={selectedCourseVenue}
-                                            onChange={(e) => setSelectedCourseVenue(e.target.value)}
-                                            required
-                                        >
-                                            <option value="" disabled>Choose a venue...</option>
-                                            {availableCourseVenues.map(v => (
-                                                <option key={v.venue_id} value={v.venue_id}>
-                                                    {v.venue_name} {v.is_lab ? '(Lab)' : '(Classroom)'} - Cap: {v.capacity}
-                                                </option>
-                                            ))}
-                                        </select>
+                                            onChange={(val) => setSelectedCourseVenue(val)}
+                                            placeholder="Choose a venue..."
+                                            required={true}
+                                            accentColor="amber"
+                                        />
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-slate-700 mb-1">Venue Used For</label>
+                                        <label className="block text-sm font-bold text-slate-700 mb-1.5 uppercase tracking-wider text-[11px]">Venue Used For</label>
                                         <select
-                                            className="w-full p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none bg-slate-50"
+                                            className="w-full p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none bg-slate-50 text-sm font-medium text-slate-700"
                                             value={selectedVenueType}
                                             onChange={(e) => setSelectedVenueType(e.target.value)}
                                         >
@@ -267,7 +379,7 @@ const VenueMapping = () => {
                                     <button
                                         type="submit"
                                         disabled={!selectedCourse || !selectedCourseVenue || isMappingCourse}
-                                        className="w-full bg-amber-500 hover:bg-amber-600 text-white font-medium rounded-xl py-2.5 flex justify-center items-center gap-2 disabled:opacity-50 transition-colors"
+                                        className="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl py-3 flex justify-center items-center gap-2 disabled:opacity-50 transition-all shadow-md shadow-amber-200/50"
                                     >
                                         {isMappingCourse ? 'Mapping...' : 'Assign to Course'}
                                     </button>
@@ -285,7 +397,14 @@ const VenueMapping = () => {
                                     <Building2 size={18} className="text-emerald-500" />
                                     Mapped Laboratories
                                 </h4>
-                                <span className="bg-emerald-100 text-emerald-700 text-xs font-bold px-2.5 py-1 rounded-full">{mappedLabs.length}</span>
+                                <div className="flex items-center gap-3">
+                                    <span className="bg-emerald-100 text-emerald-700 text-xs font-bold px-2.5 py-1 rounded-full">{mappedLabs.length}</span>
+                                    {mappedLabs.length > 0 && (
+                                        <button onClick={handleRemoveAllLabs} className="text-[10px] font-bold bg-white text-red-500 border border-red-200 hover:bg-red-50 hover:text-red-700 px-2.5 py-1 uppercase rounded-lg shadow-sm transition-colors flex items-center gap-1">
+                                            <Trash2 size={12} /> Clear All
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                             <div className="p-5">
                                 {mappedLabs.length === 0 ? (
@@ -319,7 +438,14 @@ const VenueMapping = () => {
                                     <MapPin size={18} className="text-blue-500" />
                                     Mapped Classrooms
                                 </h4>
-                                <span className="bg-blue-100 text-blue-700 text-xs font-bold px-2.5 py-1 rounded-full">{mappedClassrooms.length}</span>
+                                <div className="flex items-center gap-3">
+                                    <span className="bg-blue-100 text-blue-700 text-xs font-bold px-2.5 py-1 rounded-full">{mappedClassrooms.length}</span>
+                                    {mappedClassrooms.length > 0 && (
+                                        <button onClick={handleRemoveAllClassrooms} className="text-[10px] font-bold bg-white text-red-500 border border-red-200 hover:bg-red-50 hover:text-red-700 px-2.5 py-1 uppercase rounded-lg shadow-sm transition-colors flex items-center gap-1">
+                                            <Trash2 size={12} /> Clear All
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                             <div className="p-5">
                                 {mappedClassrooms.length === 0 ? (
@@ -353,7 +479,14 @@ const VenueMapping = () => {
                                     <BookOpen size={18} className="text-amber-500" />
                                     Mapped Course-Specific Venues
                                 </h4>
-                                <span className="bg-amber-100 text-amber-700 text-xs font-bold px-2.5 py-1 rounded-full">{courseVenues.length}</span>
+                                <div className="flex items-center gap-3">
+                                    <span className="bg-amber-100 text-amber-700 text-xs font-bold px-2.5 py-1 rounded-full">{courseVenues.length}</span>
+                                    {courseVenues.length > 0 && (
+                                        <button onClick={handleRemoveAllCourseVenues} className="text-[10px] font-bold bg-white text-red-500 border border-red-200 hover:bg-red-50 hover:text-red-700 px-2.5 py-1 uppercase rounded-lg shadow-sm transition-colors flex items-center gap-1">
+                                            <Trash2 size={12} /> Clear All
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                             <div className="p-5">
                                 {courseVenues.length === 0 ? (

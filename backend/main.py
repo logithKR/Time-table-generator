@@ -216,7 +216,8 @@ def create_course(req: schemas.CourseCreate, db: Session = Depends(get_db)):
             is_honours=is_honours,
             is_minor=req.is_minor,
             is_elective=req.is_elective,
-            is_open_elective=req.is_open_elective
+            is_open_elective=req.is_open_elective,
+            is_add_course=req.is_add_course
         )
         db.add(course)
         created_count += 1
@@ -342,6 +343,7 @@ def update_course(code: str, req: schemas.CourseUpdate, db: Session = Depends(ge
         if req.is_minor is not None: course.is_minor = req.is_minor
         if req.is_elective is not None: course.is_elective = req.is_elective
         if req.is_open_elective is not None: course.is_open_elective = req.is_open_elective
+        if req.is_add_course is not None: course.is_add_course = req.is_add_course
 
     # 3. Rebuild CommonCourseMap if more than 1 dept
     db.query(models.CommonCourseMap).filter_by(course_code=code).delete()
@@ -1124,32 +1126,99 @@ def get_student_timetable(student_id: str, db: Session = Depends(get_db)):
     
     valid_entries = {}
     student_semester = None
+    
+    # Pre-fetch Department master timetable to map Elective 5 slots for Open Electives
+    dept_master_slots = []
+    
     for r in regs:
         if student_semester is None:
             student_semester = r.semester
+            # Cache the department's master timetable layout to find the Elective 5 slots
+            dept_master_slots = db.query(models.TimetableEntry).filter_by(
+                department_code=student.department_code, semester=student_semester
+            ).all()
+
+        course = db.query(models.CourseMaster).filter_by(course_code=r.course_code, semester=r.semester).first()
+        is_open_elective = course and course.is_open_elective
+        
         c_entries = db.query(models.TimetableEntry).filter_by(course_code=r.course_code, semester=r.semester).all()
-        for e in c_entries:
-            # Display section 1 as the default schedule for students
-            if e.section_number == 1 or e.section_number is None:
-                k = (e.course_code, e.day_of_week, e.period_number)
-                if k not in valid_entries:
-                    valid_entries[k] = e
+        
+        if is_open_elective and not c_entries:
+            # If it's an Open Elective without explicit cross-department scheduling,
+            # force it into the slots where the student's home department runs "ELECTIVE 5"
+            elective_5_slots = []
+            for dme in dept_master_slots:
+                # Find the master Elective 5 block (or any block that is part of the Elective V group)
+                # Since we don't strictly have course categories on TimetableEntry, we inspect the course
+                dme_course = db.query(models.CourseMaster).filter_by(course_code=dme.course_code, semester=r.semester).first()
+                if dme_course and dme_course.is_elective and (dme_course.course_category == "ELECTIVE 5" or dme_course.course_category == "ELECTIVE V"):
+                    # Include slot_id to satisfy Pydantic schema constraints
+                    elective_5_slots.append((dme.day_of_week, dme.period_number, dme.slot_id))
+            
+            # Deduplicate the coordinates in case multiple Elective 5s share the slot
+            elective_5_coords = list(set(elective_5_slots))
+            
+            for (day, period, slot_id) in elective_5_coords:
+                # Mock a TimetableEntry dynamically for the render engine
+                mock_entry = models.TimetableEntry(
+                    id=999900 + len(valid_entries),  # Dummy ID
+                    course_code=r.course_code,
+                    course_name=course.course_name,
+                    department_code=student.department_code,
+                    semester=r.semester,
+                    day_of_week=day,
+                    period_number=period,
+                    session_type="THEORY",
+                    faculty_name="Unassigned",
+                    venue_name="",
+                    section_number=1,
+                    slot_id=slot_id
+                )
+                k = (r.course_code, day, period)
+                valid_entries[k] = mock_entry
+
+        else:
+            for e in c_entries:
+                # Display section 1 as the default schedule for students
+                if e.section_number == 1 or e.section_number is None:
+                    k = (e.course_code, e.day_of_week, e.period_number)
+                    if k not in valid_entries:
+                        valid_entries[k] = e
                     
     # Also fetch common courses that are natively meant for this student's department/semester
     # but don't explicitly require personal registration (e.g. Mentor Hour, Mini Project)
     if student_semester is not None:
         common_courses = ['mentor', 'mini']
-        for e in db.query(models.TimetableEntry).filter_by(
-            department_code=student.department_code, 
-            semester=student_semester
-        ).all():
+        for e in dept_master_slots:
             if e.course_name and e.course_code and any(c in e.course_name.lower() or c in e.course_code.lower() for c in common_courses):
                 if e.section_number == 1 or e.section_number is None:
                     k = (e.course_code, e.day_of_week, e.period_number)
                     if k not in valid_entries:
                         valid_entries[k] = e
-
     entries = list(valid_entries.values())
+    
+    import re
+    # Hydrate entries with course classification flags for the frontend labels,
+    # and clean up noisy course names (like `/ OPEN ELECTIVE`) for regular electives.
+    for e in entries:
+        course = db.query(models.CourseMaster).filter_by(course_code=e.course_code, semester=e.semester).first()
+        if course:
+            setattr(e, 'is_honours', course.is_honours)
+            setattr(e, 'is_minor', course.is_minor)
+            setattr(e, 'is_elective', course.is_elective)
+            setattr(e, 'is_open_elective', course.is_open_elective)
+            setattr(e, 'is_add_course', course.is_add_course)
+            
+            # Clean up inherited UI noise in the course name (for regular electives)
+            if course.is_elective and not course.is_open_elective and e.course_name:
+                e.course_name = re.sub(r'(?i)\s*/\s*OPEN\s*ELECTIVE\s*', '', e.course_name).strip()
+                e.course_name = re.sub(r'(?i)\s*-\s*OPEN\s*ELECTIVE\s*', '', e.course_name).strip()
+        else:
+            setattr(e, 'is_honours', False)
+            setattr(e, 'is_minor', False)
+            setattr(e, 'is_elective', False)
+            setattr(e, 'is_open_elective', False)
+            setattr(e, 'is_add_course', False)
     
     slot_map = {}
     conflicts = set()

@@ -360,13 +360,16 @@ const StudentTimetable = ({ slots }) => {
                                                             {cells.map((c, idx) => (
                                                                 <div key={idx} className={`flex flex-col justify-center ${idx > 0 ? 'border-t border-gray-300 pt-2' : ''}`}>
                                                                     {showCourseCode && (
-                                                                        <div className="font-bold text-[13px] text-gray-900 leading-tight">
-                                                                            {c.course_code}
-                                                                            {showLabels && c.is_honours && <span className="ml-1 text-[9px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded uppercase">Honours</span>}
-                                                                            {showLabels && c.is_minor && <span className="ml-1 text-[9px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded uppercase">Minor</span>}
+                                                                        <div className="font-bold text-[13px] text-gray-900 leading-tight flex flex-wrap items-center justify-center gap-1">
+                                                                            <span>{c.course_code}</span>
+                                                                            {showLabels && c.is_honours && <span className="text-[9px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded uppercase whitespace-nowrap">Honours</span>}
+                                                                            {showLabels && c.is_minor && <span className="text-[9px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded uppercase whitespace-nowrap">Minor</span>}
+                                                                            {showLabels && c.is_open_elective && <span className="text-[9px] bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded uppercase border border-gray-200 shadow-sm whitespace-nowrap">Open Elective</span>}
+                                                                            {showLabels && c.is_elective && !c.is_open_elective && <span className="text-[9px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded uppercase border border-green-200 shadow-sm whitespace-nowrap">Elective</span>}
+                                                                            {showLabels && c.is_add_course && <span className="text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded uppercase border border-amber-200 shadow-sm whitespace-nowrap">Add Course</span>}
                                                                         </div>
                                                                     )}
-                                                                    {c.course_name && !c.course_name.toLowerCase().includes('mini project') && (
+                                                                    {c.course_name && (
                                                                         <div className="text-[11px] font-semibold text-gray-700 mt-1 px-1 leading-snug">
                                                                             {c.course_name}
                                                                         </div>

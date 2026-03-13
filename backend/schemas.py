@@ -176,6 +176,11 @@ class TimetableEntry(BaseModel):
     period_number: int
     venue_name: Optional[str] = None
     section_number: Optional[int] = 1
+    is_honours: Optional[bool] = False
+    is_minor: Optional[bool] = False
+    is_elective: Optional[bool] = False
+    is_open_elective: Optional[bool] = False
+    is_add_course: Optional[bool] = False
     
     class Config:
         orm_mode = True

@@ -347,6 +347,7 @@ const FacultyTimetable = ({ slots }) => {
                                                                             {c.course_code}
                                                                             {showLabels && c.is_honours && <span className="ml-1 text-[9px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded uppercase">Honours</span>}
                                                                             {showLabels && c.is_minor && <span className="ml-1 text-[9px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded uppercase">Minor</span>}
+                                                                            {showLabels && c.is_add_course && <span className="ml-1 text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded uppercase">Add Course</span>}
                                                                         </div>
                                                                     )}
                                                                     {c.course_name && !c.course_name.toLowerCase().includes('mini project') && (

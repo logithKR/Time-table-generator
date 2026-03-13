@@ -59,8 +59,21 @@ const SubjectManager = () => {
     // Filter Logic
     const filteredSubjects = useMemo(() => {
         return subjects.filter(sub => {
-            const matchesSearch = (sub.course_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                (sub.course_code || '').toLowerCase().includes(searchTerm.toLowerCase());
+            const searchLower = searchTerm.toLowerCase();
+            const typeString = [
+                sub.is_lab ? 'lab' : '',
+                sub.is_honours ? 'honours' : '',
+                sub.is_minor ? 'minor' : '',
+                sub.is_elective ? 'elective' : '',
+                sub.is_open_elective ? 'open elective' : '',
+                sub.is_add_course ? 'add course' : '',
+                (!sub.is_lab && !sub.is_elective && !sub.is_honours && !sub.is_add_course && !sub.is_minor && !sub.is_open_elective) ? 'core' : ''
+            ].filter(Boolean).join(' ');
+
+            const matchesSearch = (sub.course_name || '').toLowerCase().includes(searchLower) ||
+                (sub.course_code || '').toLowerCase().includes(searchLower) ||
+                typeString.includes(searchLower);
+
             const matchesSem = filterSemester === 'All' || sub.semester?.toString() === filterSemester;
             const matchesCredits = filterCredits === 'All' || sub.credits?.toString() === filterCredits;
 
@@ -69,8 +82,10 @@ const SubjectManager = () => {
             if (filterType !== 'All') {
                 if (filterType === 'Core') matchesType = !sub.is_lab && !sub.is_elective && !sub.is_honours && !sub.is_add_course && !sub.is_minor && !sub.is_open_elective;
                 else if (filterType === 'Lab') matchesType = sub.is_lab;
-                else if (filterType === 'Elective') matchesType = sub.is_elective || sub.is_open_elective;
-                else if (filterType === 'Honours/Minor') matchesType = sub.is_honours || sub.is_minor;
+                else if (filterType === 'Elective') matchesType = sub.is_elective && !sub.is_open_elective;
+                else if (filterType === 'Open Elective') matchesType = sub.is_open_elective;
+                else if (filterType === 'Honours') matchesType = sub.is_honours;
+                else if (filterType === 'Minor') matchesType = sub.is_minor;
                 else if (filterType === 'Add Course') matchesType = sub.is_add_course;
             }
 
@@ -103,37 +118,48 @@ const SubjectManager = () => {
                     />
                 </div>
 
-                <div className="flex gap-4 flex-wrap">
-                    <select
-                        className="py-2 px-3 border border-slate-200 rounded-lg text-sm bg-slate-50 outline-none focus:border-primary-500"
-                        value={filterSemester}
-                        onChange={(e) => setFilterSemester(e.target.value)}
-                    >
-                        <option value="All">All Semesters</option>
-                        {[1, 2, 3, 4, 5, 6, 7, 8].map(s => <option key={s} value={s}>Semester {s}</option>)}
-                    </select>
+                <div className="flex gap-4 flex-wrap items-end">
+                    <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Semester</label>
+                        <select
+                            className="py-2.5 px-3 border border-slate-200 rounded-lg text-sm bg-slate-50 outline-none focus:border-primary-500 min-w-[120px]"
+                            value={filterSemester}
+                            onChange={(e) => setFilterSemester(e.target.value)}
+                        >
+                            <option value="All">All Semesters</option>
+                            {[1, 2, 3, 4, 5, 6, 7, 8].map(s => <option key={s} value={s}>Semester {s}</option>)}
+                        </select>
+                    </div>
 
-                    <select
-                        className="py-2 px-3 border border-slate-200 rounded-lg text-sm bg-slate-50 outline-none focus:border-primary-500"
-                        value={filterCredits}
-                        onChange={(e) => setFilterCredits(e.target.value)}
-                    >
-                        <option value="All">All Credits</option>
-                        {[1, 2, 3, 4, 5, 6].map(c => <option key={c} value={c}>{c} Credits</option>)}
-                    </select>
+                    <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Credits</label>
+                        <select
+                            className="py-2.5 px-3 border border-slate-200 rounded-lg text-sm bg-slate-50 outline-none focus:border-primary-500 min-w-[120px]"
+                            value={filterCredits}
+                            onChange={(e) => setFilterCredits(e.target.value)}
+                        >
+                            <option value="All">All Credits</option>
+                            {[1, 2, 3, 4, 5, 6].map(c => <option key={c} value={c}>{c} Credits</option>)}
+                        </select>
+                    </div>
 
-                    <select
-                        className="py-2 px-3 border border-slate-200 rounded-lg text-sm bg-slate-50 outline-none focus:border-primary-500"
-                        value={filterType}
-                        onChange={(e) => setFilterType(e.target.value)}
-                    >
-                        <option value="All">All Types</option>
-                        <option value="Core">Core</option>
-                        <option value="Lab">Lab</option>
-                        <option value="Elective">Elective</option>
-                        <option value="Honours/Minor">Honours & Minors</option>
-                        <option value="Add Course">Add Course</option>
-                    </select>
+                    <div className="flex flex-col gap-1.5 border-l border-slate-200 pl-4 ml-2">
+                        <label className="text-[10px] uppercase font-bold text-slate-500 tracking-wider text-primary-600">Type of Course</label>
+                        <select
+                            className="py-2.5 px-3 border-2 border-primary-200/50 rounded-lg text-sm bg-primary-50 text-primary-800 font-medium outline-none focus:border-primary-500 min-w-[150px] shadow-sm shadow-primary-100/30"
+                            value={filterType}
+                            onChange={(e) => setFilterType(e.target.value)}
+                        >
+                            <option value="All">All Course Types</option>
+                            <option value="Core">Core Subjects</option>
+                            <option value="Lab">Lab Classes</option>
+                            <option value="Elective">Elective</option>
+                            <option value="Open Elective">Open Elective</option>
+                            <option value="Honours">Honours</option>
+                            <option value="Minor">Minor</option>
+                            <option value="Add Course">Add Course</option>
+                        </select>
+                    </div>
                 </div>
             </div>
 
@@ -255,6 +281,12 @@ const SubjectManager = () => {
                                         checked={newSubject.is_minor}
                                         onChange={e => setNewSubject({ ...newSubject, is_minor: e.target.checked })} />
                                     Minor Course
+                                </label>
+                                <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                                    <input type="checkbox" className="w-4 h-4 text-amber-600 rounded border-gray-300 focus:ring-amber-500"
+                                        checked={newSubject.is_add_course}
+                                        onChange={e => setNewSubject({ ...newSubject, is_add_course: e.target.checked })} />
+                                    Add Course
                                 </label>
                             </div>
 

@@ -155,6 +155,7 @@ function App() {
             is_honours: fd.get('is_honours') === 'on',
             is_minor: fd.get('is_minor') === 'on',
             is_elective: fd.get('is_elective') === 'on',
+            is_add_course: fd.get('is_add_course') === 'on',
             common_departments: newCourseCommonDepts
         };
         try {
@@ -185,6 +186,7 @@ function App() {
             is_honours: fd.get('is_honours') === 'on',
             is_minor: fd.get('is_minor') === 'on',
             is_elective: fd.get('is_elective') === 'on',
+            is_add_course: fd.get('is_add_course') === 'on',
             common_departments: newCourseCommonDepts
         };
         try {
@@ -355,6 +357,7 @@ function App() {
             if (course.is_honours) return <span className="text-[8px] bg-purple-100 text-purple-700 px-1 rounded shadow-sm font-semibold border border-purple-200 uppercase tracking-wider">Honours</span>;
             if (course.is_minor) return <span className="text-[8px] bg-indigo-100 text-indigo-700 px-1 rounded shadow-sm font-semibold border border-indigo-200 uppercase tracking-wider">Minor</span>;
             if (course.is_elective) return <span className="text-[8px] bg-green-100 text-green-700 px-1 rounded shadow-sm font-semibold border border-green-200 uppercase tracking-wider">Elective</span>;
+            if (course.is_add_course) return <span className="text-[8px] bg-amber-100 text-amber-700 px-1 rounded shadow-sm font-semibold border border-amber-200 uppercase tracking-wider">Add Course</span>;
             return null;
         };
 
@@ -665,6 +668,7 @@ function App() {
                                     }} /> Minor
                                 </label>
                                 <label className="flex items-center gap-1.5 text-xs font-medium text-gray-600 cursor-pointer"><input name="is_elective" type="checkbox" className="rounded border-violet-300 text-violet-600 focus:ring-violet-400" /> Elective</label>
+                                <label className="flex items-center gap-1.5 text-xs font-medium text-gray-600 cursor-pointer"><input name="is_add_course" type="checkbox" className="rounded border-violet-300 text-amber-600 focus:ring-amber-400" /> Add Course</label>
                             </div>
 
                             {/* Enabled Native Course Sharing globally for all course structures */}
@@ -771,6 +775,9 @@ function App() {
                                 <label className="flex items-center gap-1.5 text-xs font-medium text-gray-600 cursor-pointer">
                                     <input name="is_elective" type="checkbox" defaultChecked={editingCourse.is_elective} className="rounded border-violet-300 text-violet-600 focus:ring-violet-400" /> Elective
                                 </label>
+                                <label className="flex items-center gap-1.5 text-xs font-medium text-gray-600 cursor-pointer">
+                                    <input name="is_add_course" type="checkbox" defaultChecked={editingCourse.is_add_course} className="rounded border-violet-300 text-amber-600 focus:ring-amber-400" /> Add Course
+                                </label>
                             </div>
 
                             {/* Enabled universally shared target variables cross-departments */}
@@ -855,7 +862,8 @@ function App() {
                                                     {c.is_lab && <span className="bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-lg text-[10px] font-semibold">Lab</span>}
                                                     {c.is_elective && <span className="bg-green-100 text-green-700 px-1.5 py-0.5 rounded-lg text-[10px] font-semibold">Elective</span>}
                                                     {c.is_open_elective && <span className="bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded-lg text-[10px] font-semibold">Open Elec</span>}
-                                                    {!c.is_honours && !c.is_minor && !c.is_lab && !c.is_elective && !c.is_open_elective && <span className="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-lg text-[10px] font-medium">Regular</span>}
+                                                    {c.is_add_course && <span className="bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-lg text-[10px] font-semibold">Add Course</span>}
+                                                    {!c.is_honours && !c.is_minor && !c.is_lab && !c.is_elective && !c.is_open_elective && !c.is_add_course && <span className="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-lg text-[10px] font-medium">Regular</span>}
                                                 </div>
                                             </td>
                                             <td className="p-3.5 text-center flex gap-1 justify-center">

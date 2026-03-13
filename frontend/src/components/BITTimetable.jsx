@@ -77,6 +77,7 @@ const BITTimetable = ({ timetableData, department, semester, courses, slots, bre
         if (course.is_honours) return <span className="text-[7.5px] bg-purple-100 text-purple-700 px-1 py-0.5 rounded shadow-sm font-bold border border-purple-200 uppercase tracking-wider ml-1 align-middle">Honours</span>;
         if (course.is_minor) return <span className="text-[7.5px] bg-indigo-100 text-indigo-700 px-1 py-0.5 rounded shadow-sm font-bold border border-indigo-200 uppercase tracking-wider ml-1 align-middle">Minor</span>;
         if (course.is_elective) return <span className="text-[7.5px] bg-green-100 text-green-700 px-1 py-0.5 rounded shadow-sm font-bold border border-green-200 uppercase tracking-wider ml-1 align-middle">Elective</span>;
+        if (course.is_add_course) return <span className="text-[7.5px] bg-amber-100 text-amber-700 px-1 py-0.5 rounded shadow-sm font-bold border border-amber-200 uppercase tracking-wider ml-1 align-middle">Add Course</span>;
         return null;
     }, [courses, showLabels]);
 

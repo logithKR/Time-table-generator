@@ -245,6 +245,56 @@ def update_course(code: str, req: schemas.CourseUpdate, db: Session = Depends(ge
         raise HTTPException(status_code=404, detail="Course not found")
         
     base_course = existing_courses[0]
+    
+    # 0. Handle course_code Primary Key Migration
+    new_code = req.course_code if req.course_code is not None else code
+    if new_code != code:
+        # Check if new_code already exists
+        conflict = db.query(models.CourseMaster).filter_by(course_code=new_code).first()
+        if conflict:
+            raise HTTPException(status_code=400, detail=f"Course {new_code} already exists")
+            
+        # 0.1 Create identical CourseMaster records mapped to new_code
+        for existing in existing_courses:
+            db.add(models.CourseMaster(
+                course_code=new_code,
+                department_code=existing.department_code,
+                semester=existing.semester,
+                course_name=existing.course_name,
+                course_category=existing.course_category,
+                delivery_type=existing.delivery_type,
+                lecture_hours=existing.lecture_hours,
+                tutorial_hours=existing.tutorial_hours,
+                practical_hours=existing.practical_hours,
+                credits=existing.credits,
+                weekly_sessions=existing.weekly_sessions,
+                is_lab=existing.is_lab,
+                is_elective=existing.is_elective,
+                is_open_elective=existing.is_open_elective,
+                is_honours=existing.is_honours,
+                is_minor=existing.is_minor,
+                is_add_course=existing.is_add_course,
+                enrolled_students=existing.enrolled_students
+            ))
+        db.flush() # Ensure DB sees the new masters before migrating children
+        
+        # 0.2 Migrate all Foreign Key constraint children to new_code
+        db.query(models.CourseFacultyMap).filter_by(course_code=code).update({"course_code": new_code})
+        db.query(models.CourseVenueMap).filter_by(course_code=code).update({"course_code": new_code})
+        db.query(models.CommonCourseMap).filter_by(course_code=code).update({"course_code": new_code})
+        db.query(models.CourseRegistration).filter_by(course_code=code).update({"course_code": new_code})
+        db.query(models.TimetableEntry).filter_by(course_code=code).update({"course_code": new_code})
+        
+        # 0.3 Delete original CourseMaster orphans
+        for existing in existing_courses:
+            db.delete(existing)
+        db.flush()
+        
+        # 0.4 Re-fetch and lock state to the new_code context
+        existing_courses = db.query(models.CourseMaster).filter_by(course_code=new_code).all()
+        base_course = existing_courses[0]
+        code = new_code
+
     primary_dept = req.department_code if req.department_code is not None else base_course.department_code
     semester = req.semester if req.semester is not None else base_course.semester
     

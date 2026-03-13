@@ -27,6 +27,7 @@ class CourseCreate(BaseModel):
     common_departments: Optional[List[str]] = []
 
 class CourseUpdate(BaseModel):
+    course_code: Optional[str] = None
     course_name: Optional[str] = None
     department_code: Optional[str] = None
     semester: Optional[int] = None

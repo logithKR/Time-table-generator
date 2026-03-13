@@ -454,6 +454,50 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                         f'lab_{c.course_code}_{day}_{bs}'
                     )
 
+    # ---------------------------------------------------------
+    # COMMON COURSE OR-TOOLS PINNING (REGULAR/LAB CROSS-DEPT SYNC)
+    # ---------------------------------------------------------
+    for c in regular_courses:
+        common_depts = db.query(models.CommonCourseMap).filter_by(
+            course_code=c.course_code, semester=semester
+        ).all()
+        if len(common_depts) >= 2:
+            anchor_entry = db.query(models.TimetableEntry).filter(
+                models.TimetableEntry.course_code == c.course_code,
+                models.TimetableEntry.semester == semester,
+                models.TimetableEntry.department_code != department_code
+            ).first()
+            if anchor_entry:
+                anchor_entries = db.query(models.TimetableEntry).filter(
+                    models.TimetableEntry.course_code == c.course_code,
+                    models.TimetableEntry.semester == semester,
+                    models.TimetableEntry.department_code == anchor_entry.department_code
+                ).all()
+                
+                anchor_theory = {(ae.day_of_week, ae.period_number) for ae in anchor_entries if ae.session_type == 'THEORY'}
+                anchor_lab = {(ae.day_of_week, ae.period_number) for ae in anchor_entries if ae.session_type == 'LAB'}
+                
+                if anchor_theory and course_theory_count[c.course_code] > 0:
+                    for day in all_days:
+                        for period in day_periods.get(day, []):
+                            if period > max_regular_period:
+                                continue
+                            if (day, period) in anchor_theory:
+                                model.Add(theory_vars[(c.course_code, day, period)] == 1)
+                            else:
+                                model.Add(theory_vars[(c.course_code, day, period)] == 0)
+                                
+                if anchor_lab and course_lab_blocks[c.course_code] > 0 and not (batch_rotation_needed and c in core_lab_courses):
+                    for day in all_days:
+                        for bs in lab_block_starts:
+                            if (day, bs) in slot_lookup and (day, bs + 1) in slot_lookup:
+                                if (day, bs) in anchor_lab:
+                                    model.Add(lab_vars[(c.course_code, day, bs)] == 1)
+                                else:
+                                    model.Add(lab_vars[(c.course_code, day, bs)] == 0)
+                
+                print(f"  🔗 CP-SAT constraint: pinned {c.course_code} to anchor dept {anchor_entry.department_code}")
+
     # =========================================================
     # 3. CONSTRAINTS
     # =========================================================

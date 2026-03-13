@@ -172,6 +172,7 @@ function App() {
         e.preventDefault();
         const fd = new FormData(e.target);
         const data = {
+            course_code: fd.get('course_code'),
             course_name: fd.get('course_name'),
             department_code: fd.get('department_code'),
             semester: parseInt(fd.get('semester')),
@@ -666,7 +667,7 @@ function App() {
                                 <label className="flex items-center gap-1.5 text-xs font-medium text-gray-600 cursor-pointer"><input name="is_elective" type="checkbox" className="rounded border-violet-300 text-violet-600 focus:ring-violet-400" /> Elective</label>
                             </div>
 
-                            {newCourseIsHonoursOrMinor && (
+                            {/* Enabled Native Course Sharing globally for all course structures */}
                                 <div className="col-span-full space-y-2 p-4 bg-slate-50 border border-slate-200 rounded-xl mt-2">
                                     <label className="text-sm font-semibold text-slate-700">Common across departments?</label>
                                     <p className="text-xs text-slate-500 mb-2">Select other departments that share this course.</p>
@@ -694,7 +695,7 @@ function App() {
                                         {departments.length === 0 && <p className="text-xs text-slate-400 italic">No departments available.</p>}
                                     </div>
                                 </div>
-                            )}
+
                             <div className="flex gap-2">
                                 <button type="submit" className="bg-violet-600 hover:bg-violet-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-violet-200 transition-all">Save</button>
                                 <button type="button" onClick={() => setShowAddCourse(false)} className="bg-gray-100 hover:bg-gray-200 text-gray-600 px-4 py-2.5 rounded-xl text-sm font-medium transition-all">Cancel</button>
@@ -707,6 +708,10 @@ function App() {
                     <div className="bg-white rounded-2xl border-2 border-violet-400 shadow-xl shadow-violet-200/50 p-6">
                         <h4 className="font-bold text-gray-800 mb-4 flex items-center gap-2"><Pencil className="w-4 h-4 text-violet-600" /> Edit Course {editingCourse.course_code}</h4>
                         <form onSubmit={(e) => handleUpdateCourse(e, editingCourse.course_code)} className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            <div className="flex flex-col gap-1">
+                                <label className="text-xs font-semibold text-slate-500 uppercase">Course Code</label>
+                                <input name="course_code" defaultValue={editingCourse.course_code} required className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
+                            </div>
                             <div className="flex flex-col gap-1">
                                 <label className="text-xs font-semibold text-slate-500 uppercase">Course Name</label>
                                 <input name="course_name" defaultValue={editingCourse.course_name} required className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
@@ -768,7 +773,7 @@ function App() {
                                 </label>
                             </div>
 
-                            {newCourseIsHonoursOrMinor && (
+                            {/* Enabled universally shared target variables cross-departments */}
                                 <div className="col-span-full space-y-2 p-4 bg-slate-50 border border-slate-200 rounded-xl mt-2">
                                     <label className="text-sm font-semibold text-slate-700">Common across departments?</label>
                                     <p className="text-xs text-slate-500 mb-2">Select other departments that share this course.</p>
@@ -796,7 +801,7 @@ function App() {
                                         {departments.length === 0 && <p className="text-xs text-slate-400 italic">No departments available.</p>}
                                     </div>
                                 </div>
-                            )}
+
                             <div className="flex gap-2 col-span-full mt-2">
                                 <button type="submit" className="bg-violet-600 hover:bg-violet-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-violet-200 transition-all">Update</button>
                                 <button type="button" onClick={() => { setEditingCourse(null); setNewCourseIsHonoursOrMinor(false); setNewCourseCommonDepts([]); }} className="bg-gray-100 hover:bg-gray-200 text-gray-600 px-4 py-2.5 rounded-xl text-sm font-medium transition-all">Cancel</button>

@@ -371,7 +371,15 @@ const StudentTimetable = ({ slots }) => {
                                                                     )}
                                                                     {c.course_name && (
                                                                         <div className="text-[11px] font-semibold text-gray-700 mt-1 px-1 leading-snug">
-                                                                            {c.course_name}
+                                                                            {(() => {
+                                                                                let name = c.course_name;
+                                                                                // Mini Project Display: append " / Mini Project" for Add Courses when toggle is ON
+                                                                                const deptObj = departments.find(d => d.department_code === (c.department_code || selectedDept));
+                                                                                if (c.is_add_course && deptObj?.pair_add_course_miniproject) {
+                                                                                    name = name + ' / Mini Project';
+                                                                                }
+                                                                                return name;
+                                                                            })()}
                                                                         </div>
                                                                     )}
                                                                     <div className="flex flex-row items-center justify-center mt-1.5 gap-1.5 flex-wrap">

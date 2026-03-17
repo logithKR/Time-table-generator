@@ -6,6 +6,7 @@ class DepartmentMaster(Base):
     
     department_code = Column(String, primary_key=True)
     student_count = Column(Integer, default=0, nullable=True)
+    pair_add_course_miniproject = Column(Boolean, default=False)
 
 class FacultyMaster(Base):
     __tablename__ = "faculty_master"

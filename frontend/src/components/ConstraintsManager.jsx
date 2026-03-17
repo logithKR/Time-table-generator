@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import * as api from '../utils/api';
+import { getDepartments, updateDepartment } from '../utils/api';
 import {
     Settings, Shield, Zap, Star, Users2, Layers, GitMerge, BookOpen, GraduationCap,
     Save, RotateCcw, Check, AlertTriangle, Info, ToggleLeft, ToggleRight,
@@ -272,6 +273,10 @@ const ConstraintsManager = () => {
     const [saved, setSaved] = useState(false);
     const [hasChanges, setHasChanges] = useState(false);
 
+    // --- Mini Project Display Toggle State ---
+    const [departments, setDepartments] = useState([]);
+    const [loadingDepts, setLoadingDepts] = useState(false);
+
     const loadConfig = useCallback(async () => {
         setLoading(true);
         try {
@@ -285,6 +290,15 @@ const ConstraintsManager = () => {
     }, []);
 
     useEffect(() => { loadConfig(); }, [loadConfig]);
+
+    // Fetch departments for the Mini Project toggle section
+    useEffect(() => {
+        setLoadingDepts(true);
+        getDepartments()
+            .then(res => setDepartments(res.data))
+            .catch(err => console.error('Failed to load departments:', err))
+            .finally(() => setLoadingDepts(false));
+    }, []);
 
     useEffect(() => {
         if (config && originalConfig) {
@@ -333,6 +347,16 @@ const ConstraintsManager = () => {
 
     const handleUndo = () => {
         setConfig(JSON.parse(JSON.stringify(originalConfig)));
+    };
+
+    const handleToggleMiniProject = async (code, currentVal) => {
+        try {
+            await updateDepartment(code, { pair_add_course_miniproject: !currentVal });
+            const res = await getDepartments();
+            setDepartments(res.data);
+        } catch (err) {
+            alert('Failed to toggle Mini Project display: ' + (err.response?.data?.detail || err.message));
+        }
     };
 
     if (loading || !config) {
@@ -444,6 +468,54 @@ const ConstraintsManager = () => {
                         />
                     )
                 ))}
+            </div>
+
+            {/* ─── Mini Project Display Section ─── */}
+            <div className="max-w-5xl mx-auto px-8 pb-4">
+                <div className="rounded-2xl border border-gray-100 bg-white overflow-hidden shadow-sm hover:shadow-md transition-all duration-300">
+                    <div className="px-6 py-4 flex items-center gap-4 border-b border-gray-50">
+                        <div className="p-2.5 rounded-xl bg-amber-50 text-amber-500">
+                            <BookOpen className="w-5 h-5" />
+                        </div>
+                        <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                                <h3 className="font-bold text-sm text-gray-800">Mini Project Display</h3>
+                                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-500 tracking-wider">DISPLAY ONLY</span>
+                            </div>
+                            <p className="text-[11px] text-gray-400 mt-0.5">When enabled, Add Course cells show " / Mini Project" and students not opted into Add Courses see "Mini Project" in that slot.</p>
+                        </div>
+                    </div>
+                    <div className="px-6 py-5 space-y-3">
+                        {loadingDepts ? (
+                            <div className="text-xs text-gray-400 text-center py-4">Loading departments...</div>
+                        ) : departments.length === 0 ? (
+                            <div className="text-xs text-gray-400 text-center py-4">No departments found.</div>
+                        ) : (
+                            departments.map(dept => (
+                                <div key={dept.department_code} className={`relative group rounded-xl border-2 p-4 transition-all duration-300 ${dept.pair_add_course_miniproject ? 'border-amber-200 bg-amber-50/30 shadow-sm' : 'border-gray-100 bg-white'}`}>
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-sm font-black text-gray-800 tracking-tight">{dept.department_code}</span>
+                                            {dept.pair_add_course_miniproject && (
+                                                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200 uppercase tracking-wider">Active</span>
+                                            )}
+                                        </div>
+                                        <button
+                                            onClick={() => handleToggleMiniProject(dept.department_code, dept.pair_add_course_miniproject)}
+                                            className={`relative inline-flex h-7 w-12 items-center rounded-full transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                                                dept.pair_add_course_miniproject
+                                                    ? 'bg-amber-500 focus:ring-amber-400'
+                                                    : 'bg-gray-300 focus:ring-gray-400'
+                                            }`}
+                                        >
+                                            <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-md transition-transform duration-300 ${dept.pair_add_course_miniproject ? 'translate-x-6' : 'translate-x-1'}`} />
+                                        </button>
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </div>
             </div>
 
             {/* ─── Footer ─── */}

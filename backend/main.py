@@ -47,7 +47,8 @@ def create_department(req: schemas.DepartmentCreate, db: Session = Depends(get_d
         raise HTTPException(status_code=400, detail=f"Department {req.department_code} already exists")
     dept = models.DepartmentMaster(
         department_code=req.department_code,
-        student_count=req.student_count
+        student_count=req.student_count,
+        pair_add_course_miniproject=req.pair_add_course_miniproject
     )
     db.add(dept)
     db.commit()
@@ -61,6 +62,9 @@ def update_department(code: str, req: schemas.DepartmentUpdate, db: Session = De
     
     if req.student_count is not None:
         dept.student_count = req.student_count
+    
+    if req.pair_add_course_miniproject is not None:
+        dept.pair_add_course_miniproject = req.pair_add_course_miniproject
         
     db.commit()
     db.refresh(dept)
@@ -1195,6 +1199,44 @@ def get_student_timetable(student_id: str, db: Session = Depends(get_db)):
                     k = (e.course_code, e.day_of_week, e.period_number)
                     if k not in valid_entries:
                         valid_entries[k] = e
+
+    # --- Mini Project Fallback: Fill Add Course slots with "Mini Project" for non-opted students ---
+    if student_semester is not None:
+        dept_rec = db.query(models.DepartmentMaster).filter_by(department_code=student.department_code).first()
+        if dept_rec and dept_rec.pair_add_course_miniproject:
+            # Find all Add Course subjects for this department/semester
+            add_courses = db.query(models.CourseMaster).filter_by(
+                department_code=student.department_code, semester=student_semester, is_add_course=True
+            ).all()
+            # Get the student's registered course codes
+            student_course_codes = set(r.course_code for r in regs)
+            
+            for ac in add_courses:
+                if ac.course_code not in student_course_codes:
+                    # Student did NOT opt for this Add Course — find its scheduled slots
+                    ac_entries = db.query(models.TimetableEntry).filter_by(
+                        course_code=ac.course_code, semester=student_semester
+                    ).all()
+                    for ace in ac_entries:
+                        if ace.section_number == 1 or ace.section_number is None:
+                            k = ('MINI_PROJECT_FALLBACK', ace.day_of_week, ace.period_number)
+                            if k not in valid_entries:
+                                mock_mp = models.TimetableEntry(
+                                    id=999800 + len(valid_entries),
+                                    course_code='MINI_PROJECT',
+                                    course_name='Mini Project',
+                                    department_code=student.department_code,
+                                    semester=student_semester,
+                                    day_of_week=ace.day_of_week,
+                                    period_number=ace.period_number,
+                                    session_type='THEORY',
+                                    faculty_name='Unassigned',
+                                    venue_name='',
+                                    section_number=1,
+                                    slot_id=ace.slot_id
+                                )
+                                valid_entries[k] = mock_mp
+
     entries = list(valid_entries.values())
     
     import re

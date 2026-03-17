@@ -4,7 +4,7 @@ import { toPng } from 'html-to-image';
 import jsPDF from 'jspdf';
 import { formatTime } from '../utils/timeFormat';
 
-const BITTimetable = ({ timetableData, department, semester, courses, slots, breakConfigs, onRefresh }) => {
+const BITTimetable = ({ timetableData, department, semester, courses, slots, breakConfigs, onRefresh, departments }) => {
     const componentRef = useRef(null);
     const [downloading, setDownloading] = useState(false);
 
@@ -362,6 +362,13 @@ const BITTimetable = ({ timetableData, department, semester, courses, slots, bre
                                         const renderBlock = (code, idx, isOEBlock, groupEntries) => {
                                             let groupName = groupEntries[0]?.course_name || '';
                                             groupName = groupName.replace(/\s*\/\s*OPEN\s*ELECTIVE\s*/gi, '').trim();
+
+                                            // Mini Project Display: append " / Mini Project" for Add Courses when toggle is ON
+                                            const courseObj = courses?.find(c => c.course_code === code);
+                                            const entryDept = groupEntries[0]?.department_code || department;
+                                            const deptObj = (departments || []).find(d => d.department_code === entryDept);
+                                            const showMPSlash = courseObj?.is_add_course && deptObj?.pair_add_course_miniproject;
+                                            if (showMPSlash) groupName = groupName + ' / Mini Project';
 
                                             const isMiniProject = groupName.toLowerCase().includes('mini project');
                                             return (

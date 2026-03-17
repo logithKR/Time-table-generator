@@ -60,9 +60,11 @@ class CourseFacultyCreate(BaseModel):
 class DepartmentCreate(BaseModel):
     department_code: str
     student_count: Optional[int] = 0
+    pair_add_course_miniproject: Optional[bool] = False
 
 class DepartmentUpdate(BaseModel):
     student_count: Optional[int] = None
+    pair_add_course_miniproject: Optional[bool] = None
 
 class SlotCreate(BaseModel):
     day_of_week: str
@@ -85,6 +87,7 @@ class SlotUpdate(BaseModel):
 class Department(BaseModel):
     department_code: str
     student_count: Optional[int] = 0
+    pair_add_course_miniproject: Optional[bool] = False
     class Config:
         orm_mode = True
 

@@ -75,6 +75,8 @@ const DepartmentsManager = () => {
         }
     };
 
+
+
     const startEditCapacity = (deptCode) => {
         setEditingDept(deptCode);
         const currentCap = capacities[deptCode]?.find(c => c.semester === selectedSemester)?.student_count || 0;
@@ -149,9 +151,11 @@ const DepartmentsManager = () => {
                                     <p className="text-xs text-slate-400 font-medium">Department Code</p>
                                 </div>
 
-                                <button onClick={() => handleDelete(dept.department_code)} className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100" title="Delete Department">
-                                    <Trash2 className="w-4 h-4" />
-                                </button>
+                                    <div className="flex items-center gap-2">
+                                        <button onClick={() => handleDelete(dept.department_code)} className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100" title="Delete Department">
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
+                                    </div>
                             </div>
 
                             <div className="bg-slate-50 rounded-xl p-4 border border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">

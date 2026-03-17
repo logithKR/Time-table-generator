@@ -493,8 +493,14 @@ function App() {
                                     };
 
                                     const renderCourseBlock = (code, idx, isOEBlock, groupEntries) => {
-                                        const groupName = cleanCourseName(groupEntries[0]?.course_name || '');
+                                        let groupName = cleanCourseName(groupEntries[0]?.course_name || '');
                                         const isMiniProject = groupName.toLowerCase().includes('mini project');
+
+                                        // Mini Project Display: append " / Mini Project" for Add Courses when toggle is ON
+                                        const courseObj = allCourses.find(c => c.course_code === code);
+                                        const deptObj = departments.find(d => d.department_code === selectedDept);
+                                        const showMPSlash = courseObj?.is_add_course && deptObj?.pair_add_course_miniproject;
+                                        if (showMPSlash) groupName = groupName + ' / Mini Project';
 
                                         return (
                                             <div key={`${code}-${idx}`} className={`p-2 flex flex-col justify-center flex-grow ${idx > 0 || isOEBlock && regularCodes.length > 0 ? 'border-t border-gray-200' : ''} ${isOEBlock ? 'bg-teal-50 hover:bg-teal-100/50' : 'bg-gray-50 hover:bg-blue-50'}`}>
@@ -1734,6 +1740,7 @@ function App() {
                         courses={allCourses}
                         faculty={allFaculty}
                         breakConfigs={breakConfigs}
+                        departments={departments}
                         // Pass the refresh handler to the component
                         onRefresh={() => fetchPrintData(editorDept, editorSem)}
                     />

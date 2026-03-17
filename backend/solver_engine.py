@@ -60,6 +60,7 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
     # =========================================================
     # 1. FETCH DATA
     # =========================================================
+
     courses = db.query(models.CourseMaster).filter_by(
         department_code=department_code, semester=semester, is_open_elective=False
     ).all()
@@ -595,9 +596,10 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                         if k1 in theory_vars and k2 in theory_vars:
                             model.Add(theory_vars[k1] + theory_vars[k2] <= 1)
 
-    # --- C8: Max theory sessions per course per day ---
     max_theory_per_day = c_max_theory_over if is_overloaded else c_max_theory_norm
     print(f"  📊 max_theory/course/day={max_theory_per_day}, back-to-back={'allowed' if is_overloaded or not c_no_back_to_back else 'blocked'}")
+
+
 
     for c in regular_courses:
         for day in all_days:

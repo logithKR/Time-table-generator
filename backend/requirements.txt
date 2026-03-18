@@ -1,8 +1,9 @@
 fastapi
 uvicorn
 sqlalchemy
-
 python-multipart
 pandas
 openpyxl
 ortools
+pydantic
+pydantic-settings

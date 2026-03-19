@@ -16,6 +16,7 @@ import {
     RotateCw,
     Monitor,
     Download,
+    FileSpreadsheet,
     Share2,
     Layers,
     Filter,
@@ -40,6 +41,7 @@ import StudentRegistrations from './components/StudentRegistrations';
 import FacultyTimetable from './components/FacultyTimetable';
 import StudentTimetable from './components/StudentTimetable';
 import BITTimetable from './components/BITTimetable';
+import VenueTimetable from './components/VenueTimetable';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as api from './utils/api';
@@ -86,6 +88,9 @@ function App() {
     const [editingBreakData, setEditingBreakData] = useState({});
     const [showAddBreak, setShowAddBreak] = useState(false);
 
+    // Semester Config state
+    const [semesterConfigs, setSemesterConfigs] = useState([]);
+
     // Lookups
     const [coursesMap, setCoursesMap] = useState({});
     const [facultyMap, setFacultyMap] = useState({});
@@ -116,11 +121,12 @@ function App() {
 
     const fetchMasterData = async () => {
         try {
-            const [d, s, sl, brks] = await Promise.all([api.getDepartments(), api.getSemesters(), api.getSlots(), api.getBreaks()]);
+            const [d, s, sl, brks, sConf] = await Promise.all([api.getDepartments(), api.getSemesters(), api.getSlots(), api.getBreaks(), api.getSemesterConfigs()]);
             setDepartments(d.data);
             setSemesters(s.data);
             setSlots(sl.data);
             setBreakConfigs(brks.data);
+            setSemesterConfigs(sConf.data);
         } catch (err) { console.error("Failed to load master data", err); }
     };
 
@@ -325,6 +331,22 @@ function App() {
             if (!confirm("Switching to Print View. Unsaved changes in Editor will be lost. Proceed?")) return;
         }
         fetchPrintData(selectedDept, selectedSem);
+    };
+
+    const handleDownloadExcel = async () => {
+        try {
+            const res = await api.exportTimetableExcel(selectedDept, selectedSem);
+            const url = window.URL.createObjectURL(new Blob([res.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `timetable_${selectedDept || 'all'}_${selectedSem || 'all'}.xlsx`);
+            document.body.appendChild(link);
+            link.click();
+            link.parentNode.removeChild(link);
+        } catch (err) {
+            console.error("Excel Export Error:", err);
+            alert("Failed to export Excel. Please check console.");
+        }
     };
 
     // --- Timetable Render ---
@@ -1280,6 +1302,16 @@ function App() {
         });
     };
 
+    const handleSaveSemesterConfig = async (semester, academic_year) => {
+        try {
+            await api.updateSemesterConfig(semester, { academic_year });
+            const res = await api.getSemesterConfigs();
+            setSemesterConfigs(res.data);
+        } catch(err) {
+            alert('Failed to update config: ' + err.message);
+        }
+    };
+
     const renderSlotsPage = () => {
         const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
         const grouped = {};
@@ -1423,6 +1455,36 @@ function App() {
                             No break timings configured. Click "Add Break" to allocate formatting.
                         </div>
                     )}
+                </div>
+
+                {/* --- GLOBAL ACADEMIC YEAR CONFIG --- */}
+                <div className="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-2xl border border-indigo-200 shadow-md p-6 overflow-hidden">
+                    <div className="mb-4">
+                        <h3 className="text-lg font-bold text-indigo-900 flex items-center gap-2">
+                            <Layers className="w-5 h-5 text-indigo-600" /> Academic Year
+                        </h3>
+                        <p className="text-sm text-indigo-700/80 mt-1">Set the current Academic Year for all timetable exports (PDF & Excel).</p>
+                    </div>
+                    <div className="max-w-md">
+                        <div className="bg-white rounded-xl border border-indigo-100 p-4 shadow-sm relative group overflow-hidden">
+                            <div className="absolute top-0 left-0 w-1 h-full bg-indigo-400"></div>
+                            <div className="pl-2 flex items-center gap-3">
+                                <h4 className="font-extrabold text-indigo-900 whitespace-nowrap">Academic Year:</h4>
+                                <input 
+                                    type="text" 
+                                    placeholder="e.g. 2025-2026" 
+                                    defaultValue={(semesterConfigs.find(c => c.semester === 0) || {}).academic_year || ''}
+                                    onBlur={e => {
+                                        const current = (semesterConfigs.find(c => c.semester === 0) || {}).academic_year || '';
+                                        if(e.target.value !== current) {
+                                            handleSaveSemesterConfig(0, e.target.value);
+                                        }
+                                    }}
+                                    className="flex-1 text-sm p-2 border border-indigo-200 rounded focus:ring-2 focus:ring-indigo-400 outline-none transition-shadow" 
+                                />
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 
                 {/* --- TIME SLOTS SYSTEM --- */}
@@ -1669,6 +1731,9 @@ function App() {
                         >
                             <Edit2 className="w-4 h-4" /><span>Edit Timetable</span>
                         </button>
+                        <button onClick={handleDownloadExcel} className="flex items-center space-x-2 text-sm text-emerald-700 hover:text-emerald-900 border border-emerald-200 px-4 py-1.5 rounded-xl bg-white shadow-sm hover:shadow-md hover:border-emerald-300 font-semibold transition-all">
+                            <FileSpreadsheet className="w-4 h-4" /><span>Export Excel</span>
+                        </button>
                         <button onClick={handleDownloadPDF} className="flex items-center space-x-2 text-sm text-violet-700 hover:text-violet-900 border border-violet-200 px-4 py-1.5 rounded-xl bg-white shadow-sm hover:shadow-md hover:border-violet-300 font-semibold transition-all">
                             <Download className="w-4 h-4" /><span>Export PDF</span>
                         </button>
@@ -1749,7 +1814,7 @@ function App() {
         </div>
     );
 
-    const pageTitle = { dashboard: 'Timetable Generator', editor: 'Timetable Editor', print: 'Print View', timeslots: 'Time Slots', departments: 'Departments Setup', subjects: 'Course / Subject Details', faculty: 'Faculty Details', mappings: 'Course-Faculty Mappings', venues: 'Venues & Classrooms', venue_mappings: 'Department Venues', students: 'Students & Registrations', faculty_timetable: 'Faculty Personal Timetable', student_timetable: 'Student Personal Timetable', constraints: 'Algorithm Constraints', user_constraints: 'User Constraints' };
+    const pageTitle = { dashboard: 'Timetable Generator', editor: 'Timetable Editor', print: 'Print View', timeslots: 'Time Slots', departments: 'Departments Setup', subjects: 'Course / Subject Details', faculty: 'Faculty Details', mappings: 'Course-Faculty Mappings', venues: 'Venues & Classrooms', venue_mappings: 'Department Venues', students: 'Students & Registrations', faculty_timetable: 'Faculty Personal Timetable', student_timetable: 'Student Personal Timetable', venue_timetable: 'Venue Timetable', constraints: 'Algorithm Constraints', user_constraints: 'User Constraints' };
 
     const switchTab = (tab) => {
         setActiveTab(tab);
@@ -1772,11 +1837,11 @@ function App() {
             <aside className={`fixed inset-y-0 left-0 z-50 ${isCollapsed ? 'w-20' : 'w-64'} bg-white border-r border-gray-100 transform transition-all duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:relative lg:translate-x-0 shadow-xl shadow-gray-200/50 flex flex-col print:hidden`}>
                 <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'} p-6 border-b border-gray-50 transition-all duration-300`}>
                     <div className="flex items-center space-x-3 overflow-hidden">
-                        <div className="w-8 h-8 bg-violet-600 rounded-lg flex items-center justify-center shadow-lg shadow-violet-200 flex-shrink-0">
-                            <Calendar className="w-5 h-5 text-white" />
+                        <div className="w-8 h-8 flex items-center justify-center flex-shrink-0">
+                            <img src="/bitsathy-logo.png" alt="BITSATHY Logo" className="w-full h-full object-contain" />
                         </div>
                         <span className={`text-xl font-bold tracking-tight text-gray-800 whitespace-nowrap transition-opacity duration-300 ${isCollapsed ? 'opacity-0 w-0 hidden' : 'opacity-100'}`}>
-                            Time Table
+                            BITSATHY
                         </span>
                     </div>
                 </div>
@@ -1798,6 +1863,7 @@ function App() {
                         { id: 'students', icon: Users, label: 'Students & Reg.' },
                         { id: 'faculty_timetable', icon: BookOpen, label: 'Faculty Timetable' },
                         { id: 'student_timetable', icon: GraduationCap, label: 'Student Timetable' },
+                        { id: 'venue_timetable', icon: MapPin, label: 'Venue Timetable' },
                         { id: 'mappings', icon: GraduationCap, label: 'Course-Faculty' },
                         { id: 'timeslots', icon: Clock, label: 'Time Slots' },
                         { id: 'venues', icon: MapPin, label: 'Venues' },
@@ -1844,8 +1910,9 @@ function App() {
                         {activeTab === 'faculty' && renderFacultyPage()}
                         {activeTab === 'students' && <StudentRegistrations />}
                         {activeTab === 'faculty_timetable' && <FacultyTimetable slots={slots} />}
-                        {activeTab === 'student_timetable' && <StudentTimetable slots={slots} />}
-                        {activeTab === 'mappings' && renderMappingsPage()}
+                        { activeTab === 'student_timetable' && <StudentTimetable slots={slots} /> }
+                        { activeTab === 'venue_timetable' && <VenueTimetable slots={slots} /> }
+                        { activeTab === 'mappings' && renderMappingsPage() }
                         {activeTab === 'timeslots' && renderSlotsPage()}
                         {activeTab === 'venues' && <Venues />}
                         {activeTab === 'venue_mappings' && <VenueMapping />}

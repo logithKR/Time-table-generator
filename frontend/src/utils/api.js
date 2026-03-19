@@ -53,6 +53,14 @@ export const generateTimetable = (data) => axios.post(`${API_URL}/generate`, dat
 export const getTimetable = (deptCode, sem) => axios.get(`${API_URL}/timetable?department_code=${deptCode}&semester=${sem}`);
 export const getTimetableEntries = getTimetable;
 export const saveTimetable = (data) => axios.post(`${API_URL}/timetable/save`, data);
+export const exportTimetableExcel = (deptCode, sem) => {
+    let url = `${API_URL}/export/timetable/excel`;
+    const params = [];
+    if (deptCode) params.push(`department_code=${deptCode}`);
+    if (sem) params.push(`semester=${sem}`);
+    if (params.length) url += `?${params.join('&')}`;
+    return axios.get(url, { responseType: 'blob' });
+};
 
 // --- Venues ---
 export const getVenues = () => axios.get(`${API_URL}/venues`);
@@ -110,12 +118,21 @@ export const deleteRegistration = (id) => axios.delete(`${API_URL}/registrations
 // --- Personalized Timetables ---
 export const getFacultyTimetable = (facultyId) => axios.get(`${API_URL}/timetable/faculty/${facultyId}`);
 export const getStudentTimetable = (studentId) => axios.get(`${API_URL}/timetable/student/${studentId}`);
+export const getVenueTimetable = (venueName) => axios.get(`${API_URL}/timetable/venue/${venueName}`);
 
 // --- Availability Queries (Smart Editor) ---
-export const getAvailableFaculty = (deptCode, day, period) =>
-    axios.get(`${API_URL}/available-faculty?department_code=${deptCode}&day=${day}&period=${period}`);
-export const getAvailableVenues = (deptCode, semester, day, period) =>
-    axios.get(`${API_URL}/available-venues?department_code=${deptCode}&semester=${semester}&day=${day}&period=${period}`);
+export const getAvailableFaculty = (deptCode, day, period, courseCode = '', showAll = false) => {
+    let url = `${API_URL}/available-faculty?department_code=${deptCode}&day=${day}&period=${period}`;
+    if (courseCode) url += `&course_code=${courseCode}`;
+    if (showAll) url += `&show_all=true`;
+    return axios.get(url);
+};
+export const getAvailableVenues = (deptCode, semester, day, period, courseCode = '', showAll = false) => {
+    let url = `${API_URL}/available-venues?department_code=${deptCode}&semester=${semester}&day=${day}&period=${period}`;
+    if (courseCode) url += `&course_code=${courseCode}`;
+    if (showAll) url += `&show_all=true`;
+    return axios.get(url);
+};
 
 // --- Conflict Check (Cross-Department) ---
 export const checkConflicts = (data) => axios.post(`${API_URL}/check-conflicts`, data);
@@ -130,6 +147,15 @@ export const getCommonCourses = () => axios.get(`${API_URL}/common-courses`);
 export const saveCommonCourse = (data) => axios.post(`${API_URL}/common-courses`, data);
 export const deleteCommonCourse = (courseCode, semester) =>
     axios.delete(`${API_URL}/common-courses/${courseCode}/${semester}`);
+export const setCommonCourseVenue = (data) => axios.post(`${API_URL}/common-courses/venue`, data);
+export const clearCommonCourseVenue = (courseCode, semester) =>
+    axios.delete(`${API_URL}/common-courses/venue/${courseCode}/${semester}`);
+export const getCommonCourseStudentDist = (courseCode, semester) =>
+    axios.get(`${API_URL}/common-courses/student-distribution/${courseCode}/${semester}`);
+
+// --- Semester Configs (Academic Year) ---
+export const getSemesterConfigs = () => axios.get(`${API_URL}/api/semester-config`);
+export const updateSemesterConfig = (semester, data) => axios.post(`${API_URL}/api/semester-config/${semester}`, data);
 
 // --- User Constraints ---
 export const getUserConstraints = (dept, sem) => {

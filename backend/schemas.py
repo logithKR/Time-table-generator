@@ -8,6 +8,16 @@ class GenerateRequest(BaseModel):
     mentor_day: str 
     mentor_period: int = 8
 
+class SemesterConfigUpdate(BaseModel):
+    academic_year: str
+
+class SemesterConfigResponse(BaseModel):
+    semester: int
+    academic_year: str
+    class Config:
+        from_attributes = True
+
+
 class CourseCreate(BaseModel):
     course_code: str
     course_name: str
@@ -184,6 +194,11 @@ class TimetableEntry(BaseModel):
     is_elective: Optional[bool] = False
     is_open_elective: Optional[bool] = False
     is_add_course: Optional[bool] = False
+    strength: Optional[int] = None
+    total_sections: Optional[int] = 1
+    dept_breakdown: Optional[list] = None  # [{dept: "CSE", count: 60}, ...] for common courses
+    combined_strength: Optional[int] = None  # total across all depts in a common course
+    is_common_course: Optional[bool] = False
     
     class Config:
         orm_mode = True

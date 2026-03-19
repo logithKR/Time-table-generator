@@ -3,6 +3,12 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from pydantic import BaseModel
 import json
+import math
+import io
+from fastapi.responses import StreamingResponse
+import openpyxl
+from openpyxl.utils import get_column_letter
+from openpyxl.styles import Alignment, PatternFill, Border, Side, Font
 import models, schemas
 from database import engine, get_db
 from fastapi.middleware.cors import CORSMiddleware
@@ -35,6 +41,26 @@ def run_import_book1(background_tasks: BackgroundTasks):
 # ============================================
 # DEPARTMENTS
 # ============================================
+
+# ============================================
+# SEMESTER CONFIG
+# ============================================
+
+@app.get("/api/semester-config", response_model=List[schemas.SemesterConfigResponse])
+def get_semester_configs(db: Session = Depends(get_db)):
+    return db.query(models.SemesterConfig).all()
+
+@app.post("/api/semester-config/{semester}", response_model=schemas.SemesterConfigResponse)
+def update_semester_config(semester: int, req: schemas.SemesterConfigUpdate, db: Session = Depends(get_db)):
+    config = db.query(models.SemesterConfig).filter_by(semester=semester).first()
+    if not config:
+        config = models.SemesterConfig(semester=semester, academic_year=req.academic_year)
+        db.add(config)
+    else:
+        config.academic_year = req.academic_year
+    db.commit()
+    db.refresh(config)
+    return config
 
 @app.get("/departments", response_model=List[schemas.Department])
 def get_departments(db: Session = Depends(get_db)):
@@ -704,12 +730,11 @@ def get_available_faculty(
     department_code: str,
     day: str,
     period: int,
+    course_code: str = None,
+    show_all: bool = False,
     db: Session = Depends(get_db)
 ):
-    """Return faculty who are NOT busy at this day+period across all depts/sems."""
-    # All faculty across all departments
-    all_faculty = db.query(models.FacultyMaster).all()
-
+    """Return faculty, applying context-aware filtering based on course mapping."""
     # All faculty_names busy at this exact slot (across ALL departments and semesters)
     busy_names = set()
     busy_entries = db.query(models.TimetableEntry.faculty_name).filter(
@@ -722,8 +747,29 @@ def get_available_faculty(
     for (name,) in busy_entries:
         busy_names.add(name)
 
+    base_faculty = []
+    
+    if show_all:
+        base_faculty = db.query(models.FacultyMaster).all()
+    elif course_code:
+        # Try to find specific mappings for this course in this department
+        mapped = db.query(models.CourseFacultyMap).filter_by(
+            department_code=department_code, course_code=course_code
+        ).all()
+        if mapped:
+            mapped_ids = [m.faculty_id for m in mapped]
+            base_faculty = db.query(models.FacultyMaster).filter(
+                models.FacultyMaster.faculty_id.in_(mapped_ids)
+            ).all()
+            
+    # Fallback to department if not found or no course_code provided
+    if not show_all and not base_faculty:
+        base_faculty = db.query(models.FacultyMaster).filter_by(
+            department_code=department_code
+        ).all()
+
     result = []
-    for f in all_faculty:
+    for f in base_faculty:
         result.append({
             "faculty_id": f.faculty_id,
             "faculty_name": f.faculty_name,
@@ -741,12 +787,11 @@ def get_available_venues(
     semester: int,
     day: str,
     period: int,
+    course_code: str = None,
+    show_all: bool = False,
     db: Session = Depends(get_db)
 ):
-    """Return venues that are NOT used at this day+period across all depts/sems."""
-    # Get all venues
-    venues = db.query(models.VenueMaster).all()
-
+    """Return venues, applying context-aware filtering based on global or local course mappings."""
     # All venue_names busy at this exact slot (across ALL departments and semesters)
     busy_venue_names = set()
     busy_entries = db.query(models.TimetableEntry.venue_name).filter(
@@ -758,8 +803,47 @@ def get_available_venues(
     for (name,) in busy_entries:
         busy_venue_names.add(name)
 
+    base_venues = []
+
+    if show_all:
+        base_venues = db.query(models.VenueMaster).all()
+    elif course_code:
+        # 1. Check if it's a common course with a global venue lock
+        common = db.query(models.CommonCourseMap).filter_by(
+            course_code=course_code, semester=semester
+        ).filter(models.CommonCourseMap.venue_name != None).first()
+        
+        if common and common.venue_name:
+            v_obj = db.query(models.VenueMaster).filter_by(venue_name=common.venue_name).first()
+            if v_obj: base_venues = [v_obj]
+            
+        # 2. If no global lock, check for department-specific mappings
+        if not base_venues:
+            mapped = db.query(models.CourseVenueMap).filter_by(
+                department_code=department_code, course_code=course_code
+            ).all()
+            if mapped:
+                mapped_ids = [m.venue_id for m in mapped]
+                base_venues = db.query(models.VenueMaster).filter(
+                    models.VenueMaster.venue_id.in_(mapped_ids)
+                ).all()
+
+    # Fallback to department venues if not found or no course_code provided
+    if not show_all and not base_venues:
+        dept_venues = db.query(models.DepartmentVenueMap).filter_by(
+            department_code=department_code, semester=semester
+        ).all()
+        if dept_venues:
+            mapped_vids = [v.venue_id for v in dept_venues]
+            base_venues = db.query(models.VenueMaster).filter(
+                models.VenueMaster.venue_id.in_(mapped_vids)
+            ).all()
+        else:
+            # Absolute fallback if department has no venues mapped at all
+            base_venues = db.query(models.VenueMaster).all()
+
     result = []
-    for v in venues:
+    for v in base_venues:
         result.append({
             "venue_id": v.venue_id,
             "venue_name": v.venue_name,
@@ -956,6 +1040,17 @@ def get_course_venues(department_code: str = None, db: Session = Depends(get_db)
 
 @app.post("/course-venues", response_model=schemas.CourseVenueResponse)
 def create_course_venue(req: schemas.CourseVenueCreate, db: Session = Depends(get_db)):
+    # Block venue assignment for common courses — must use /common-courses/venue instead
+    is_common = db.query(models.CommonCourseMap).filter_by(
+        course_code=req.course_code
+    ).first()
+    if is_common:
+        raise HTTPException(
+            status_code=400,
+            detail=f"'{req.course_code}' is a common course shared across departments. "
+                   f"Use the Common Course Venues section to assign its venue globally."
+        )
+
     existing = db.query(models.CourseVenueMap).filter_by(
         department_code=req.department_code,
         course_code=req.course_code,
@@ -1281,6 +1376,112 @@ def get_student_timetable(student_id: str, db: Session = Depends(get_db)):
     return {"conflicts": list(conflicts), "timetable": entries}
 
 
+@app.get("/timetable/venue/{venue_name}", response_model=schemas.PersonalTimetableResponse)
+def get_venue_timetable(venue_name: str, db: Session = Depends(get_db)):
+    # 1. Fetch matching entries (can be part of comma separated venues)
+    all_entries = db.query(models.TimetableEntry).all()
+    raw_entries = []
+    for e in all_entries:
+        if e.venue_name and venue_name in [v.strip() for v in e.venue_name.split(",")]:
+            raw_entries.append(e)
+
+    # 2. Build set of common course codes for fast lookup
+    all_common = db.query(models.CommonCourseMap).all()
+    common_course_keys = set()  # {(course_code, semester)}
+    for cc in all_common:
+        common_course_keys.add((cc.course_code, cc.semester))
+
+    # 3. Group entries by (day, period) to detect common courses vs conflicts
+    slot_groups = {}  # (day, period) -> [entry, ...]
+    for e in raw_entries:
+        key = (e.day_of_week, e.period_number)
+        slot_groups.setdefault(key, []).append(e)
+
+    # 4. Process each slot: compute strength, detect common courses, merge breakdown
+    entries = []
+    conflicts = set()
+
+    for slot_key, slot_entries in slot_groups.items():
+        # Sub-group by course_code within the same slot
+        course_groups = {}  # course_code -> [entries for that course]
+        for e in slot_entries:
+            course_groups.setdefault(e.course_code, []).append(e)
+
+        # Check for REAL conflicts: different course_codes in same venue+slot
+        if len(course_groups) > 1:
+            courses_str = " & ".join(
+                [f"{code} ({', '.join(set(x.department_code for x in grp))})"
+                 for code, grp in course_groups.items()]
+            )
+            conflicts.add(
+                f"Conflict on {slot_key[0]} Period {slot_key[1]}: "
+                f"Venue occupied by multiple distinct courses: {courses_str}"
+            )
+
+        # Process each course group in this slot
+        for course_code, group in course_groups.items():
+            is_common = (course_code, group[0].semester) in common_course_keys and len(group) > 1
+
+            # Build department breakdown with strength per dept
+            dept_breakdown = []
+            total_combined = 0
+
+            for e in group:
+                # Calculate per-dept strength
+                sem_count = db.query(models.DepartmentSemesterCount).filter_by(
+                    department_code=e.department_code, semester=e.semester
+                ).first()
+                student_count = sem_count.student_count if sem_count and sem_count.student_count > 0 else 60
+
+                course = db.query(models.CourseMaster).filter_by(
+                    course_code=e.course_code, semester=e.semester, department_code=e.department_code
+                ).first()
+                enrolled = course.enrolled_students if course and course.enrolled_students else 0
+                base_count = min(enrolled, student_count) if enrolled > 0 else student_count
+
+                # Calculate sections for this dept's version of the course
+                same_course_entries = db.query(models.TimetableEntry).filter_by(
+                    course_code=e.course_code, semester=e.semester,
+                    department_code=e.department_code, session_type=e.session_type
+                ).all()
+                total_secs = max([se.section_number or 1 for se in same_course_entries] + [1])
+                strength = math.ceil(base_count / total_secs) if total_secs > 0 else base_count
+
+                dept_breakdown.append({
+                    "dept": e.department_code,
+                    "count": strength,
+                    "total_sections": total_secs,
+                    "section": e.section_number or 1
+                })
+                total_combined += strength
+
+                setattr(e, 'total_sections', total_secs)
+                setattr(e, 'strength', strength)
+
+            if is_common:
+                # For common courses, attach breakdown and combined strength to ALL entries in group
+                for e in group:
+                    setattr(e, 'dept_breakdown', dept_breakdown)
+                    setattr(e, 'combined_strength', total_combined)
+                    setattr(e, 'is_common_course', True)
+
+                # Only emit the FIRST entry to avoid duplicate rows in the timetable grid
+                # but with complete aggregated data
+                representative = group[0]
+                setattr(representative, 'dept_breakdown', dept_breakdown)
+                setattr(representative, 'combined_strength', total_combined)
+                setattr(representative, 'is_common_course', True)
+                entries.append(representative)
+            else:
+                # Non-common: add all entries individually (could be split batches, etc.)
+                for e in group:
+                    setattr(e, 'dept_breakdown', None)
+                    setattr(e, 'combined_strength', None)
+                    setattr(e, 'is_common_course', False)
+                    entries.append(e)
+
+    return {"conflicts": list(conflicts), "timetable": entries}
+
 # ============================================
 # CONFLICT CHECK (Cross-Department)
 # ============================================
@@ -1551,15 +1752,36 @@ def reset_scheduler_config(db: Session = Depends(get_db)):
 
 @app.get("/common-courses")
 def get_common_courses(db: Session = Depends(get_db)):
-    """Return all common course groups as a list of {course_code, semester, departments}."""
+    """Return all common course groups with venue info and per-dept student counts."""
     rows = db.query(models.CommonCourseMap).all()
     # Group by course_code + semester
     groups: dict = {}
     for row in rows:
         key = (row.course_code, row.semester)
         if key not in groups:
-            groups[key] = {"course_code": row.course_code, "semester": row.semester, "departments": []}
+            groups[key] = {
+                "course_code": row.course_code,
+                "semester": row.semester,
+                "departments": [],
+                "venue_name": row.venue_name,
+                "venue_type": row.venue_type or 'BOTH',
+                "dept_student_counts": []
+            }
+        # Per-dept student count
+        sem_count = db.query(models.DepartmentSemesterCount).filter_by(
+            department_code=row.department_code, semester=row.semester
+        ).first()
+        count = sem_count.student_count if sem_count and sem_count.student_count > 0 else 0
+        
         groups[key]["departments"].append(row.department_code)
+        groups[key]["dept_student_counts"].append({
+            "dept": row.department_code,
+            "count": count
+        })
+        # Use venue from any row (all should be same)
+        if row.venue_name and not groups[key]["venue_name"]:
+            groups[key]["venue_name"] = row.venue_name
+            groups[key]["venue_type"] = row.venue_type or 'BOTH'
     return list(groups.values())
 
 
@@ -1570,20 +1792,106 @@ class CommonCourseRequest(BaseModel):
 
 @app.post("/common-courses")
 def save_common_course(req: CommonCourseRequest, db: Session = Depends(get_db)):
-    """Create or replace the department list for a common course group."""
+    """Create or replace the department list for a common course group.
+    Preserves the existing global venue if one was already set."""
+    # Check if there's an existing venue set
+    existing_venue = None
+    existing_type = 'BOTH'
+    old_rows = db.query(models.CommonCourseMap).filter_by(
+        course_code=req.course_code, semester=req.semester
+    ).all()
+    for r in old_rows:
+        if r.venue_name:
+            existing_venue = r.venue_name
+            existing_type = r.venue_type or 'BOTH'
+            break
+
     # Delete existing entries for this course+semester
     db.query(models.CommonCourseMap).filter_by(
         course_code=req.course_code, semester=req.semester
     ).delete()
-    # Insert new entries
+    # Insert new entries, carrying forward the global venue
     for dept in req.department_codes:
         db.add(models.CommonCourseMap(
             course_code=req.course_code,
             semester=req.semester,
-            department_code=dept
+            department_code=dept,
+            venue_name=existing_venue,
+            venue_type=existing_type
         ))
     db.commit()
     return {"status": "saved", "course_code": req.course_code, "semester": req.semester}
+
+
+class CommonCourseVenueRequest(BaseModel):
+    course_code: str
+    semester: int
+    venue_name: str
+    venue_type: str = 'BOTH'  # THEORY / LAB / BOTH
+
+@app.post("/common-courses/venue")
+def set_common_course_venue(req: CommonCourseVenueRequest, db: Session = Depends(get_db)):
+    """Globally set the venue for a common course — applies to ALL departments."""
+    rows = db.query(models.CommonCourseMap).filter_by(
+        course_code=req.course_code, semester=req.semester
+    ).all()
+    if not rows:
+        raise HTTPException(status_code=404, detail=f"No common course found for {req.course_code} semester {req.semester}")
+    
+    vtype = (req.venue_type or 'BOTH').upper()
+    # Update all rows atomically
+    db.query(models.CommonCourseMap).filter_by(
+        course_code=req.course_code, semester=req.semester
+    ).update({"venue_name": req.venue_name, "venue_type": vtype})
+    
+    # Also sync existing TimetableEntry rows for this common course
+    db.query(models.TimetableEntry).filter_by(
+        course_code=req.course_code, semester=req.semester
+    ).update({"venue_name": req.venue_name})
+    
+    db.commit()
+    
+    dept_codes = [r.department_code for r in rows]
+    return {
+        "status": "saved",
+        "course_code": req.course_code,
+        "semester": req.semester,
+        "venue_name": req.venue_name,
+        "venue_type": vtype,
+        "synced_departments": dept_codes
+    }
+
+
+@app.delete("/common-courses/venue/{course_code:path}/{semester}")
+def clear_common_course_venue(course_code: str, semester: int, db: Session = Depends(get_db)):
+    """Remove the global venue assignment from a common course."""
+    affected = db.query(models.CommonCourseMap).filter_by(
+        course_code=course_code, semester=semester
+    ).update({"venue_name": None, "venue_type": "BOTH"})
+    db.commit()
+    return {"status": "cleared", "rows": affected}
+
+
+@app.get("/common-courses/student-distribution/{course_code:path}/{semester}")
+def get_common_course_students(course_code: str, semester: int, db: Session = Depends(get_db)):
+    """Get per-department student counts for a common course."""
+    rows = db.query(models.CommonCourseMap).filter_by(
+        course_code=course_code, semester=semester
+    ).all()
+    if not rows:
+        raise HTTPException(status_code=404, detail="Common course not found")
+    
+    breakdown = []
+    total = 0
+    for row in rows:
+        sem_count = db.query(models.DepartmentSemesterCount).filter_by(
+            department_code=row.department_code, semester=semester
+        ).first()
+        count = sem_count.student_count if sem_count and sem_count.student_count > 0 else 0
+        breakdown.append({"dept": row.department_code, "count": count})
+        total += count
+    
+    return {"course_code": course_code, "semester": semester, "total": total, "departments": breakdown}
 
 
 @app.delete("/common-courses/{course_code:path}/{semester}")
@@ -1832,3 +2140,260 @@ def validate_user_constraint(
         "warnings": warnings
     }
 
+# ============================================
+# EXPORT
+# ============================================
+
+@app.get("/export/timetable/excel")
+def export_timetable_excel(
+    department_code: str = None, 
+    semester: int = None, 
+    db: Session = Depends(get_db)
+):
+    """Generates a highly-formatted Excel (.xlsx) version of the Timetable."""
+    # Fetch slots
+    slots = db.query(models.SlotMaster).order_by(models.SlotMaster.day_of_week, models.SlotMaster.period_number).all()
+    if not slots:
+        raise HTTPException(status_code=400, detail="No slots configured")
+        
+    days_order = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+    active_days = [d for d in days_order if any(s.day_of_week == d for s in slots)]
+    if not active_days: active_days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
+    
+    max_period = max([s.period_number for s in slots], default=8)
+    periods = list(range(1, max_period + 1))
+    
+    # Fetch timetable entries
+    query = db.query(models.TimetableEntry)
+    if department_code: query = query.filter(models.TimetableEntry.department_code == department_code)
+    if semester: query = query.filter(models.TimetableEntry.semester == semester)
+    entries = query.all()
+    
+    # Group entries by (day, period)
+    timetable_dict = {}
+    for e in entries:
+        key = (e.day_of_week, e.period_number)
+        if key not in timetable_dict:
+            timetable_dict[key] = []
+        timetable_dict[key].append(e)
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = f"Timetable"
+    
+    # Styles matching PDF layout exactly
+    thin = Side(border_style="thin", color="D1D5DB") # Gray-300
+    thick = Side(border_style="medium", color="1F2937") # Gray-800
+    border_all = Border(top=thin, left=thin, right=thin, bottom=thin)
+    
+    fill_header = PatternFill(start_color="F9FAFB", end_color="F9FAFB", fill_type="solid") # bg-gray-50
+    fill_day = PatternFill(start_color="F9FAFB", end_color="F9FAFB", fill_type="solid") # bg-gray-50
+    fill_lab = PatternFill(start_color="FEF9C3", end_color="FEF9C3", fill_type="solid") # bg-amber-50 equivalent
+    fill_class = PatternFill(start_color="FFFFFF", end_color="FFFFFF", fill_type="solid")
+    fill_empty = PatternFill(start_color="F3F4F6", end_color="F3F4F6", fill_type="solid") # bg-gray-100
+    
+    font_bold = Font(bold=True, color="1F2937", size=11)
+    font_title = Font(bold=True, size=16, color="111827")
+    align_center = Alignment(horizontal='center', vertical='center', wrap_text=True)
+    
+    try:
+        from openpyxl.drawing.image import Image
+    except ImportError:
+        Image = None
+    import os
+
+    # Fetch Academic Year (global - stored at semester=0)
+    academic_year = "___________"
+    config = db.query(models.SemesterConfig).filter_by(semester=0).first()
+    if config and config.academic_year:
+        academic_year = config.academic_year
+    
+    # Fetch active breaks
+    all_breaks = db.query(models.BreakConfigMaster).all()
+    active_breaks = []
+    for b in all_breaks:
+        sem_ids = json.loads(b.semester_ids) if b.semester_ids else []
+        if not sem_ids or (semester and semester in sem_ids):
+            active_breaks.append(b)
+
+    fill_break = PatternFill(start_color="E5E7EB", end_color="E5E7EB", fill_type="solid")
+    header_cols_total = len(periods) + 1
+
+    # --- ROW 1-5: INSTITUTION HEADER ---
+    logo_path = os.path.join(os.path.dirname(__file__), "bitsathy-logo.png")
+    if Image and os.path.exists(logo_path):
+        try:
+            img = Image(logo_path)
+            img.width = 100
+            img.height = 100
+            ws.add_image(img, "A1")
+        except Exception as e:
+            print(f"Warning: Could not inject logo: {e}")
+
+    ws.merge_cells(start_row=1, start_column=2, end_row=1, end_column=header_cols_total)
+    c1 = ws.cell(row=1, column=2, value="BANNARI AMMAN INSTITUTE OF TECHNOLOGY")
+    c1.font = Font(bold=True, size=18, color="1E3A8A")
+    c1.alignment = align_center
+
+    ws.merge_cells(start_row=2, start_column=2, end_row=2, end_column=header_cols_total)
+    c2 = ws.cell(row=2, column=2, value="(An Autonomous Institution Affiliated to Anna University, Chennai)")
+    c2.font = Font(bold=True, size=11, color="111827")
+    c2.alignment = align_center
+
+    ws.merge_cells(start_row=3, start_column=2, end_row=3, end_column=header_cols_total)
+    c3 = ws.cell(row=3, column=2, value="Sathyamangalam - 638401")
+    c3.font = Font(bold=True, size=11, color="111827")
+    c3.alignment = align_center
+
+    ws.merge_cells(start_row=4, start_column=2, end_row=4, end_column=header_cols_total)
+    c4 = ws.cell(row=4, column=2, value="CLASS TIMETABLE")
+    c4.font = Font(bold=True, size=14, color="111827")
+    c4.alignment = align_center
+
+    ws.merge_cells(start_row=5, start_column=2, end_row=5, end_column=header_cols_total)
+    c5 = ws.cell(row=5, column=2, value=f"Academic Year {academic_year}")
+    c5.font = Font(bold=True, size=12, color="111827")
+    c5.alignment = align_center
+
+    ws.row_dimensions[1].height = 25
+    ws.row_dimensions[2].height = 15
+    ws.row_dimensions[3].height = 15
+    ws.row_dimensions[4].height = 20
+    ws.row_dimensions[5].height = 20
+
+    # --- ROW 6-7: BREAK DISPLAY HEADER ---
+    ws.merge_cells(start_row=6, start_column=1, end_row=6, end_column=header_cols_total)
+    b_head = ws.cell(row=6, column=1, value="SCHEDULED BREAKS")
+    b_head.font = Font(bold=True, size=10, color="1F2937")
+    b_head.fill = fill_day
+    b_head.alignment = align_center
+    b_head.border = border_all
+
+    break_text = "  |  ".join([f"{b.break_type}: {b.start_time}-{b.end_time}" for b in active_breaks]) if active_breaks else "No breaks scheduled"
+    ws.merge_cells(start_row=7, start_column=1, end_row=7, end_column=header_cols_total)
+    b_val = ws.cell(row=7, column=1, value=break_text)
+    b_val.font = Font(bold=True, size=10, color="4B5563")
+    b_val.fill = fill_break
+    b_val.alignment = align_center
+    b_val.border = border_all
+
+    ws.row_dimensions[6].height = 20
+    ws.row_dimensions[7].height = 25
+
+    # --- ROW 8: DEPARTMENT AND SEMESTER META ROW ---
+    ws.merge_cells(start_row=8, start_column=1, end_row=8, end_column=header_cols_total)
+    meta_text = f"DEPARTMENT OF {department_code or 'ALL'} | SEMESTER {semester or 'ALL'}"
+    m_cell = ws.cell(row=8, column=1, value=meta_text)
+    m_cell.font = Font(bold=True, size=12, color="000000")
+    m_cell.alignment = align_center
+    ws.row_dimensions[8].height = 25
+    
+    # Space between title and table
+    header_row = 10
+    
+    # Headers Setup
+    d_cell = ws.cell(row=header_row, column=1, value="DAY / PERIOD")
+    d_cell.font = Font(bold=True, color="1F2937", size=10)
+    d_cell.alignment = align_center
+    d_cell.fill = fill_day
+    d_cell.border = border_all
+    ws.column_dimensions['A'].width = 16
+    
+    for i, p in enumerate(periods):
+        col = i + 2
+        slot = next((s for s in slots if s.period_number == p and s.day_of_week == 'Monday'), None)
+        time_str = f"{slot.start_time} - {slot.end_time}" if slot else ""
+        header_text = f"Period {p}\n({time_str})"
+        c = ws.cell(row=header_row, column=col, value=header_text)
+        c.font = Font(bold=True, color="374151", size=10)
+        c.alignment = align_center
+        c.fill = fill_header
+        c.border = border_all
+        ws.column_dimensions[get_column_letter(col)].width = 24
+        
+    ws.row_dimensions[header_row].height = 35
+    
+    # Body Setup
+    current_row = header_row + 1
+    for day in active_days:
+        dc = ws.cell(row=current_row, column=1, value=day[:3].upper()) # MON, TUE etc.
+        dc.font = Font(bold=True, size=12, color="1F2937")
+        dc.alignment = align_center
+        dc.fill = fill_day
+        dc.border = border_all
+        
+        ws.row_dimensions[current_row].height = 85
+        
+        skip_next = False
+        for i, p in enumerate(periods):
+            col = i + 2
+            if skip_next:
+                skip_next = False
+                continue
+                
+            cell_entries = timetable_dict.get((day, p), [])
+            # Check for merged LAB span
+            is_lab = any(e.session_type.upper() == 'LAB' for e in cell_entries) if cell_entries else False
+            col_span = 1
+            if is_lab and i < len(periods) - 1:
+                next_p = periods[i+1]
+                next_entries = timetable_dict.get((day, next_p), [])
+                if any(e.session_type.upper() == 'LAB' for e in next_entries):
+                    cur_codes = sorted(list(set(e.course_code for e in cell_entries if e.session_type.upper() == 'LAB')))
+                    nxt_codes = sorted(list(set(e.course_code for e in next_entries if e.session_type.upper() == 'LAB')))
+                    if cur_codes == nxt_codes and len(cur_codes) > 0:
+                        col_span = 2
+                        skip_next = True
+            
+            # Text Construction
+            if not cell_entries:
+                cell_text = "Empty Slot"
+                fill = fill_empty
+                cell_font = Font(italic=True, color="9CA3AF", size=10)
+            else:
+                lines = []
+                for idx, e in enumerate(cell_entries):
+                    c_name = e.course_name or ''
+                    fac = e.faculty_name or 'Unassigned'
+                    ven = e.venue_name or ''
+                    block = f"{e.course_code}\n{c_name}\n({fac})\n[{ven}]"
+                    lines.append(block)
+                cell_text = "\n\n---\n\n".join(lines)
+                fill = fill_lab if is_lab else fill_class
+                cell_font = Font(bold=False, size=10, color="111827")
+                
+            c = ws.cell(row=current_row, column=col, value=cell_text)
+            c.alignment = align_center
+            c.fill = fill
+            c.border = border_all
+            c.font = cell_font
+            
+            if col_span > 1:
+                ws.merge_cells(start_row=current_row, start_column=col, end_row=current_row, end_column=col + col_span - 1)
+                for merge_col in range(col, col + col_span):
+                    mc = ws.cell(row=current_row, column=merge_col)
+                    mc.border = border_all
+                    
+        current_row += 1
+
+    # Apply thick borders to outline the table
+    for r in range(header_row, current_row):
+        ws.cell(row=r, column=1).border = Border(left=thick, top=ws.cell(row=r, column=1).border.top, bottom=ws.cell(row=r, column=1).border.bottom, right=ws.cell(row=r, column=1).border.right)
+        ws.cell(row=r, column=len(periods)+1).border = Border(right=thick, top=ws.cell(row=r, column=len(periods)+1).border.top, bottom=ws.cell(row=r, column=len(periods)+1).border.bottom, left=ws.cell(row=r, column=len(periods)+1).border.left)
+    for c in range(1, len(periods)+2):
+        ws.cell(row=header_row, column=c).border = Border(top=thick, left=ws.cell(row=header_row, column=c).border.left, right=ws.cell(row=header_row, column=c).border.right, bottom=ws.cell(row=header_row, column=c).border.bottom)
+        ws.cell(row=current_row-1, column=c).border = Border(bottom=thick, left=ws.cell(row=current_row-1, column=c).border.left, right=ws.cell(row=current_row-1, column=c).border.right, top=ws.cell(row=current_row-1, column=c).border.top)
+    
+    ws.cell(row=header_row, column=1).border = Border(top=thick, left=thick, bottom=ws.cell(row=header_row, column=1).border.bottom, right=ws.cell(row=header_row, column=1).border.right)
+    ws.cell(row=header_row, column=len(periods)+1).border = Border(top=thick, right=thick, bottom=ws.cell(row=header_row, column=len(periods)+1).border.bottom, left=ws.cell(row=header_row, column=len(periods)+1).border.left)
+    ws.cell(row=current_row-1, column=1).border = Border(bottom=thick, left=thick, top=ws.cell(row=current_row-1, column=1).border.top, right=ws.cell(row=current_row-1, column=1).border.right)
+    ws.cell(row=current_row-1, column=len(periods)+1).border = Border(bottom=thick, right=thick, top=ws.cell(row=current_row-1, column=len(periods)+1).border.top, left=ws.cell(row=current_row-1, column=len(periods)+1).border.left)
+
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+    
+    headers = {
+        'Content-Disposition': f'attachment; filename="timetable_{department_code or "all"}_{semester or "all"}.xlsx"'
+    }
+    return StreamingResponse(output, headers=headers, media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')

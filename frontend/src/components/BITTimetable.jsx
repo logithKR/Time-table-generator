@@ -4,7 +4,7 @@ import { toPng } from 'html-to-image';
 import jsPDF from 'jspdf';
 import { formatTime } from '../utils/timeFormat';
 
-const BITTimetable = ({ timetableData, department, semester, courses, slots, breakConfigs, onRefresh, departments }) => {
+const BITTimetable = ({ timetableData, department, semester, courses, slots, breakConfigs, onRefresh, departments, semesterConfigs }) => {
     const componentRef = useRef(null);
     const [downloading, setDownloading] = useState(false);
 
@@ -232,23 +232,29 @@ const BITTimetable = ({ timetableData, department, semester, courses, slots, bre
             <div className="w-full bg-white print:shadow-none bg-transparent">
                 <div id="printable-content" ref={componentRef} className="w-full" style={{ backgroundColor: '#ffffff', padding: '6mm' }}>
                     {/* Header */}
-                    <div className="flex" style={{ border: '2px solid #000000', borderBottom: 'none' }}>
-                        <div className="flex-grow text-center">
+                    <div className="flex bg-white" style={{ border: '2px solid #000000', borderBottom: 'none' }}>
+                        <div className="w-24 border-r-2 border-black flex items-center justify-center p-2 bg-white">
+                            <img src="/bitsathy-logo.png" alt="BITSATHY Logo" className="w-full h-auto object-contain" />
+                        </div>
+                        <div className="flex-grow text-center bg-white flex flex-col justify-center">
                             <div className="h-full flex flex-col justify-center py-1">
-                                <h1 className="font-bold text-xl py-0.5 tracking-wide" style={{ color: '#000000', fontFamily: 'Arial, sans-serif' }}>BANNARI AMMAN INSTITUTE OF TECHNOLOGY</h1>
-                                <h2 className="font-bold text-base py-0.5 tracking-wide" style={{ color: '#000000', fontFamily: 'Arial, sans-serif' }}>SATHYAMANGALAM</h2>
-                                <h3 className="font-bold text-sm py-0.5 tracking-wide" style={{ color: '#000000', fontFamily: 'Arial, sans-serif' }}>CLASS TIMETABLE</h3>
-                                <div className="font-bold text-xs py-0.5" style={{ color: '#000000', fontFamily: 'Arial, sans-serif' }}>ACADEMIC YEAR 2025 - 2026</div>
+                                <h1 className="font-extrabold text-2xl tracking-widest text-blue-900" style={{ fontFamily: 'Arial, sans-serif' }}>BANNARI AMMAN INSTITUTE OF TECHNOLOGY</h1>
+                                <h2 className="font-bold text-xs tracking-wide mt-0.5" style={{ color: '#000000', fontFamily: 'Arial, sans-serif' }}>(An Autonomous Institution Affiliated to Anna University, Chennai)</h2>
+                                <h2 className="font-bold text-xs tracking-wide mb-1" style={{ color: '#000000', fontFamily: 'Arial, sans-serif' }}>Sathyamanagalam - 638401</h2>
+                                <h3 className="font-bold text-base py-0.5 tracking-widest uppercase" style={{ color: '#000000', fontFamily: 'Arial, sans-serif' }}>CLASS TIMETABLE</h3>
                             </div>
                         </div>
-                        <div className="w-72 text-xs font-bold" style={{ borderLeft: '2px solid #000000' }}>
+                        <div className="w-64 text-xs font-bold bg-white" style={{ borderLeft: '2px solid #000000' }}>
+                            <div className="p-1.5 text-center text-xs uppercase" style={{ borderBottom: '2px solid #000000', backgroundColor: '#f3f4f6', color: '#000000', fontFamily: 'Arial, sans-serif' }}>
+                                Academic Year { (semesterConfigs || []).find(c => c.semester === 0)?.academic_year || '_________' }
+                            </div>
                             <div className="grid grid-cols-2" style={{ borderBottom: '1px solid #000000', backgroundColor: '#f3f4f6' }}>
-                                <div className="p-1 text-center" style={{ borderRight: '1px solid #000000', color: '#000000', fontFamily: 'Arial, sans-serif' }}>Breaks</div>
+                                <div className="p-1 text-center border-r border-black" style={{ color: '#000000', fontFamily: 'Arial, sans-serif' }}>Breaks</div>
                                 <div className="p-1 text-center" style={{ color: '#000000', fontFamily: 'Arial, sans-serif' }}>Timings</div>
                             </div>
                             {BREAKS.map((b, i) => (
-                                <div key={i} className="grid grid-cols-2 items-center" style={{ borderBottom: '1px solid #000000', minHeight: '28px' }}>
-                                    <div className="p-1 text-center text-[10px]" style={{ borderRight: '1px solid #000000', color: '#000000', fontFamily: 'Arial, sans-serif' }}>{b.name}</div>
+                                <div key={i} className="grid grid-cols-2 items-center bg-white" style={{ borderBottom: '1px solid #000000', minHeight: '28px' }}>
+                                    <div className="p-1 text-center text-[10px] border-r border-black" style={{ color: '#000000', fontFamily: 'Arial, sans-serif' }}>{b.name}</div>
                                     <div className="p-1 text-center text-[10px]" style={{ color: '#000000', fontFamily: 'Arial, sans-serif' }}>{b.time}</div>
                                 </div>
                             ))}

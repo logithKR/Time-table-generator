@@ -173,6 +173,12 @@ class DepartmentSemesterCount(Base):
 # Index for fast retrieval by dept/sem
 Index('idx_dept_sem_count', DepartmentSemesterCount.department_code, DepartmentSemesterCount.semester)
 
+class SemesterConfig(Base):
+    __tablename__ = "semester_config"
+    semester = Column(Integer, primary_key=True)
+    academic_year = Column(String, default="")
+
+
 class CourseVenueMap(Base):
     __tablename__ = "course_venue_map"
     
@@ -195,13 +201,17 @@ class SchedulerConfig(Base):
 
 class CommonCourseMap(Base):
     """Links a single course_code+semester to multiple departments.
-    All rows with the same course_code+semester must share the same timetable slot."""
+    All rows with the same course_code+semester must share the same timetable slot.
+    venue_name is the GLOBAL venue — enforced to be identical across all rows
+    with the same (course_code, semester)."""
     __tablename__ = "common_course_map"
 
     id              = Column(Integer, primary_key=True, autoincrement=True)
     course_code     = Column(String, nullable=False)
     semester        = Column(Integer, nullable=False)
     department_code = Column(String, ForeignKey('department_master.department_code'), nullable=False)
+    venue_name      = Column(String, nullable=True)    # Global locked venue for this common course
+    venue_type      = Column(String, default='BOTH')   # THEORY / LAB / BOTH
 
     __table_args__ = (
         UniqueConstraint('course_code', 'semester', 'department_code', name='uix_common_course'),

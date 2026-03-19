@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { getDepartments, getVenues, getDepartmentVenues, mapVenueToDepartment, removeVenueMapping, getCourses, getCourseVenues, mapVenueToCourse, removeCourseVenueMapping } from '../utils/api';
-import { MapPin, Plus, Trash2, Building2, BookOpen, Search, ChevronDown } from 'lucide-react';
+import { getDepartments, getVenues, getDepartmentVenues, mapVenueToDepartment, removeVenueMapping, getCourses, getCourseVenues, mapVenueToCourse, removeCourseVenueMapping, getCommonCourses, setCommonCourseVenue, clearCommonCourseVenue } from '../utils/api';
+import { MapPin, Plus, Trash2, Building2, BookOpen, Search, ChevronDown, Lock, Users, Globe } from 'lucide-react';
 
 const SearchableSelect = ({ options, value, onChange, placeholder, icon: Icon, required, accentColor = "violet" }) => {
     const [isOpen, setIsOpen] = useState(false);
@@ -102,6 +102,13 @@ const VenueMapping = () => {
     const [selectedCourseVenue, setSelectedCourseVenue] = useState('');
     const [selectedVenueType, setSelectedVenueType] = useState('BOTH');
 
+    // Common course venue state
+    const [commonCourses, setCommonCourses] = useState([]);
+    const [commonVenueAssigning, setCommonVenueAssigning] = useState(null); // course_code being assigned
+    const [commonVenueSelected, setCommonVenueSelected] = useState('');
+    const [commonVenueType, setCommonVenueType] = useState('BOTH');
+    const [showCommonSection, setShowCommonSection] = useState(true);
+
     const [isMapping, setIsMapping] = useState(false);
     const [isMappingCourse, setIsMappingCourse] = useState(false);
 
@@ -121,12 +128,14 @@ const VenueMapping = () => {
 
     const fetchInitialData = async () => {
         try {
-            const [deptRes, venueRes] = await Promise.all([
+            const [deptRes, venueRes, ccRes] = await Promise.all([
                 getDepartments(),
-                getVenues()
+                getVenues(),
+                getCommonCourses()
             ]);
             setDepartments(deptRes.data);
             setVenues(venueRes.data);
+            setCommonCourses(ccRes.data);
             if (deptRes.data.length > 0 && !selectedDept) {
                 setSelectedDept(deptRes.data[0].department_code);
             }
@@ -260,6 +269,46 @@ const VenueMapping = () => {
         }
     };
 
+    // --- Common Course Venue Handlers ---
+    const handleAssignCommonVenue = async (courseCode, semester) => {
+        if (!commonVenueSelected) return;
+        try {
+            const venueObj = venues.find(v => v.venue_id === parseInt(commonVenueSelected));
+            if (!venueObj) return;
+            await setCommonCourseVenue({
+                course_code: courseCode,
+                semester: semester,
+                venue_name: venueObj.venue_name,
+                venue_type: commonVenueType
+            });
+            // Refresh common courses
+            const ccRes = await getCommonCourses();
+            setCommonCourses(ccRes.data);
+            setCommonVenueAssigning(null);
+            setCommonVenueSelected('');
+            setCommonVenueType('BOTH');
+        } catch (err) {
+            console.error(err);
+            alert("Error assigning venue: " + (err.response?.data?.detail || err.message));
+        }
+    };
+
+    const handleClearCommonVenue = async (courseCode, semester) => {
+        if (!window.confirm(`Clear the global venue for ${courseCode}? This will unlink it from all departments.`)) return;
+        try {
+            await clearCommonCourseVenue(courseCode, semester);
+            const ccRes = await getCommonCourses();
+            setCommonCourses(ccRes.data);
+        } catch (err) {
+            console.error(err);
+            alert("Error clearing venue: " + (err.response?.data?.detail || err.message));
+        }
+    };
+
+    // Filter out common courses from per-dept course-venue mapping
+    const commonCourseCodes = new Set(commonCourses.map(cc => cc.course_code));
+    const nonCommonCourses = courses.filter(c => !commonCourseCodes.has(c.course_code));
+
     return (
         <div className="space-y-6 max-w-5xl mx-auto">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -294,6 +343,131 @@ const VenueMapping = () => {
                     </div>
                 </div>
             </div>
+
+            {/* ===== COMMON COURSE VENUES (Global) ===== */}
+            {commonCourses.length > 0 && (
+                <div className="bg-white rounded-2xl shadow-sm border-2 border-teal-200 overflow-hidden mb-2">
+                    <div
+                        className="bg-teal-50 px-5 py-3 border-b border-teal-200 flex justify-between items-center cursor-pointer"
+                        onClick={() => setShowCommonSection(!showCommonSection)}
+                    >
+                        <h4 className="font-bold text-teal-800 flex items-center gap-2">
+                            <Globe size={18} className="text-teal-500" />
+                            Common Course Venues
+                            <span className="text-[10px] bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full font-bold uppercase">Global Lock</span>
+                        </h4>
+                        <div className="flex items-center gap-3">
+                            <span className="bg-teal-100 text-teal-700 text-xs font-bold px-2.5 py-1 rounded-full">{commonCourses.length}</span>
+                            <ChevronDown size={16} className={`text-teal-500 transition-transform ${showCommonSection ? 'rotate-180' : ''}`} />
+                        </div>
+                    </div>
+                    {showCommonSection && (
+                        <div className="p-5 space-y-3">
+                            <p className="text-xs text-teal-600 font-medium bg-teal-50 px-3 py-2 rounded-lg border border-teal-100">
+                                <Lock size={12} className="inline mr-1" />
+                                Venues set here apply <strong>globally</strong> to all departments sharing the course. Individual departments cannot override this.
+                            </p>
+                            {commonCourses.map(cc => (
+                                <div key={`${cc.course_code}-${cc.semester}`} className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 hover:border-teal-300 transition-colors">
+                                    <div className="flex justify-between items-start gap-3">
+                                        <div className="flex-1">
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <span className="font-bold text-slate-800">{cc.course_code}</span>
+                                                <span className="text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded font-bold">Sem {cc.semester}</span>
+                                                {cc.venue_name ? (
+                                                    <span className="text-[10px] bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                                                        <Lock size={10} /> {cc.venue_name}
+                                                        <span className="text-teal-500">({cc.venue_type})</span>
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold">No Venue</span>
+                                                )}
+                                            </div>
+                                            <div className="flex items-center gap-2 mt-2 flex-wrap">
+                                                <Users size={12} className="text-slate-400" />
+                                                <span className="text-xs text-slate-500 font-medium">Depts:</span>
+                                                {cc.departments.map(d => (
+                                                    <span key={d} className="text-[10px] bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.5 rounded font-bold">{d}</span>
+                                                ))}
+                                            </div>
+                                            {cc.dept_student_counts && cc.dept_student_counts.length > 0 && (
+                                                <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                                                    {cc.dept_student_counts.map(d => (
+                                                        <span key={d.dept} className="text-[9px] bg-cyan-50 text-cyan-800 border border-cyan-200 px-1.5 py-0.5 rounded shadow-sm font-bold">
+                                                            {d.dept}: {d.count}
+                                                        </span>
+                                                    ))}
+                                                    <span className="text-[9px] bg-green-100 text-green-800 border border-green-200 px-1.5 py-0.5 rounded shadow-sm font-extrabold">
+                                                        Total: {cc.dept_student_counts.reduce((s, d) => s + d.count, 0)}
+                                                    </span>
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="flex items-center gap-2 flex-shrink-0">
+                                            {commonVenueAssigning === `${cc.course_code}-${cc.semester}` ? (
+                                                <div className="flex items-center gap-2">
+                                                    <select
+                                                        value={commonVenueSelected}
+                                                        onChange={e => setCommonVenueSelected(e.target.value)}
+                                                        className="p-1.5 border border-teal-200 rounded-lg text-xs bg-white focus:ring-2 focus:ring-teal-400 outline-none"
+                                                    >
+                                                        <option value="">Choose venue</option>
+                                                        {venues.map(v => (
+                                                            <option key={v.venue_id} value={v.venue_id}>
+                                                                {v.venue_name} {v.is_lab ? '(Lab)' : ''} - Cap: {v.capacity}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                    <select
+                                                        value={commonVenueType}
+                                                        onChange={e => setCommonVenueType(e.target.value)}
+                                                        className="p-1.5 border border-teal-200 rounded-lg text-xs bg-white focus:ring-2 focus:ring-teal-400 outline-none"
+                                                    >
+                                                        <option value="BOTH">Both</option>
+                                                        <option value="THEORY">Theory</option>
+                                                        <option value="LAB">Lab</option>
+                                                    </select>
+                                                    <button
+                                                        onClick={() => handleAssignCommonVenue(cc.course_code, cc.semester)}
+                                                        disabled={!commonVenueSelected}
+                                                        className="px-3 py-1.5 bg-teal-600 text-white text-xs font-bold rounded-lg hover:bg-teal-700 disabled:opacity-50 transition-all"
+                                                    >
+                                                        Save
+                                                    </button>
+                                                    <button
+                                                        onClick={() => { setCommonVenueAssigning(null); setCommonVenueSelected(''); }}
+                                                        className="px-2 py-1.5 bg-slate-200 text-slate-600 text-xs font-bold rounded-lg hover:bg-slate-300 transition-all"
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <>
+                                                    <button
+                                                        onClick={() => setCommonVenueAssigning(`${cc.course_code}-${cc.semester}`)}
+                                                        className="px-3 py-1.5 bg-teal-100 text-teal-700 text-xs font-bold rounded-lg hover:bg-teal-200 transition-all flex items-center gap-1"
+                                                    >
+                                                        <MapPin size={12} /> {cc.venue_name ? 'Change' : 'Assign'}
+                                                    </button>
+                                                    {cc.venue_name && (
+                                                        <button
+                                                            onClick={() => handleClearCommonVenue(cc.course_code, cc.semester)}
+                                                            className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                            title="Clear Venue"
+                                                        >
+                                                            <Trash2 size={14} />
+                                                        </button>
+                                                    )}
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
 
             {selectedDept && (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -339,7 +513,7 @@ const VenueMapping = () => {
                                     <div>
                                         <label className="block text-sm font-bold text-slate-700 mb-1.5 uppercase tracking-wider text-[11px]">Select Course</label>
                                         <SearchableSelect 
-                                            options={courses.map(c => ({
+                                            options={nonCommonCourses.map(c => ({
                                                 value: c.course_code,
                                                 label: `${c.course_code} - ${c.course_name}`
                                             }))}

@@ -313,6 +313,8 @@ const ManualEntryModal = ({ isOpen, onClose, onSave, initialData, allSections, i
     const [isAddingCourse, setIsAddingCourse] = useState(false);
     const [currentSpan, setCurrentSpan] = useState(initialSpan);
     const [isExtending, setIsExtending] = useState(false);
+    const [showAllFaculty, setShowAllFaculty] = useState(false);
+    const [showAllVenues, setShowAllVenues] = useState(false);
 
     React.useEffect(() => { setCurrentSpan(initialSpan); }, [initialSpan, isOpen]);
 
@@ -356,17 +358,19 @@ const ManualEntryModal = ({ isOpen, onClose, onSave, initialData, allSections, i
         setActiveTab(0);
     }, [allSections]);
 
+    const currentCourseCode = courseGroups.length > 0 && courseGroups[activeTab] ? courseGroups[activeTab].code : '';
+
     React.useEffect(() => {
         if (!department || !day || !period) return;
         setLoading(true);
         Promise.all([
-            api.getAvailableFaculty(department, day, period).catch(() => ({ data: [] })),
-            api.getAvailableVenues(department, semester, day, period).catch(() => ({ data: [] }))
+            api.getAvailableFaculty(department, day, period, currentCourseCode, showAllFaculty).catch(() => ({ data: [] })),
+            api.getAvailableVenues(department, semester, day, period, currentCourseCode, showAllVenues).catch(() => ({ data: [] }))
         ]).then(([facRes, venRes]) => {
             setAvailableFaculty(facRes.data || []);
             setAvailableVenues(venRes.data || []);
         }).finally(() => setLoading(false));
-    }, [department, semester, day, period]);
+    }, [department, semester, day, period, currentCourseCode, showAllFaculty, showAllVenues]);
 
     const handleSubmit = (e) => {
         e.preventDefault();
@@ -428,7 +432,16 @@ const ManualEntryModal = ({ isOpen, onClose, onSave, initialData, allSections, i
         return (
             <div>
                 <div className="flex items-center justify-between mb-0.5">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase">Faculty</label>
+                    <div className="flex items-center gap-2">
+                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Faculty</label>
+                        {!isManual && (
+                            <button type="button" onClick={() => setShowAllFaculty(!showAllFaculty)}
+                                className={`text-[8px] px-2 py-0.5 rounded-full font-bold transition-all border shadow-sm ${showAllFaculty ? 'bg-amber-100 text-amber-700 border-amber-300 hover:bg-amber-200' : 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100'}`}
+                                title="Toggle between mapped faculty and all faculty">
+                                {showAllFaculty ? 'Showing All' : 'Filtered'}
+                            </button>
+                        )}
+                    </div>
                     <button type="button" onClick={() => toggleManual(manualKey)}
                         className="text-[9px] text-violet-500 hover:text-violet-700 flex items-center gap-0.5 font-semibold">
                         {isManual ? <><ChevronDown className="w-2.5 h-2.5" /> Dropdown</> : <><Type className="w-2.5 h-2.5" /> Type</>}
@@ -471,7 +484,16 @@ const ManualEntryModal = ({ isOpen, onClose, onSave, initialData, allSections, i
         return (
             <div>
                 <div className="flex items-center justify-between mb-0.5">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase">Venue</label>
+                    <div className="flex items-center gap-2">
+                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Venue</label>
+                        {!isManual && (
+                            <button type="button" onClick={() => setShowAllVenues(!showAllVenues)}
+                                className={`text-[8px] px-2 py-0.5 rounded-full font-bold transition-all border shadow-sm ${showAllVenues ? 'bg-amber-100 text-amber-700 border-amber-300 hover:bg-amber-200' : 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100'}`}
+                                title="Toggle between mapped venues and all venues">
+                                {showAllVenues ? 'Showing All' : 'Filtered'}
+                            </button>
+                        )}
+                    </div>
                     <button type="button" onClick={() => toggleManual(manualKey)}
                         className="text-[9px] text-violet-500 hover:text-violet-700 flex items-center gap-0.5 font-semibold">
                         {isManual ? <><ChevronDown className="w-2.5 h-2.5" /> Dropdown</> : <><Type className="w-2.5 h-2.5" /> Type</>}
@@ -677,8 +699,8 @@ const ManualEntryModal = ({ isOpen, onClose, onSave, initialData, allSections, i
                                     setIsExtending(true);
                                     try {
                                         const [facRes, venRes] = await Promise.all([
-                                            api.getAvailableFaculty(department, day, targetP).catch(() => ({ data: [] })),
-                                            api.getAvailableVenues(department, semester, day, targetP).catch(() => ({ data: [] }))
+                                            api.getAvailableFaculty(department, day, targetP, currentCourseCode, showAllFaculty).catch(() => ({ data: [] })),
+                                            api.getAvailableVenues(department, semester, day, targetP, currentCourseCode, showAllVenues).catch(() => ({ data: [] }))
                                         ]);
                                         const availFacs = facRes.data || [];
                                         const availVens = venRes.data || [];

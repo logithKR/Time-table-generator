@@ -141,6 +141,22 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
             elif vtype == 'LAB':
                 cv_lookup[cv.course_code]['lab'] = v.venue_name
 
+    # Override cv_lookup for common courses with their GLOBAL venue
+    # This ensures all departments share the same venue for common courses
+    common_entries = db.query(models.CommonCourseMap).filter(
+        models.CommonCourseMap.course_code.in_([c.course_code for c in courses]),
+        models.CommonCourseMap.semester == semester,
+        models.CommonCourseMap.venue_name != None
+    ).all()
+    for cc in common_entries:
+        vtype = (cc.venue_type or 'BOTH').upper()
+        if cc.course_code not in cv_lookup:
+            cv_lookup[cc.course_code] = {}
+        if vtype in ('BOTH', 'THEORY'):
+            cv_lookup[cc.course_code]['theory'] = cc.venue_name
+        if vtype in ('BOTH', 'LAB'):
+            cv_lookup[cc.course_code]['lab'] = cc.venue_name
+
     # Pre-fetch department default venues
     dept_venue_maps = db.query(models.DepartmentVenueMap).filter_by(department_code=department_code, semester=semester).all()
     default_labs = []

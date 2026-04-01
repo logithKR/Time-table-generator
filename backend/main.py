@@ -660,24 +660,65 @@ def delete_break(break_id: int, db: Session = Depends(get_db)):
 def generate_timetable(request: schemas.GenerateRequest, db: Session = Depends(get_db)):
     from solver_engine import generate_schedule
     
-    success = generate_schedule(
+    # 1. Fetch current config
+    config_record = db.query(models.SchedulerConfig).first()
+    
+    config = DEFAULT_CONFIG
+    if config_record and config_record.config_json:
+        if isinstance(config_record.config_json, str):
+            config = json.loads(config_record.config_json)
+        else:
+            config = config_record.config_json
+            
+    hard_mode = False
+    try:
+        hard_mode_cfg = config.get("validation", {}).get("hard_constraint_mode", {})
+        hard_mode = bool(hard_mode_cfg.get("enabled", False))
+    except (KeyError, AttributeError):
+        pass
+    
+    result = generate_schedule(
         db, 
         department_code=request.department_code, 
         semester=request.semester,
         mentor_day=request.mentor_day,
-        mentor_period=request.mentor_period
+        mentor_period=request.mentor_period,
+        hard_mode=hard_mode
     )
     
-    if success:
-        return {"status": "success", "message": "Timetable generated successfully"}
-    else:
-        courses = db.query(models.CourseMaster).filter_by(
-            department_code=request.department_code, semester=request.semester, is_open_elective=False
-        ).all()
-        if not courses:
-            raise HTTPException(status_code=400, detail=f"No courses found for {request.department_code} Sem {request.semester}. Check data import.")
-        total_ws = sum(c.weekly_sessions for c in courses)
-        raise HTTPException(status_code=400, detail=f"Cannot generate: {total_ws} weekly sessions for ~47 available slots. Schedule may be overloaded. Review course data for {request.department_code} Sem {request.semester}.")
+    # Check if the result is the new dictionary format or the old boolean format
+    if isinstance(result, bool):
+        success = result
+        if success:
+            return {"status": "success", "message": "Timetable generated successfully", "warnings": []}
+        else:
+            courses = db.query(models.CourseMaster).filter_by(
+                department_code=request.department_code, semester=request.semester, is_open_elective=False
+            ).all()
+            if not courses:
+                raise HTTPException(status_code=400, detail=f"No courses found for {request.department_code} Sem {request.semester}. Check data import.")
+            total_ws = sum(c.weekly_sessions for c in courses)
+            raise HTTPException(status_code=400, detail=f"Cannot generate: {total_ws} weekly sessions for ~47 available slots. Schedule may be overloaded. Review course data for {request.department_code} Sem {request.semester}.")
+            
+    # New structured response handling
+    if not result.get("success", False):
+        if result.get("errors"):
+            # If we have structured errors and hard mode blocked generation, return 422 Unprocessable Entity
+            raise HTTPException(status_code=422, detail={
+                "message": "Resource verification failed. Schedule generation aborted.",
+                "errors": result.get("errors", []),
+                "warnings": result.get("warnings", [])
+            })
+        else:
+            raise HTTPException(status_code=400, detail="Solver exhausted all possibilities and failed to find a valid arrangement. Try reducing constraints.")
+            
+    # Success with potential warnings
+    return {
+        "status": "success", 
+        "message": f"Successfully generated and saved {result.get('entries_saved', 0)} entries.", 
+        "warnings": result.get("warnings", []),
+        "entries_saved": result.get("entries_saved", 0)
+    }
 
 # ============================================
 # UPDATED TIMETABLE ENDPOINT (MASTER VIEW)
@@ -718,6 +759,15 @@ def save_timetable(request: schemas.TimetableSaveRequest, db: Session = Depends(
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=f"Save failed: {str(e)}")
+
+@app.get("/api/conflicts")
+def get_conflicts(
+    department_code: Optional[str] = None, 
+    semester: Optional[int] = None, 
+    db: Session = Depends(get_db)
+):
+    from conflict_detector import detect_conflicts
+    return detect_conflicts(db, department_code, semester)
         
     return {"status": "success", "count": len(new_entries)}
 
@@ -1563,9 +1613,17 @@ def check_conflicts(request: schemas.ConflictCheckRequest, db: Session = Depends
 # ============================================
 # SCHEDULER CONFIG (Constraint Management)
 # ============================================
+# ============================================
 import json
 
 DEFAULT_CONFIG = {
+    "validation": {
+        "hard_constraint_mode": {
+            "value": False, "enabled": False, "type": "flag",
+            "label": "Hard Constraint Mode",
+            "description": "Block generation and display errors when there are insufficient faculty or venues"
+        }
+    },
     "hard_constraints": {
         "max_courses_per_slot": {
             "value": 1, "enabled": True, "type": "number",
@@ -1709,6 +1767,24 @@ DEFAULT_CONFIG = {
     }
 }
 
+def merge_configs(default_c, saved_c):
+    import copy
+    result = copy.deepcopy(default_c)
+    if not isinstance(saved_c, dict):
+        return result
+    for category, items in saved_c.items():
+        if category in result and isinstance(items, dict):
+            for key, val in items.items():
+                if key in result[category] and isinstance(val, dict):
+                    # Only merge user-editable state, keep UI schema from defaults
+                    for state_key in ['value', 'enabled', 'overloaded_value']:
+                        if state_key in val:
+                            result[category][key][state_key] = val[state_key]
+                else:
+                    result[category][key] = val
+        else:
+            result[category] = items
+    return result
 
 @app.get("/api/config")
 def get_scheduler_config(db: Session = Depends(get_db)):
@@ -1719,7 +1795,11 @@ def get_scheduler_config(db: Session = Depends(get_db)):
         db.add(row)
         db.commit()
         db.refresh(row)
-    return json.loads(row.config_json)
+        return json.loads(row.config_json)
+    
+    saved_config = json.loads(row.config_json) if row.config_json else {}
+    merged_config = merge_configs(DEFAULT_CONFIG, saved_config)
+    return merged_config
 
 
 @app.put("/api/config")

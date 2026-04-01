@@ -9,9 +9,16 @@ import {
 
 // ─── Category Config ───
 const CATEGORIES = {
+    validation: {
+        label: 'Pre-Validation & Errors',
+        icon: Shield,
+        color: 'rose',
+        description: 'Control whether the system blocks generation on resource shortages',
+        badge: 'CRITICAL'
+    },
     hard_constraints: {
         label: 'Hard Constraints',
-        icon: Shield,
+        icon: AlertTriangle,
         color: 'rose',
         description: 'These rules are NEVER violated during generation',
         badge: 'ABSOLUTE'
@@ -70,6 +77,10 @@ const CATEGORIES = {
 // ─── Value Editor Based on Type ───
 const ValueEditor = ({ item, value, onChange, enabled }) => {
     const type = item.type;
+
+    if (type === 'flag') {
+        return null;
+    }
 
     if (type === 'boolean') {
         return (

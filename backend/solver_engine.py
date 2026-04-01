@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 import models
 import math
 
-def generate_schedule(db: Session, department_code: str, semester: int, mentor_day: str, mentor_period: int = 8):
+def generate_schedule(db: Session, department_code: str, semester: int, mentor_day: str, mentor_period: int = 8, hard_mode: bool = False):
     """
     Generates a timetable matching real BIT college pattern, driven by SchedulerConfig.
     """
@@ -76,10 +76,10 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
 
     if not courses:
         print("❌ No courses found.")
-        return False
+        return {"success": False, "errors": [{"type": "NO_COURSES", "severity": "ERROR", "course_code": None, "course_name": None, "details": {}, "context": {"department": department_code, "semester": semester}, "suggestion": f"Add courses for {department_code} Semester {semester}"}], "warnings": [], "entries_saved": 0}
     if not slots:
         print("❌ No active slots found for this semester.")
-        return False
+        return {"success": False, "errors": [{"type": "NO_SLOTS", "severity": "ERROR", "course_code": None, "course_name": None, "details": {}, "context": {"department": department_code, "semester": semester}, "suggestion": f"Configure time slots for Semester {semester}"}], "warnings": [], "entries_saved": 0}
 
     # Faculty lookups — now with delivery_type for priority sorting
     course_faculty = {}     # course_code -> [(fac_id, fac_name, delivery_type), ...]
@@ -112,7 +112,7 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
     
     if not courses:
         print("❌ No valid courses left after filtering constraints.")
-        return False
+        return {"success": False, "errors": [{"type": "NO_VALID_COURSES", "severity": "ERROR", "course_code": None, "course_name": None, "details": {}, "context": {"department": department_code, "semester": semester}, "suggestion": "Check faculty mappings for language elective courses"}], "warnings": [], "entries_saved": 0}
 
     slot_lookup = {}
     day_periods = {}
@@ -261,12 +261,26 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
         run_faculty_busy[key].add(fac_id)
 
     generation_warnings = []  # Collect warnings for the user
+    generation_errors = []     # Collect hard-stop errors (only block in hard_mode)
+
+    def make_error(err_type, course_code, course_name, details, context=None, suggestion=""):
+        return {
+            "type": err_type, "severity": "ERROR",
+            "course_code": course_code, "course_name": course_name,
+            "details": details, "context": context or {},
+            "suggestion": suggestion
+        }
 
     mentor_day_clean = mentor_day.strip().capitalize()
 
     # Separate courses
     regular_courses = [c for c in courses if not (c.is_honours or c.is_minor)]
     honours_courses = [c for c in courses if c.is_honours or c.is_minor]
+    
+    def is_mini_project(course_code):
+        cname = course_names.get(course_code, course_code).lower()
+        c_obj = next((c for c in courses if c.course_code == course_code), None)
+        return "mini project" in cname or (c_obj and getattr(c_obj, 'is_add_course', False))
 
     # ── Build elective pair groups ──
     # Courses with the same course_category (e.g. "ELECTIVE 3") share the same slots
@@ -447,6 +461,56 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
     else:
         print("  ✅ Sufficient faculty and venues available. Lab Batch Rotation not needed.")
 
+    # =========================================================
+    # PRE-VALIDATION PHASE (HARD MODE ONLY)
+    # =========================================================
+    if hard_mode:
+        print("  🔒 HARD MODE ON: Running pre-validation checks...")
+        
+        # 1. Check Faculty Sufficiency
+        for c in regular_courses:
+            if is_mini_project(c.course_code): continue
+            needed = get_course_sections(c.course_code, False)
+            mapped_theory = len([f for f in get_theory_faculty(c.course_code) if f[0]])
+            if needed > 0 and mapped_theory < needed:
+                cname = course_names.get(c.course_code, c.course_code)
+                generation_errors.append(make_error(
+                    "FACULTY_DEFICIT", c.course_code, cname,
+                    {"required": needed, "available": mapped_theory, "deficit": needed - mapped_theory, "type": "THEORY"},
+                    {"department": department_code, "semester": semester},
+                    f"Map at least {needed - mapped_theory} more theory faculty for this course."
+                ))
+        
+        # 2. Lab Specific Pre-validation (if not rotating)
+        for c in core_lab_courses_to_merge if not batch_rotation_needed else []:
+            if is_mini_project(c.course_code): continue
+            needed = get_course_sections(c.course_code, True)
+            mapped_lab = len([f for f in get_lab_faculty(c.course_code) if f[0] and f[2] in ('LAB', 'THEORY WITH LAB')])
+            if needed > 0 and mapped_lab < needed:
+                cname = course_names.get(c.course_code, c.course_code)
+                generation_errors.append(make_error(
+                    "FACULTY_DEFICIT", c.course_code, cname,
+                    {"required": needed, "available": mapped_lab, "deficit": needed - mapped_lab, "type": "LAB"},
+                    {"department": department_code, "semester": semester},
+                    f"Map at least {needed - mapped_lab} more lab faculty, or enable Batch Rotation."
+                ))
+                
+            course_cv = cv_lookup.get(c.course_code, {})
+            available_labs = 1 if 'lab' in course_cv else len(default_labs)
+            if c_venue_aware_rot and needed > 0 and available_labs < needed:
+                cname = course_names.get(c.course_code, c.course_code)
+                generation_errors.append(make_error(
+                    "VENUE_SHORTAGE", c.course_code, cname,
+                    {"required": needed, "available": available_labs, "deficit": needed - available_labs, "type": "LAB"},
+                    {"department": department_code, "semester": semester},
+                    f"Allocate {needed - available_labs} more lab venues to this department, or enable Venue-Aware Batch Rotation."
+                ))
+                
+        # If any hard-stop errors found during pre-validation, abort!
+        if generation_errors:
+            print(f"❌ Hard mode pre-validation failed with {len(generation_errors)} errors.")
+            return {"success": False, "errors": generation_errors, "warnings": generation_warnings, "entries_saved": 0}
+        print("  ✅ Pre-validation passed.")
 
     # --- LAB variables ---
     lab_vars = {}
@@ -814,7 +878,7 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
 
     if status != cp_model.OPTIMAL and status != cp_model.FEASIBLE:
         print(f"❌ No solution found ({solver.StatusName(status)}).")
-        return False
+        return {"success": False, "errors": [{"type": "SOLVER_FAILED", "severity": "ERROR", "course_code": None, "course_name": None, "details": {}, "context": {"department": department_code, "semester": semester}, "suggestion": "Try relaxing constraints or adding more resources."}], "warnings": [], "entries_saved": 0}
 
     print(f"✅ Solution Found ({solver.StatusName(status)})")
 
@@ -841,22 +905,34 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
     current_run_occupancy = {}
 
     def assign_venue(day, period, course_code, is_lab, required_idx):
+        if is_mini_project(course_code):
+            return None
         course_cv = cv_lookup.get(course_code, {})
         session_key = 'lab' if is_lab else 'theory'
         if session_key in course_cv:
             return course_cv[session_key]
         pool = default_labs if is_lab else default_classrooms
         if not pool:
+            if hard_mode:
+                cname = course_names.get(course_code, course_code)
+                generation_errors.append(make_error("VENUE_SHORTAGE", course_code, cname, {"required": 1, "available": 0, "deficit": 1, "type": session_key.upper()}, {"day": day, "period": period}, "Add default venues to this department."))
+                return None
             return None
+            
         key = (day, period)
         occupied_g = global_occupancy.get(key, set())
         occupied_l = current_run_occupancy.get(key, set())
         available = [v for v in pool if v not in occupied_g and v not in occupied_l]
         if not available:
+            if hard_mode:
+                cname = course_names.get(course_code, course_code)
+                generation_errors.append(make_error("VENUE_CONFLICT", course_code, cname, {"pool_size": len(pool), "occupied": len(pool), "type": session_key.upper()}, {"day": day, "period": period}, "Add more default venues or spread classes across more days."))
+                return None
             # Overloaded room globally; fallback to spreading locally
             assigned = pool[required_idx % len(pool)]
         else:
             assigned = available[required_idx % len(available)]
+            
         if key not in current_run_occupancy:
             current_run_occupancy[key] = set()
         current_run_occupancy[key].add(assigned)
@@ -873,7 +949,11 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
     filled_slots = set()
 
     # --- Save THEORY entries (multi-section + elective pairing) ---
+    all_partner_codes = {p.course_code for partners in elective_partners.values() for p in partners}
     for c in regular_courses:
+        if c.course_code in all_partner_codes:
+            continue
+            
         sorted_fac = get_theory_faculty(c.course_code)
         cname = course_names.get(c.course_code, c.course_code)
         partners = elective_partners.get(c.course_code, [])
@@ -892,8 +972,9 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                         gc_fac = get_theory_faculty(gc.course_code)
                         gc_name = course_names.get(gc.course_code, gc.course_code)
                         
+                        total_secs = get_course_sections(gc.course_code, False)
                         assigned_sections = 0
-                        for sec in range(get_course_sections(gc.course_code, False)):
+                        for sec in range(total_secs):
                             # Find available faculty for this course
                             fac_assigned = None
                             for fid, fname, dtype in gc_fac:
@@ -902,21 +983,27 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                                     break
                             
                             if not fac_assigned and gc_fac:
+                                if hard_mode and not is_mini_project(gc.course_code):
+                                    print(f"DEBUG! fac_assigned=None! gc={gc.course_code}, day={day}, period={period}")
+                                    for dfid, dfname, dtype in gc_fac:
+                                        print(f"  -> checking fid={dfid}: free={is_faculty_free(dfid, day, period)}, run={dfid in run_faculty_busy.get((day, period), set())}, global={dfid in global_faculty_busy.get((day, period), set())}")
+                                    generation_errors.append(make_error("FACULTY_DEFICIT", gc.course_code, gc_name, {"required": total_secs, "available": len(gc_fac), "deficit": total_secs - len(gc_fac), "type": "THEORY"}, {"day": day, "period": period}, "Add more unique theory faculty to handle parallel sections without clashes."))
+                                    continue
                                 fac_assigned = (gc_fac[sec % len(gc_fac)][0], gc_fac[sec % len(gc_fac)][1])
-                                generation_warnings.append(
-                                    f"\u26a0\ufe0f  {gc.course_code} (THEORY) {day} P{period} Sec {sec+1}: "
-                                    f"Reusing faculty {fac_assigned[1]} \u2014 not enough unique theory faculty. "
-                                    f"Need {get_course_sections(gc.course_code, False)}, have {len(gc_fac)} mapped."
-                                )
+                                if not is_mini_project(gc.course_code):
+                                    generation_warnings.append(
+                                        f"\u26a0\ufe0f  {gc.course_code} (THEORY) {day} P{period} Sec {sec+1}: "
+                                        f"Reusing faculty {fac_assigned[1]} \u2014 not enough unique theory faculty. "
+                                        f"Need {get_course_sections(gc.course_code, False)}, have {len(gc_fac)} mapped."
+                                    )
                             elif not fac_assigned:
                                 fac_assigned = (None, 'Unassigned')
-                                generation_warnings.append(
-                                    f"\u274c {gc.course_code} (THEORY): No faculty mapped at all!"
-                                )
+                                if not is_mini_project(gc.course_code):
+                                    generation_warnings.append(
+                                        f"\u274c {gc.course_code} (THEORY): No faculty mapped at all!"
+                                    )
                             
                             c_venue = assign_venue(day, period, gc.course_code, False, count + sec)
-                            
-                            total_secs = get_course_sections(gc.course_code, False)
                             display_name = gc_name
                             
                             entry = models.TimetableEntry(
@@ -939,6 +1026,8 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
 
     # --- Save LAB entries (multi-section + elective pairing) ---
     for c in regular_courses:
+        if c.course_code in all_partner_codes:
+            continue
         if course_lab_blocks[c.course_code] == 0:
             continue
         if batch_rotation_needed and c in core_lab_courses:
@@ -955,7 +1044,8 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                         gc_fac = get_lab_faculty(gc.course_code)
                         gc_name = course_names.get(gc.course_code, gc.course_code)
                         
-                        for sec in range(get_course_sections(gc.course_code, True)):
+                        total_lab_secs = get_course_sections(gc.course_code, True)
+                        for sec in range(total_lab_secs):
                             fac_assigned = None
                             for fid, fname, dtype in gc_fac:
                                 if is_faculty_free(fid, day, bs) and is_faculty_free(fid, day, bs + 1):
@@ -963,14 +1053,19 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                                     break
                             
                             if not fac_assigned and gc_fac:
+                                if hard_mode and not is_mini_project(gc.course_code):
+                                    generation_errors.append(make_error("FACULTY_DEFICIT", gc.course_code, gc_name, {"required": total_lab_secs, "available": len(gc_fac), "deficit": total_lab_secs - len(gc_fac), "type": "LAB"}, {"day": day, "period": f"P{bs}-P{bs+1}"}, "Add more unique lab faculty or enable Batch Rotation."))
+                                    continue
                                 fac_assigned = (gc_fac[sec % len(gc_fac)][0], gc_fac[sec % len(gc_fac)][1])
-                                generation_warnings.append(
-                                    f"\u26a0\ufe0f  {gc.course_code} (LAB) {day} P{bs}-P{bs+1} Sec {sec+1}: "
-                                    f"Reusing faculty {fac_assigned[1]} \u2014 not enough unique lab faculty. "
-                                    f"Need {get_course_sections(gc.course_code, True)}, have {len(gc_fac)} mapped."
-                                )
+                                if not is_mini_project(gc.course_code):
+                                    generation_warnings.append(
+                                        f"\u26a0\ufe0f  {gc.course_code} (LAB) {day} P{bs}-P{bs+1} Sec {sec+1}: "
+                                        f"Reusing faculty {fac_assigned[1]} \u2014 not enough unique lab faculty."
+                                    )
                             elif not fac_assigned:
                                 fac_assigned = (None, 'Unassigned')
+                                if not is_mini_project(gc.course_code):
+                                    generation_warnings.append(f"\u274c {gc.course_code} (LAB): No faculty mapped at all!")
                             
                             for p in [bs, bs + 1]:
                                 c_v = assign_venue(day, p, gc.course_code, True, count + sec)
@@ -1030,8 +1125,12 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                             fac_assigned = (fid, fname)
                             break
                     if not fac_assigned and gc_fac:
+                        if hard_mode and not is_mini_project(c.course_code):
+                            generation_errors.append(make_error("FACULTY_DEFICIT", c.course_code, cname, {"required": merged_batch_count, "available": len(gc_fac), "deficit": merged_batch_count - len(gc_fac), "type": "LAB_BATCH"}, {"day": day, "period": f"P{bs}-P{bs+1}"}, "Insufficient faculty for lab rotation."))
+                            continue
                         fac_assigned = (gc_fac[batch_idx % len(gc_fac)][0], gc_fac[batch_idx % len(gc_fac)][1])
-                        generation_warnings.append(f"LAB reuse: {c.course_code} B{batch_idx+1} {day} P{bs}-P{bs+1}")
+                        if not is_mini_project(c.course_code):
+                            generation_warnings.append(f"LAB reuse: {c.course_code} B{batch_idx+1} {day} P{bs}-P{bs+1}")
                     elif not fac_assigned:
                         fac_assigned = (None, 'Unassigned')
                     for p in [bs, bs+1]:
@@ -1063,6 +1162,9 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                             fac_assigned = (fid, fname)
                             break
                     if not fac_assigned and gc_fac:
+                        if hard_mode and not is_mini_project(c.course_code):
+                            generation_errors.append(make_error("FACULTY_DEFICIT", c.course_code, cname, {"required": merged_batch_count, "available": len(gc_fac), "deficit": merged_batch_count - len(gc_fac), "type": "THEORY_FALLBACK"}, {"day": day, "period": f"P{bs}-P{bs+1}"}, "Insufficient theory faculty for lab fallback rotation."))
+                            continue
                         fac_assigned = (gc_fac[batch_idx % len(gc_fac)][0], gc_fac[batch_idx % len(gc_fac)][1])
                     elif not fac_assigned:
                         fac_assigned = (None, 'Unassigned')
@@ -1691,7 +1793,14 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
         for w in generation_warnings:
             print(f"  {w}")
         print(f"{'='*60}\n")
+        
+    if hard_mode and generation_errors:
+        db.rollback()
+        print(f"❌ Hard mode generation aborted during save phase with {len(generation_errors)} errors.")
+        return {"success": False, "errors": generation_errors, "warnings": generation_warnings, "entries_saved": 0}
 
     db.commit()
     print(f"💾 Saved {count} timetable entries.")
-    return True
+    
+    # Return structured dict
+    return {"success": True, "errors": generation_errors, "warnings": generation_warnings, "entries_saved": count}

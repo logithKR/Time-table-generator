@@ -13,6 +13,10 @@ const BITTimetable = ({ timetableData, department, semester, courses, slots, bre
     const [showCourseCode, setShowCourseCode] = useState(true);
     const [showFaculty, setShowFaculty] = useState(true);
     const [showVenues, setShowVenues] = useState(true);
+    const [showConflictsPanel, setShowConflictsPanel] = useState(true);
+
+    const safeConflicts = conflicts || { faculty_conflicts: [], venue_conflicts: [] };
+    const hasConflicts = safeConflicts.faculty_conflicts.length > 0 || safeConflicts.venue_conflicts.length > 0;
 
     const handlePrint = () => {
         window.print();
@@ -228,6 +232,85 @@ const BITTimetable = ({ timetableData, department, semester, courses, slots, bre
                 </div>
             </div>
 
+            {/* Conflicts Panel */}
+            {hasConflicts && (
+                <div className="mb-4 bg-white border-2 border-rose-200 rounded-xl overflow-hidden shadow-sm no-print" style={{ fontFamily: 'Arial, sans-serif' }}>
+                    <div 
+                        className="bg-rose-50 px-4 py-3 flex items-center justify-between cursor-pointer hover:bg-rose-100 transition-colors"
+                        onClick={() => setShowConflictsPanel(!showConflictsPanel)}
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className="bg-rose-500 text-white rounded-full p-1.5 shadow-sm">
+                                <AlertCircle size={16} />
+                            </div>
+                            <h3 className="font-bold text-rose-800 text-sm">
+                                Detected Conflicts ({safeConflicts.faculty_conflicts.length + safeConflicts.venue_conflicts.length})
+                            </h3>
+                            <span className="text-xs bg-white/60 text-rose-600 px-2 py-0.5 rounded-full font-semibold border border-rose-200">
+                                Fix required
+                            </span>
+                        </div>
+                        <button className="text-rose-500 hover:text-rose-700">
+                            {showConflictsPanel ? 'Hide Details' : 'View Details'}
+                        </button>
+                    </div>
+                    
+                    {showConflictsPanel && (
+                        <div className="p-4 border-t border-rose-100 max-h-64 overflow-y-auto">
+                            {safeConflicts.faculty_conflicts.length > 0 && (
+                                <div className="mb-4 last:mb-0">
+                                    <h4 className="text-xs font-bold text-rose-700 uppercase tracking-widest mb-2 flex items-center gap-2">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span> Faculty Clashes
+                                    </h4>
+                                    <div className="space-y-2 pl-3">
+                                        {safeConflicts.faculty_conflicts.map((c, i) => (
+                                            <div key={i} className="text-[11px] bg-rose-50/50 p-2 rounded-lg border border-rose-100 flex items-start flex-col gap-1">
+                                                <div className="flex items-center gap-2 font-bold text-gray-800 flex-wrap">
+                                                    <span className="text-rose-600">{c.faculty_name}</span> is scheduled in multiple classes on <span className="bg-white px-1 border rounded">{c.day} P{c.period}</span>:
+                                                </div>
+                                                <div className="flex flex-wrap gap-1.5 mt-0.5">
+                                                    {c.courses.map((course, idx) => (
+                                                        <span key={idx} className="bg-white border border-gray-200 px-1.5 py-0.5 rounded text-gray-600 font-mono text-[10px]">
+                                                            {course.dept} S{course.sem}: {course.course}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                                <div className="text-rose-500 mt-1 italic text-[10px]">{c.suggestion}</div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                            
+                            {safeConflicts.venue_conflicts.length > 0 && (
+                                <div className="mb-0">
+                                    <h4 className="text-xs font-bold text-orange-600 uppercase tracking-widest mb-2 flex items-center gap-2">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-orange-500"></span> Venue Overbookings
+                                    </h4>
+                                    <div className="space-y-2 pl-3">
+                                        {safeConflicts.venue_conflicts.map((c, i) => (
+                                            <div key={i} className="text-[11px] bg-orange-50/50 p-2 rounded-lg border border-orange-100 flex items-start flex-col gap-1">
+                                                <div className="flex items-center gap-2 font-bold text-gray-800 flex-wrap">
+                                                    <span className="text-orange-600">{c.venue_name}</span> is overbooked on <span className="bg-white px-1 border rounded">{c.day} P{c.period}</span>:
+                                                </div>
+                                                <div className="flex flex-wrap gap-1.5 mt-0.5">
+                                                    {c.courses.map((course, idx) => (
+                                                        <span key={idx} className="bg-white border border-gray-200 px-1.5 py-0.5 rounded text-gray-600 font-mono text-[10px]">
+                                                            {course.dept} S{course.sem}: {course.course}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                                <div className="text-orange-500 mt-1 italic text-[10px]">{c.suggestion}</div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            )}
+
             {/* Printable Content - Now managed simply by browser scaling */}
             <div className="w-full bg-white print:shadow-none bg-transparent">
                 <div id="printable-content" ref={componentRef} className="w-full" style={{ backgroundColor: '#ffffff', padding: '6mm' }}>
@@ -377,8 +460,24 @@ const BITTimetable = ({ timetableData, department, semester, courses, slots, bre
                                             if (showMPSlash) groupName = groupName + ' / Mini Project';
 
                                             const isMiniProject = groupName.toLowerCase().includes('mini project');
+                                            
+                                            // Check conflicts for this specific block
+                                            const factIds = groupEntries.map(e => e.faculty_id);
+                                            const venueName = groupEntries[0]?.venue_name;
+                                            const hasFacConflict = safeConflicts.faculty_conflicts.some(c => c.day === day && c.period === i + 1 && factIds.includes(c.faculty_id));
+                                            const hasVenConflict = safeConflicts.venue_conflicts.some(c => c.day === day && c.period === i + 1 && c.venue_name === venueName);
+                                            
+                                            const conflictBorder = hasFacConflict || hasVenConflict ? '2px dashed #ef4444' : 'none';
+                                            const conflictBg = hasFacConflict || hasVenConflict ? '#fef2f2' : 'transparent';
+                                            
                                             return (
-                                                <div key={code + idx} style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '2px 0', borderTop: idx > 0 || (isOEBlock && regularCodes.length > 0) ? '1px solid #d1d5db' : 'none', marginTop: idx > 0 ? '2px' : 0, flexGrow: 1 }}>
+                                                <div key={code + idx} className="relative group" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '2px 0', borderTop: idx > 0 || (isOEBlock && regularCodes.length > 0) ? '1px solid #d1d5db' : 'none', marginTop: idx > 0 ? '2px' : 0, flexGrow: 1, border: conflictBorder, backgroundColor: conflictBg, zIndex: hasFacConflict || hasVenConflict ? 10 : 1 }}>
+                                                    {(hasFacConflict || hasVenConflict) && (
+                                                        <div className="absolute -top-1.5 -right-1.5 bg-white rounded-full no-print" title="Conflict Detected" style={{ zIndex: 20 }}>
+                                                            <AlertCircle className="text-rose-500 w-3 h-3 drop-shadow bg-white rounded-full" />
+                                                        </div>
+                                                    )}
+
                                                     {showCourseCode && <div style={{ fontWeight: 'bold', fontSize: '11px', color: isOEBlock ? '#0f766e' : '#000000' }}>{code}{getCourseBadge(code)}</div>}
                                                     <div style={{ fontWeight: '600', fontSize: '10px', lineHeight: 1.2, color: isOEBlock ? '#0d9488' : '#000000' }}>{groupName || (isOEBlock ? 'OPEN ELECTIVE' : '')}</div>
                                                     {!isMiniProject && groupEntries.map((e, sIdx) => (

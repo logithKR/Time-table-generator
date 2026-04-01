@@ -28,7 +28,10 @@ import {
     Building2,
     LogOut,
     Settings,
-    Link2
+    Link2,
+    Info,
+    AlertCircle,
+    AlertTriangle
 } from 'lucide-react';
 import TimetableEditor from './components/TimetableEditor';
 import ConstraintsManager from './components/ConstraintsManager';
@@ -101,9 +104,15 @@ function App() {
     const [mentorDay, setMentorDay] = useState('Friday');
     const [mentorPeriod, setMentorPeriod] = useState(7);
 
-    // Timetable Data
     const [timetableEntries, setTimetableEntries] = useState([]);
     const [loading, setLoading] = useState(false);
+    
+    // Generation Feedback
+    const [generationErrors, setGenerationErrors] = useState(null);
+    const [generationWarnings, setGenerationWarnings] = useState([]);
+    
+    // Conflict Detection
+    const [detectedConflicts, setDetectedConflicts] = useState({ faculty_conflicts: [], venue_conflicts: [] });
 
     // Display Toggles
     const [showLabels, setShowLabels] = useState(true);
@@ -280,18 +289,35 @@ function App() {
     const handleGenerate = async () => {
         if (!selectedDept || !selectedSem) { alert("Please select Department and Semester!"); return; }
         setLoading(true);
+        setGenerationErrors(null);
+        setGenerationWarnings([]);
+        
         try {
             const res = await api.generateTimetable({
                 department_code: selectedDept, semester: parseInt(selectedSem),
                 mentor_day: mentorDay, mentor_period: parseInt(mentorPeriod)
             });
+            
             if (res.data.status === 'success') {
-                alert('Timetable Generated Successfully!');
+                if (res.data.warnings && res.data.warnings.length > 0) {
+                    setGenerationWarnings(res.data.warnings);
+                } else {
+                    alert('Timetable Generated Successfully!');
+                }
                 fetchTimetable();
                 setRefreshTrigger(prev => prev + 1);
             }
         } catch (err) {
-            alert('Failed to generate: ' + (err.response?.data?.detail || err.message));
+            // Handle HTTP 422 (Hard Constraint Stop)
+            if (err.response?.status === 422 && err.response?.data?.detail?.errors) {
+                setGenerationErrors({
+                    message: err.response.data.detail.message,
+                    errors: err.response.data.detail.errors,
+                    warnings: err.response.data.detail.warnings || []
+                });
+            } else {
+                alert('Failed to generate: ' + (err.response?.data?.detail || err.message));
+            }
         } finally {
             setLoading(false);
         }
@@ -303,8 +329,16 @@ function App() {
         try {
             const d = dept || '';
             const s = sem || '';
-            const res = await api.getTimetableEntries(d, s);
-            setTimetableEntries(res.data);
+            
+            // Fetch timetable entries and conflicts in parallel
+            const [entryRes, conflictRes] = await Promise.all([
+                api.getTimetableEntries(d, s),
+                api.getConflicts(d, s)
+            ]);
+            
+            setTimetableEntries(entryRes.data);
+            setDetectedConflicts(conflictRes.data || { faculty_conflicts: [], venue_conflicts: [] });
+            
             if (d && s) {
                 const c_res = await api.getCourses(d, parseInt(s));
                 setAllCourses(c_res.data);
@@ -1713,6 +1747,55 @@ function App() {
                     </button>
                 </div>
             </div>
+            
+            {/* --- GENERATION ERRORS INLINE (HARD MODE) --- */}
+            {generationErrors && (
+                <div className="bg-white rounded-2xl shadow-lg shadow-rose-100/50 w-full overflow-hidden flex flex-col border-2 border-rose-200">
+                    <div className="bg-rose-50 border-b border-rose-100 p-6 flex items-start gap-4">
+                        <div className="p-3 bg-rose-100 text-rose-600 rounded-xl">
+                            <AlertTriangle className="w-8 h-8" />
+                        </div>
+                        <div className="flex-1">
+                            <h2 className="text-xl font-black text-rose-900 tracking-tight">Generation Aborted</h2>
+                            <p className="text-sm font-medium text-rose-700 mt-1">{generationErrors.message}</p>
+                        </div>
+                        <button onClick={() => setGenerationErrors(null)} className="p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-100 rounded-lg transition-colors">
+                            <X className="w-5 h-5" />
+                        </button>
+                    </div>
+                    
+                    <div className="p-6 overflow-y-auto bg-gray-50 flex-1 space-y-4 max-h-96">
+                        {generationErrors.errors.map((err, idx) => (
+                            <div key={idx} className="bg-white border-2 border-rose-100 rounded-xl p-4 shadow-sm relative overflow-hidden">
+                                <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-rose-500"></div>
+                                <div className="flex items-start justify-between gap-4">
+                                    <div>
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-rose-50 text-rose-600 uppercase tracking-wider">{err.type}</span>
+                                            {err.course_code && <span className="text-[11px] font-bold text-gray-500">{err.course_code}</span>}
+                                        </div>
+                                        <h3 className="font-bold text-gray-800 text-sm mb-2">{err.course_name || 'System Resource'}</h3>
+                                        
+                                        {err.details && (
+                                            <div className="flex flex-wrap gap-2 mb-3">
+                                                {err.details.required !== undefined && <span className="text-xs bg-gray-50 border border-gray-100 text-gray-600 px-2 py-1 rounded-md">Required: <strong>{err.details.required}</strong></span>}
+                                                {err.details.available !== undefined && <span className="text-xs bg-gray-50 border border-gray-100 text-gray-600 px-2 py-1 rounded-md">Available: <strong className="text-rose-600">{err.details.available}</strong></span>}
+                                                {err.details.type && <span className="text-xs bg-purple-50 border border-purple-100 text-purple-600 px-2 py-1 rounded-md">Type: <strong>{err.details.type}</strong></span>}
+                                            </div>
+                                        )}
+                                        
+                                        <div className="mt-3 flex items-start gap-2 text-sm text-gray-600 bg-blue-50/50 p-3 rounded-lg border border-blue-100">
+                                            <Info className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
+                                            <p><strong>Suggestion:</strong> {err.suggestion}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+            
             <div className="bg-white rounded-2xl shadow-lg shadow-violet-50/50 border border-violet-100 overflow-hidden">
                 <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-white">
                     <h3 className="font-bold text-gray-700">{selectedDept && selectedSem ? `${selectedDept} - Semester ${selectedSem} ` : 'Timetable Preview'}</h3>
@@ -1806,6 +1889,8 @@ function App() {
                         faculty={allFaculty}
                         breakConfigs={breakConfigs}
                         departments={departments}
+                        semesterConfigs={semesterConfigs}
+                        conflicts={detectedConflicts}
                         // Pass the refresh handler to the component
                         onRefresh={() => fetchPrintData(editorDept, editorSem)}
                     />
@@ -1889,6 +1974,33 @@ function App() {
                     </div>
                 </div>
             </aside>
+
+            {/* --- GENERATION ERRORS INLINE HAS MOVED TO DASHBOARD TAB --- */}
+            
+            {/* --- GENERATION WARNINGS TOAST --- */}
+            {generationWarnings.length > 0 && (
+                <div className="fixed bottom-6 right-6 z-50 w-full max-w-sm">
+                    <div className="bg-amber-50 border-2 border-amber-200 rounded-2xl shadow-xl shadow-amber-100/50 overflow-hidden">
+                        <div className="p-4 flex items-start gap-3">
+                            <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+                            <div className="flex-1 min-w-0">
+                                <h3 className="text-sm font-bold text-amber-800">Generated with {generationWarnings.length} Warnings</h3>
+                                <p className="text-xs text-amber-600 mt-1 mb-3">The solver made automatic adjustments due to constraints.</p>
+                                <div className="max-h-32 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
+                                    {generationWarnings.map((w, i) => (
+                                        <div key={i} className="text-[11px] bg-white border border-amber-100 p-2 rounded-lg text-gray-600 leading-tight">
+                                            {w}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                            <button onClick={() => setGenerationWarnings([])} className="p-1 text-amber-400 hover:text-amber-600 hover:bg-amber-100 rounded-lg transition-colors shrink-0">
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <main className="flex-1 flex flex-col h-screen overflow-hidden relative print:overflow-visible print:h-auto print:block">
                 <header className="bg-white border-b border-gray-100 shadow-sm z-10 px-8 py-4 flex items-center justify-between print:hidden">

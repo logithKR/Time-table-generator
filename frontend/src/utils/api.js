@@ -52,6 +52,14 @@ export const deleteBreak = (breakId) => axios.delete(`${API_URL}/breaks/${breakI
 export const generateTimetable = (data) => axios.post(`${API_URL}/generate`, data);
 export const getTimetable = (deptCode, sem) => axios.get(`${API_URL}/timetable?department_code=${deptCode}&semester=${sem}`);
 export const getTimetableEntries = getTimetable;
+export const getConflicts = (deptCode, sem) => {
+    let url = `${API_URL}/api/conflicts`;
+    const params = [];
+    if (deptCode) params.push(`department_code=${deptCode}`);
+    if (sem) params.push(`semester=${sem}`);
+    if (params.length) url += `?${params.join('&')}`;
+    return axios.get(url);
+};
 export const saveTimetable = (data) => axios.post(`${API_URL}/timetable/save`, data);
 export const exportTimetableExcel = (deptCode, sem) => {
     let url = `${API_URL}/export/timetable/excel`;

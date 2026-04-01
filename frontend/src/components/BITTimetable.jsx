@@ -4,7 +4,7 @@ import { toPng } from 'html-to-image';
 import jsPDF from 'jspdf';
 import { formatTime } from '../utils/timeFormat';
 
-const BITTimetable = ({ timetableData, department, semester, courses, slots, breakConfigs, onRefresh, departments, semesterConfigs }) => {
+const BITTimetable = ({ timetableData, department, semester, courses, slots, breakConfigs, onRefresh, departments, semesterConfigs, conflicts }) => {
     const componentRef = useRef(null);
     const [downloading, setDownloading] = useState(false);
 

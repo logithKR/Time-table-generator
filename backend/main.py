@@ -38,6 +38,16 @@ def run_import_book1(background_tasks: BackgroundTasks):
     background_tasks.add_task(import_book1.import_book1_data)
     return {"message": "Data import from Book1.xlsx has started in the background."}
 
+@app.post("/api/sync-cms")
+def run_sync_cms():
+    from sync_cms_to_local import sync_databases
+    try:
+        sync_databases()
+        return {"status": "success", "message": "CMS data synchronized successfully."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Sync failed: {str(e)}")
+
+
 # ============================================
 # DEPARTMENTS
 # ============================================

@@ -913,8 +913,11 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
             return course_cv[session_key]
         pool = default_labs if is_lab else default_classrooms
         if not pool:
+            cname = course_names.get(course_code, course_code)
+            wmsg = f"Subject {cname} has no venue assigned because no venues were configured."
+            if wmsg not in generation_warnings:
+                generation_warnings.append(wmsg)
             if hard_mode:
-                cname = course_names.get(course_code, course_code)
                 generation_errors.append(make_error("VENUE_SHORTAGE", course_code, cname, {"required": 1, "available": 0, "deficit": 1, "type": session_key.upper()}, {"day": day, "period": period}, "Add default venues to this department."))
                 return None
             return None
@@ -924,12 +927,14 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
         occupied_l = current_run_occupancy.get(key, set())
         available = [v for v in pool if v not in occupied_g and v not in occupied_l]
         if not available:
+            cname = course_names.get(course_code, course_code)
+            wmsg = f"Subject {cname} could not be assigned a venue due to insufficient available venues."
+            if wmsg not in generation_warnings:
+                generation_warnings.append(wmsg)
             if hard_mode:
-                cname = course_names.get(course_code, course_code)
                 generation_errors.append(make_error("VENUE_CONFLICT", course_code, cname, {"pool_size": len(pool), "occupied": len(pool), "type": session_key.upper()}, {"day": day, "period": period}, "Add more default venues or spread classes across more days."))
                 return None
-            # Overloaded room globally; fallback to spreading locally
-            assigned = pool[required_idx % len(pool)]
+            return None
         else:
             assigned = available[required_idx % len(available)]
             
@@ -989,19 +994,17 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                                         print(f"  -> checking fid={dfid}: free={is_faculty_free(dfid, day, period)}, run={dfid in run_faculty_busy.get((day, period), set())}, global={dfid in global_faculty_busy.get((day, period), set())}")
                                     generation_errors.append(make_error("FACULTY_DEFICIT", gc.course_code, gc_name, {"required": total_secs, "available": len(gc_fac), "deficit": total_secs - len(gc_fac), "type": "THEORY"}, {"day": day, "period": period}, "Add more unique theory faculty to handle parallel sections without clashes."))
                                     continue
-                                fac_assigned = (gc_fac[sec % len(gc_fac)][0], gc_fac[sec % len(gc_fac)][1])
+                                fac_assigned = (None, 'Unassigned')
                                 if not is_mini_project(gc.course_code):
-                                    generation_warnings.append(
-                                        f"\u26a0\ufe0f  {gc.course_code} (THEORY) {day} P{period} Sec {sec+1}: "
-                                        f"Reusing faculty {fac_assigned[1]} \u2014 not enough unique theory faculty. "
-                                        f"Need {get_course_sections(gc.course_code, False)}, have {len(gc_fac)} mapped."
-                                    )
+                                    wmsg = f"Subject {gc_name} could not be assigned a faculty due to insufficient available faculty members."
+                                    if wmsg not in generation_warnings:
+                                        generation_warnings.append(wmsg)
                             elif not fac_assigned:
                                 fac_assigned = (None, 'Unassigned')
                                 if not is_mini_project(gc.course_code):
-                                    generation_warnings.append(
-                                        f"\u274c {gc.course_code} (THEORY): No faculty mapped at all!"
-                                    )
+                                    wmsg = f"Subject {gc_name} has no faculty assigned because no faculty members were configured."
+                                    if wmsg not in generation_warnings:
+                                        generation_warnings.append(wmsg)
                             
                             c_venue = assign_venue(day, period, gc.course_code, False, count + sec)
                             display_name = gc_name
@@ -1056,16 +1059,17 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                                 if hard_mode and not is_mini_project(gc.course_code):
                                     generation_errors.append(make_error("FACULTY_DEFICIT", gc.course_code, gc_name, {"required": total_lab_secs, "available": len(gc_fac), "deficit": total_lab_secs - len(gc_fac), "type": "LAB"}, {"day": day, "period": f"P{bs}-P{bs+1}"}, "Add more unique lab faculty or enable Batch Rotation."))
                                     continue
-                                fac_assigned = (gc_fac[sec % len(gc_fac)][0], gc_fac[sec % len(gc_fac)][1])
+                                fac_assigned = (None, 'Unassigned')
                                 if not is_mini_project(gc.course_code):
-                                    generation_warnings.append(
-                                        f"\u26a0\ufe0f  {gc.course_code} (LAB) {day} P{bs}-P{bs+1} Sec {sec+1}: "
-                                        f"Reusing faculty {fac_assigned[1]} \u2014 not enough unique lab faculty."
-                                    )
+                                    wmsg = f"Subject {gc_name} could not be assigned a faculty due to insufficient available faculty members."
+                                    if wmsg not in generation_warnings:
+                                        generation_warnings.append(wmsg)
                             elif not fac_assigned:
                                 fac_assigned = (None, 'Unassigned')
                                 if not is_mini_project(gc.course_code):
-                                    generation_warnings.append(f"\u274c {gc.course_code} (LAB): No faculty mapped at all!")
+                                    wmsg = f"Subject {gc_name} has no faculty assigned because no faculty members were configured."
+                                    if wmsg not in generation_warnings:
+                                        generation_warnings.append(wmsg)
                             
                             for p in [bs, bs + 1]:
                                 c_v = assign_venue(day, p, gc.course_code, True, count + sec)
@@ -1128,11 +1132,17 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                         if hard_mode and not is_mini_project(c.course_code):
                             generation_errors.append(make_error("FACULTY_DEFICIT", c.course_code, cname, {"required": merged_batch_count, "available": len(gc_fac), "deficit": merged_batch_count - len(gc_fac), "type": "LAB_BATCH"}, {"day": day, "period": f"P{bs}-P{bs+1}"}, "Insufficient faculty for lab rotation."))
                             continue
-                        fac_assigned = (gc_fac[batch_idx % len(gc_fac)][0], gc_fac[batch_idx % len(gc_fac)][1])
+                        fac_assigned = (None, 'Unassigned')
                         if not is_mini_project(c.course_code):
-                            generation_warnings.append(f"LAB reuse: {c.course_code} B{batch_idx+1} {day} P{bs}-P{bs+1}")
+                            wmsg = f"Subject {cname} could not be assigned a faculty due to insufficient available faculty members."
+                            if wmsg not in generation_warnings:
+                                generation_warnings.append(wmsg)
                     elif not fac_assigned:
                         fac_assigned = (None, 'Unassigned')
+                        if not is_mini_project(c.course_code):
+                            wmsg = f"Subject {cname} has no faculty assigned because no faculty members were configured."
+                            if wmsg not in generation_warnings:
+                                generation_warnings.append(wmsg)
                     for p in [bs, bs+1]:
                         c_v = assign_venue(day, p, c.course_code, True, batch_idx)
                         slot_obj = slot_lookup.get((day, p))
@@ -1165,9 +1175,17 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                         if hard_mode and not is_mini_project(c.course_code):
                             generation_errors.append(make_error("FACULTY_DEFICIT", c.course_code, cname, {"required": merged_batch_count, "available": len(gc_fac), "deficit": merged_batch_count - len(gc_fac), "type": "THEORY_FALLBACK"}, {"day": day, "period": f"P{bs}-P{bs+1}"}, "Insufficient theory faculty for lab fallback rotation."))
                             continue
-                        fac_assigned = (gc_fac[batch_idx % len(gc_fac)][0], gc_fac[batch_idx % len(gc_fac)][1])
+                        fac_assigned = (None, 'Unassigned')
+                        if not is_mini_project(c.course_code):
+                            wmsg = f"Subject {cname} could not be assigned a faculty due to insufficient available faculty members."
+                            if wmsg not in generation_warnings:
+                                generation_warnings.append(wmsg)
                     elif not fac_assigned:
                         fac_assigned = (None, 'Unassigned')
+                        if not is_mini_project(c.course_code):
+                            wmsg = f"Subject {cname} has no faculty assigned because no faculty members were configured."
+                            if wmsg not in generation_warnings:
+                                generation_warnings.append(wmsg)
                     for p in [bs, bs+1]:
                         c_v = assign_venue(day, p, c.course_code, False, batch_idx)
                         slot_obj = slot_lookup.get((day, p))
@@ -1215,9 +1233,16 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
         ).first()
 
         fids  = course_faculty.get(c.course_code, [])
-        fid   = fids[0][0] if fids else None
-        fname = fids[0][1] if fids else None
         cname = course_names.get(c.course_code, c.course_code)
+        if fids:
+            fid   = fids[0][0]
+            fname = fids[0][1]
+        else:
+            fid   = None
+            fname = 'Unassigned'
+            wmsg = f"Subject {cname} has no faculty assigned because no faculty members were configured."
+            if wmsg not in generation_warnings:
+                generation_warnings.append(wmsg)
         stype = 'HONOURS' if c.is_honours else 'MINOR'
         needed = c.weekly_sessions or (
             course_theory_count.get(c.course_code, 3) +
@@ -1340,8 +1365,13 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
 
         def get_faculty(c):
             fids = course_faculty.get(c.course_code, [])
-            return (fids[0][0] if fids else None,
-                    fids[0][1] if fids else None)
+            if fids:
+                return fids[0][0], fids[0][1]
+            cname = course_names.get(c.course_code, c.course_code)
+            wmsg = f"Subject {cname} has no faculty assigned because no faculty members were configured."
+            if wmsg not in generation_warnings:
+                generation_warnings.append(wmsg)
+            return None, 'Unassigned'
 
         def sessions_needed(c):
             return c.weekly_sessions or (

@@ -34,6 +34,7 @@ export const updateCourse = (code, data) => axios.put(`${API_URL}/courses/${code
 export const createCourseFaculty = (data) => axios.post(`${API_URL}/course-faculty`, data);
 export const createSlot = (data) => axios.post(`${API_URL}/slots`, data);
 export const createBreak = (data) => axios.post(`${API_URL}/breaks`, data);
+export const syncCmsData = () => axios.post(`${API_URL}/api/sync-cms`);
 
 // --- PUT (Update) ---
 export const updateDepartment = (code, data) => axios.put(`${API_URL}/departments/${code}`, data);

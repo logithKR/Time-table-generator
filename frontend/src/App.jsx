@@ -106,6 +106,7 @@ function App() {
 
     const [timetableEntries, setTimetableEntries] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [syncingCms, setSyncingCms] = useState(false);
     
     // Generation Feedback
     const [generationErrors, setGenerationErrors] = useState(null);
@@ -320,6 +321,18 @@ function App() {
             }
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleSyncCms = async () => {
+        setSyncingCms(true);
+        try {
+            const res = await api.syncCmsData();
+            alert(res.data.message || 'CMS Data Synchronized successfully!');
+        } catch (err) {
+            alert('Failed to sync CMS data: ' + (err.response?.data?.detail || err.message));
+        } finally {
+            setSyncingCms(false);
         }
     };
 
@@ -1712,10 +1725,16 @@ function App() {
     const renderDashboard = () => (
         <div className="space-y-6">
             <div className="bg-white p-6 rounded-2xl shadow-lg shadow-violet-50/50 border border-violet-100">
-                <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-                    <Monitor className="w-5 h-5 text-violet-600" />
-                    <span>Generate Timetable</span>
-                </h3>
+                <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                        <Monitor className="w-5 h-5 text-violet-600" />
+                        <span>Generate Timetable</span>
+                    </h3>
+                    <button onClick={handleSyncCms} disabled={syncingCms} className={`px-4 py-2 text-sm rounded-xl text-white font-bold flex items-center gap-2 transition-all ${syncingCms ? 'bg-gray-400 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700 shadow-md shadow-emerald-200 hover:shadow-emerald-300 hover:-translate-y-0.5 active:scale-95'}`}>
+                        <RotateCw className={`w-4 h-4 ${syncingCms ? 'animate-spin' : ''}`} />
+                        <span>{syncingCms ? 'Syncing CMS...' : 'Sync CMS Data'}</span>
+                    </button>
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                     <div>
                         <label className="block text-sm font-semibold text-gray-700 mb-1.5">Department</label>

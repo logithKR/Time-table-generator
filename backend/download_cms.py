@@ -20,9 +20,13 @@ QUERIES = {
     "departments": "SELECT * FROM cms.departments",
     "hod_elective_selections": "SELECT academic_year, batch, course_id, curriculum_id, department_id, id, semester, slot_name, status FROM cms.hod_elective_selections",
     "normal_cards": "SELECT card_type, curriculum_id, id, semester_number, status FROM cms.normal_cards",
-    "students": "SELECT department_id, enrollment_no, id, status, student_name FROM cms.students",
+    "students": "SELECT id, student_name, enrollment_no, register_no, department_id, learning_mode_id, status, year FROM cms.students",
     "teacher_course_history": "SELECT course_id, id, teacher_id FROM cms.teacher_course_history",
-    "teachers": "SELECT dept, desg, email, faculty_id, id, name, status FROM cms.teachers"
+    "teachers": "SELECT dept, desg, email, faculty_id, id, name, status FROM cms.teachers",
+    "student_elective_choices": "SELECT * FROM cms.student_elective_choices",
+    "student_courses": "SELECT * FROM cms.student_courses",
+    "learning_modes": "SELECT * FROM cms.learning_modes",
+    "academic_calendar": "SELECT * FROM cms.academic_calendar"
 }
 
 def download_tables():

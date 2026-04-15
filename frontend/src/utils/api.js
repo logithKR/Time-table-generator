@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = 'http://127.0.0.1:8000';
+const API_URL = '/api';
 
 // --- GET ---
 export const getDepartments = () => axios.get(`${API_URL}/departments`);
@@ -181,4 +181,3 @@ export const deleteUserConstraint = (uuid) => axios.delete(`${API_URL}/api/user-
 export const toggleUserConstraint = (uuid) => axios.patch(`${API_URL}/api/user-constraints/${uuid}/toggle`);
 export const reorderUserConstraints = (order) => axios.post(`${API_URL}/api/user-constraints/reorder`, { order });
 export const validateUserConstraint = (data) => axios.post(`${API_URL}/api/user-constraints/validate`, data);
-

@@ -31,7 +31,8 @@ import {
     Link2,
     Info,
     AlertCircle,
-    AlertTriangle
+    AlertTriangle,
+    Bell
 } from 'lucide-react';
 import TimetableEditor from './components/TimetableEditor';
 import ConstraintsManager from './components/ConstraintsManager';
@@ -110,7 +111,9 @@ function App() {
     
     // Generation Feedback
     const [generationErrors, setGenerationErrors] = useState(null);
-    const [generationWarnings, setGenerationWarnings] = useState([]);
+        const [generationWarnings, setGenerationWarnings] = useState([]);
+    const [isWarningsPanelOpen, setIsWarningsPanelOpen] = useState(false);
+
     
     // Conflict Detection
     const [detectedConflicts, setDetectedConflicts] = useState({ faculty_conflicts: [], venue_conflicts: [] });
@@ -300,8 +303,9 @@ function App() {
             });
             
             if (res.data.status === 'success') {
-                if (res.data.warnings && res.data.warnings.length > 0) {
+                                if (res.data.warnings && res.data.warnings.length > 0) {
                     setGenerationWarnings(res.data.warnings);
+                    setIsWarningsPanelOpen(true);
                 } else {
                     alert('Timetable Generated Successfully!');
                 }
@@ -1995,31 +1999,7 @@ function App() {
             </aside>
 
             {/* --- GENERATION ERRORS INLINE HAS MOVED TO DASHBOARD TAB --- */}
-            
-            {/* --- GENERATION WARNINGS TOAST --- */}
-            {generationWarnings.length > 0 && (
-                <div className="fixed bottom-6 right-6 z-50 w-full max-w-sm">
-                    <div className="bg-amber-50 border-2 border-amber-200 rounded-2xl shadow-xl shadow-amber-100/50 overflow-hidden">
-                        <div className="p-4 flex items-start gap-3">
-                            <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
-                            <div className="flex-1 min-w-0">
-                                <h3 className="text-sm font-bold text-amber-800">Generated with {generationWarnings.length} Warnings</h3>
-                                <p className="text-xs text-amber-600 mt-1 mb-3">The solver made automatic adjustments due to constraints.</p>
-                                <div className="max-h-32 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
-                                    {generationWarnings.map((w, i) => (
-                                        <div key={i} className="text-[11px] bg-white border border-amber-100 p-2 rounded-lg text-gray-600 leading-tight">
-                                            {w}
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                            <button onClick={() => setGenerationWarnings([])} className="p-1 text-amber-400 hover:text-amber-600 hover:bg-amber-100 rounded-lg transition-colors shrink-0">
-                                <X className="w-4 h-4" />
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+
 
             <main className="flex-1 flex flex-col h-screen overflow-hidden relative print:overflow-visible print:h-auto print:block">
                 <header className="bg-white border-b border-gray-100 shadow-sm z-10 px-8 py-4 flex items-center justify-between print:hidden">
@@ -2028,6 +2008,15 @@ function App() {
                         <h2 className="text-2xl font-bold text-gray-800">{pageTitle[activeTab] || 'Dashboard'}</h2>
                     </div>
                     <div className="flex items-center space-x-4">
+                        {generationWarnings.length > 0 && (
+                            <button 
+                                onClick={() => setIsWarningsPanelOpen(!isWarningsPanelOpen)}
+                                className="relative p-2 rounded-full text-amber-500 hover:bg-amber-50 transition-colors"
+                            >
+                                <Bell className="w-6 h-6 animate-pulse" />
+                                <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></span>
+                            </button>
+                        )}
                         <div className="h-10 w-10 bg-violet-100 rounded-full flex items-center justify-center text-violet-700 font-bold border-2 border-white shadow-sm">A</div>
                     </div>
                 </header>
@@ -2054,8 +2043,91 @@ function App() {
                     </div>
                 </div>
             </main>
+{/* --- RIGHT SIDEBAR WARNINGS UI --- */}
+            {isWarningsPanelOpen && generationWarnings.length > 0 && (
+                <div 
+                    className="fixed inset-0 bg-gray-900/20 backdrop-blur-sm z-40 lg:hidden"
+                    onClick={() => setIsWarningsPanelOpen(false)}
+                />
+            )}
+            <aside 
+                className={`fixed lg:static inset-y-0 right-0 z-50 bg-white flex flex-col overflow-hidden transition-all duration-300 ease-in-out shadow-2xl lg:shadow-none print:hidden flex-shrink-0 ${isWarningsPanelOpen && generationWarnings.length > 0 ? 'w-80 sm:w-96 translate-x-0 border-l border-gray-200 opacity-100' : 'w-0 translate-x-full lg:translate-x-0 opacity-0 border-transparent'}`}
+            >
+                <div className="w-80 sm:w-96 h-full flex flex-col">
+                <div className="p-5 border-b border-gray-100 flex items-center justify-between bg-amber-50/50">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-amber-100/50 rounded-xl">
+                            <AlertTriangle className="w-5 h-5 text-amber-600" />
+                        </div>
+                        <div>
+                            <h2 className="font-bold text-gray-800">Generation Alerts</h2>
+                            <p className="text-xs text-gray-500">{generationWarnings.length} notices found</p>
+                        </div>
+                    </div>
+                    <button 
+                        onClick={() => setIsWarningsPanelOpen(false)} 
+                        className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-all"
+                    >
+                        <X className="w-5 h-5" />
+                    </button>
+                </div>
+                
+                <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar bg-slate-50/50">
+                    {generationWarnings.map((w, i) => (
+                        <div key={i} className="bg-white rounded-xl p-4 border border-red-50/80 shadow-sm shadow-red-100/20 relative group hover:shadow-md hover:border-red-100 transition-all">
+                            <div className={`absolute top-0 left-0 w-1 h-full rounded-l-xl ${w.type === 'FACULTY' ? 'bg-orange-400' : 'bg-rose-400'}`}></div>
+                            
+                            <div className="pl-2">
+                                <div className="flex items-center justify-between mb-2">
+                                    <h4 className="text-sm font-bold text-gray-800 break-words pr-2">{w.subject_name || w.course_code}</h4>
+                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded flex-shrink-0 ${w.type === 'FACULTY' ? 'bg-orange-50 text-orange-600 border border-orange-100' : 'bg-rose-50 text-rose-600 border border-rose-100'}`}>
+                                        {w.type}
+                                    </span>
+                                </div>
+                                <div className="flex items-center gap-2 text-xs text-gray-500 font-medium mb-2 bg-slate-50 border border-slate-100 rounded-md p-1.5 inline-flex w-full">
+                                    <MapPin className="w-3.5 h-3.5 text-blue-400" />
+                                    <span>{w.course_code}</span>
+                                    <span className="text-gray-300">|</span>
+                                    <span className="capitalize">{w.day ? `${w.day} ` : ''}{String(w.period).replace(/period\s*/i, 'Period ')}</span>
+                                    {w.section && (
+                                        <>
+                                            <span className="text-gray-300">|</span>
+                                            <span>Section {w.section}</span>
+                                        </>
+                                    )}
+                                </div>
+                                
+                                <p className="text-[13px] text-gray-700 leading-snug">{w.reason}</p>
+                                
+                                {w.resource_name && w.resource_name !== 'Unassigned' && (
+                                    <p className="text-xs text-gray-500 mt-2 bg-gray-50 p-1.5 rounded border border-gray-100">
+                                        Affected: <span className="font-semibold text-gray-700">{w.resource_name}</span>
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+                {/* Clear button at bottom */}
+                {generationWarnings.length > 0 && (
+                    <div className="p-4 border-t border-gray-100 bg-white">
+                        <button 
+                            onClick={() => { setGenerationWarnings([]); setIsWarningsPanelOpen(false); }}
+                            className="w-full py-2.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-600 rounded-xl text-sm font-bold transition-all"
+                        >
+                            Dismiss All
+                        </button>
+                    </div>
+                )}
+                </div>
+            </aside>
+
+
         </div>
     );
 }
+
+
+            
 
 export default App;

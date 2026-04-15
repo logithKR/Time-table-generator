@@ -1,6 +1,6 @@
 # Systems
 .DS_Store
-Thumbs.db
+
 
 # Environments
 venv/
@@ -8,7 +8,6 @@ venv2/
 ttvenv/
 node_modules/
 __pycache__/
-*.db
 # Logs & temp output
 *.log
 *.txt

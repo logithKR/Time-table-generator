@@ -593,7 +593,7 @@ const VenueMapping = () => {
                                                 </div>
                                                 <button
                                                     onClick={() => handleRemoveMapping(map.id)}
-                                                    className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                                                    className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors sm:opacity-0 sm:group-hover:opacity-100"
                                                     title="Remove Mapping"
                                                 >
                                                     <Trash2 size={16} />
@@ -634,7 +634,7 @@ const VenueMapping = () => {
                                                 </div>
                                                 <button
                                                     onClick={() => handleRemoveMapping(map.id)}
-                                                    className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                                                    className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors sm:opacity-0 sm:group-hover:opacity-100"
                                                     title="Remove Mapping"
                                                 >
                                                     <Trash2 size={16} />
@@ -684,7 +684,7 @@ const VenueMapping = () => {
                                                 </div>
                                                 <button
                                                     onClick={() => handleRemoveCourseMapping(map.id)}
-                                                    className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                                                    className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors sm:opacity-0 sm:group-hover:opacity-100"
                                                     title="Remove Course Mapping"
                                                 >
                                                     <Trash2 size={16} />

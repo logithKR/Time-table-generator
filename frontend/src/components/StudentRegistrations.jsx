@@ -242,84 +242,140 @@ const StudentRegistrations = () => {
                 </button>
             </div>
 
-            {/* Data Table */}
+            {/* Data Display */}
             <div className="bg-white rounded-2xl border border-violet-100 shadow-lg shadow-violet-50/50 overflow-hidden">
-                <div className="overflow-x-auto">
-                    {loading ? (
-                        <div className="flex justify-center p-12">
-                            <Loader2 className="w-8 h-8 text-violet-500 animate-spin" />
-                        </div>
-                    ) : (
-                        <table className="min-w-full text-sm">
-                            <thead>
-                                <tr className="bg-gray-50 border-b border-gray-100">
+                {loading ? (
+                    <div className="flex justify-center p-12">
+                        <Loader2 className="w-8 h-8 text-violet-500 animate-spin" />
+                    </div>
+                ) : (
+                    <>
+                        {/* Desktop Table View */}
+                        <div className="hidden md:block overflow-x-auto">
+                            <table className="min-w-full text-sm">
+                                <thead>
+                                    <tr className="bg-gray-50 border-b border-gray-100">
+                                        {activeTab === 'students' ? (
+                                            <>
+                                                <th className="p-3.5 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">Student ID</th>
+                                                <th className="p-3.5 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">Name</th>
+                                                <th className="p-3.5 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">Email</th>
+                                                <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider">Department</th>
+                                                <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider w-16">Actions</th>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <th className="p-3.5 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">ID</th>
+                                                <th className="p-3.5 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">Student ID</th>
+                                                <th className="p-3.5 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">Course Code</th>
+                                                <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider">Semester</th>
+                                                <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider w-16">Actions</th>
+                                            </>
+                                        )}
+                                    </tr>
+                                </thead>
+                                <tbody>
                                     {activeTab === 'students' ? (
-                                        <>
-                                            <th className="p-3.5 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">Student ID</th>
-                                            <th className="p-3.5 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">Name</th>
-                                            <th className="p-3.5 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">Email</th>
-                                            <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider">Department</th>
-                                            <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider w-16">Actions</th>
-                                        </>
+                                        filteredStudents.length > 0 ? (
+                                            filteredStudents.map((s, i) => (
+                                                <tr key={s.student_id} className={`border-b border-violet-50 hover:bg-violet-50/40 transition-colors duration-200 ${i % 2 === 0 ? 'bg-white' : 'bg-purple-50/20'}`}>
+                                                    <td className="p-3.5 font-mono font-bold text-violet-800">{s.student_id}</td>
+                                                    <td className="p-3.5 text-gray-800 font-medium">{s.name}</td>
+                                                    <td className="p-3.5 text-gray-500">{s.email || '-'}</td>
+                                                    <td className="p-3.5 text-center">
+                                                        <span className="bg-violet-100 text-violet-800 px-2.5 py-1 rounded-full text-xs font-bold">
+                                                            {s.department_code}
+                                                        </span>
+                                                    </td>
+                                                    <td className="p-3.5 text-center">
+                                                        <button onClick={() => handleDeleteStudent(s.student_id)} className="text-red-300 hover:text-red-600 transition-colors p-1 rounded-lg hover:bg-red-50" title="Delete">
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        ) : (
+                                            <tr><td colSpan="5" className="py-12 text-center text-gray-400 text-sm">{selectedDept ? 'No students found.' : 'Select a department to view students.'}</td></tr>
+                                        )
                                     ) : (
-                                        <>
-                                            <th className="p-3.5 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">ID</th>
-                                            <th className="p-3.5 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">Student ID</th>
-                                            <th className="p-3.5 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">Course Code</th>
-                                            <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider">Semester</th>
-                                            <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider w-16">Actions</th>
-                                        </>
+                                        filteredRegistrations.length > 0 ? (
+                                            filteredRegistrations.map((r, i) => (
+                                                <tr key={r.id} className={`border-b border-violet-50 hover:bg-violet-50/40 transition-colors duration-200 ${i % 2 === 0 ? 'bg-white' : 'bg-purple-50/20'}`}>
+                                                    <td className="p-3.5 text-gray-400 text-sm font-mono">#{r.id}</td>
+                                                    <td className="p-3.5 font-mono font-bold text-violet-800">{r.student_id}</td>
+                                                    <td className="p-3.5 text-violet-600 font-bold">{r.course_code}</td>
+                                                    <td className="p-3.5 text-center">
+                                                        <span className="bg-violet-100 text-violet-800 px-2.5 py-1 rounded-full text-xs font-bold">{r.semester}</span>
+                                                    </td>
+                                                    <td className="p-3.5 text-center">
+                                                        <button onClick={() => handleDeleteRegistration(r.id)} className="text-red-300 hover:text-red-600 transition-colors p-1 rounded-lg hover:bg-red-50" title="Delete">
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        ) : (
+                                            <tr><td colSpan="5" className="py-12 text-center text-gray-400 text-sm">{selectedCourse ? 'No registrations found.' : 'Select a course to view registrations.'}</td></tr>
+                                        )
                                     )}
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {activeTab === 'students' ? (
-                                    filteredStudents.length > 0 ? (
-                                        filteredStudents.map((s, i) => (
-                                            <tr key={s.student_id} className={`border-b border-violet-50 hover:bg-violet-50/40 transition-colors duration-200 ${i % 2 === 0 ? 'bg-white' : 'bg-purple-50/20'}`}>
-                                                <td className="p-3.5 font-mono font-bold text-violet-800">{s.student_id}</td>
-                                                <td className="p-3.5 text-gray-800 font-medium">{s.name}</td>
-                                                <td className="p-3.5 text-gray-500">{s.email || '-'}</td>
-                                                <td className="p-3.5 text-center">
-                                                    <span className="bg-violet-100 text-violet-800 px-2.5 py-1 rounded-full text-xs font-bold">
-                                                        {s.department_code}
-                                                    </span>
-                                                </td>
-                                                <td className="p-3.5 text-center">
-                                                    <button onClick={() => handleDeleteStudent(s.student_id)} className="text-red-300 hover:text-red-600 transition-colors p-1 rounded-lg hover:bg-red-50" title="Delete">
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        ))
-                                    ) : (
-                                        <tr><td colSpan="5" className="py-12 text-center text-gray-400 text-sm">{selectedDept ? 'No students found.' : 'Select a department to view students.'}</td></tr>
-                                    )
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* Mobile Stacked Cards View */}
+                        <div className="md:hidden flex flex-col p-2 space-y-2 bg-slate-50">
+                            {activeTab === 'students' ? (
+                                filteredStudents.length > 0 ? (
+                                    filteredStudents.map(s => (
+                                        <div key={s.student_id} className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex flex-col gap-3 relative">
+                                            <div className="flex justify-between items-start pr-8">
+                                                <div>
+                                                    <h4 className="font-bold text-gray-800">{s.name}</h4>
+                                                    <span className="font-mono text-sm text-violet-700 font-semibold">{s.student_id}</span>
+                                                </div>
+                                                <span className="bg-violet-100 text-violet-800 px-2 py-1 rounded-lg text-xs font-bold">{s.department_code}</span>
+                                            </div>
+                                            <div className="text-xs text-gray-500 break-all">
+                                                {s.email || 'No email provided'}
+                                            </div>
+                                            <button 
+                                                onClick={() => handleDeleteStudent(s.student_id)} 
+                                                className="absolute top-4 right-4 p-2 text-red-400 hover:bg-red-50 rounded-lg transition-colors"
+                                            >
+                                                <Trash2 className="w-5 h-5" />
+                                            </button>
+                                        </div>
+                                    ))
                                 ) : (
-                                    filteredRegistrations.length > 0 ? (
-                                        filteredRegistrations.map((r, i) => (
-                                            <tr key={r.id} className={`border-b border-violet-50 hover:bg-violet-50/40 transition-colors duration-200 ${i % 2 === 0 ? 'bg-white' : 'bg-purple-50/20'}`}>
-                                                <td className="p-3.5 text-gray-400 text-sm font-mono">#{r.id}</td>
-                                                <td className="p-3.5 font-mono font-bold text-violet-800">{r.student_id}</td>
-                                                <td className="p-3.5 text-violet-600 font-bold">{r.course_code}</td>
-                                                <td className="p-3.5 text-center">
-                                                    <span className="bg-violet-100 text-violet-800 px-2.5 py-1 rounded-full text-xs font-bold">{r.semester}</span>
-                                                </td>
-                                                <td className="p-3.5 text-center">
-                                                    <button onClick={() => handleDeleteRegistration(r.id)} className="text-red-300 hover:text-red-600 transition-colors p-1 rounded-lg hover:bg-red-50" title="Delete">
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        ))
-                                    ) : (
-                                        <tr><td colSpan="5" className="py-12 text-center text-gray-400 text-sm">{selectedCourse ? 'No registrations found.' : 'Select a course to view registrations.'}</td></tr>
-                                    )
-                                )}
-                            </tbody>
-                        </table>
-                    )}
-                </div>
+                                    <div className="py-8 text-center text-gray-400 text-sm">{selectedDept ? 'No students found.' : 'Select a department to view students.'}</div>
+                                )
+                            ) : (
+                                filteredRegistrations.length > 0 ? (
+                                    filteredRegistrations.map(r => (
+                                        <div key={r.id} className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex flex-col gap-2 relative">
+                                            <div className="flex justify-between items-center pr-8 border-b border-gray-50 pb-2">
+                                                <span className="font-mono font-bold text-violet-800">{r.student_id}</span>
+                                                <span className="text-xs text-gray-400 font-mono">#{r.id}</span>
+                                            </div>
+                                            <div className="flex justify-between items-center pt-1">
+                                                <span className="text-sm font-bold text-gray-700 bg-gray-50 px-2 py-1 rounded-md border border-gray-100">{r.course_code}</span>
+                                                <span className="bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-lg text-xs font-bold border border-indigo-100">Sem {r.semester}</span>
+                                            </div>
+                                            <button 
+                                                onClick={() => handleDeleteRegistration(r.id)} 
+                                                className="absolute top-3 right-3 p-2 text-red-400 hover:bg-red-50 rounded-lg transition-colors"
+                                            >
+                                                <Trash2 className="w-5 h-5" />
+                                            </button>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="py-8 text-center text-gray-400 text-sm">{selectedCourse ? 'No registrations found.' : 'Select a course to view registrations.'}</div>
+                                )
+                            )}
+                        </div>
+                    </>
+                )}
             </div>
 
             {/* Add Student Modal */}

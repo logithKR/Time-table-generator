@@ -39,3 +39,27 @@
 .gradient-bg {
   background: radial-gradient(circle at top left, #e0f2fe, #f0f9ff 50%, #ffffff);
 }
+
+/* Custom scrollbar for mobile horizontal-scroll containers */
+.custom-scrollbar {
+  -webkit-overflow-scrolling: touch;
+}
+.custom-scrollbar::-webkit-scrollbar {
+  height: 6px;
+  width: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(139, 92, 246, 0.25);
+  border-radius: 999px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(139, 92, 246, 0.45);
+}
+
+/* iOS safe area padding for bottom navigation */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}

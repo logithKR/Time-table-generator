@@ -193,7 +193,7 @@ const Venues = () => {
 
             {/* List */}
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-                <div className="overflow-x-auto">
+                <div className="hidden md:block overflow-x-auto">
                     <table className="w-full text-left border-collapse">
                         <thead>
                             <tr className="bg-gray-50 border-b border-gray-100 text-xs uppercase text-gray-500 font-semibold tracking-wider">
@@ -237,12 +237,49 @@ const Venues = () => {
                         </tbody>
                     </table>
                 </div>
+
+                {/* Mobile Stacked Cards */}
+                <div className="md:hidden flex flex-col p-2 gap-2 bg-slate-50">
+                    {loading ? (
+                        <div className="p-8 text-center text-gray-500">Loading venues...</div>
+                    ) : filteredVenues.length === 0 ? (
+                        <div className="p-8 text-center text-gray-500">No venues found.</div>
+                    ) : (
+                        filteredVenues.map(venue => (
+                            <div key={venue.venue_id} className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex flex-col gap-2 relative">
+                                <div className="flex justify-between items-center pr-10 border-b border-gray-50 pb-2">
+                                    <h4 className="font-bold text-gray-800">{venue.venue_name}</h4>
+                                    <span className="text-xs text-gray-500 font-semibold bg-gray-100 px-2 py-1 rounded-lg">Block: {venue.block || '-'}</span>
+                                </div>
+                                <div className="flex justify-between items-center pt-2">
+                                    <div className="flex items-center gap-2">
+                                        <Users className="w-4 h-4 text-gray-400" />
+                                        <span className="text-sm font-semibold text-gray-700">{venue.capacity} seats</span>
+                                    </div>
+                                    <div>
+                                        {venue.is_lab ? (
+                                            <span className="px-2 py-1 rounded-md bg-amber-50 text-amber-700 text-xs font-bold border border-amber-100">LAB</span>
+                                        ) : (
+                                            <span className="px-2 py-1 rounded-md bg-blue-50 text-blue-700 text-xs font-bold border border-blue-100">CLASS</span>
+                                        )}
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => handleDelete(venue.venue_id)}
+                                    className="absolute top-3 right-3 p-2 text-red-400 hover:bg-red-50 rounded-lg transition-colors"
+                                >
+                                    <Trash2 className="w-5 h-5" />
+                                </button>
+                            </div>
+                        ))
+                    )}
+                </div>
             </div>
 
             {/* Add Modal */}
             {showAdd && (
-                <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
+                <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-end md:items-center justify-center md:p-4">
+                    <div className="bg-white rounded-t-3xl md:rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in slide-in-from-bottom-5 md:zoom-in duration-200 safe-area-bottom">
                         <div className="p-6 bg-gray-50 border-b border-gray-100 flex justify-between items-center">
                             <h3 className="font-bold text-lg text-gray-800">Add New Venue</h3>
                             <button onClick={() => setShowAdd(false)} className="text-gray-400 hover:text-gray-600">✕</button>

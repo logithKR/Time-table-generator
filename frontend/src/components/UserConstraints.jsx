@@ -142,17 +142,17 @@ const ConstraintCard = ({ constraint, onToggle, onEdit, onDelete, onDuplicate })
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
                     <button onClick={() => onDuplicate(constraint)}
-                        className="p-1.5 rounded-lg text-gray-300 hover:text-violet-500 hover:bg-violet-50 transition-all opacity-0 group-hover:opacity-100"
+                        className="p-1.5 rounded-lg text-gray-300 hover:text-violet-500 hover:bg-violet-50 transition-all sm:opacity-0 sm:group-hover:opacity-100"
                         title="Duplicate">
                         <Copy className="w-3.5 h-3.5" />
                     </button>
                     <button onClick={() => onEdit(constraint)}
-                        className="p-1.5 rounded-lg text-gray-300 hover:text-blue-500 hover:bg-blue-50 transition-all opacity-0 group-hover:opacity-100"
+                        className="p-1.5 rounded-lg text-gray-300 hover:text-blue-500 hover:bg-blue-50 transition-all sm:opacity-0 sm:group-hover:opacity-100"
                         title="Edit">
                         <Pencil className="w-3.5 h-3.5" />
                     </button>
                     <button onClick={() => onDelete(constraint.uuid)}
-                        className="p-1.5 rounded-lg text-gray-300 hover:text-rose-500 hover:bg-rose-50 transition-all opacity-0 group-hover:opacity-100"
+                        className="p-1.5 rounded-lg text-gray-300 hover:text-rose-500 hover:bg-rose-50 transition-all sm:opacity-0 sm:group-hover:opacity-100"
                         title="Delete">
                         <Trash2 className="w-3.5 h-3.5" />
                     </button>

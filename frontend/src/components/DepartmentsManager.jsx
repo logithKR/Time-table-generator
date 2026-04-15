@@ -152,7 +152,7 @@ const DepartmentsManager = () => {
                                 </div>
 
                                     <div className="flex items-center gap-2">
-                                        <button onClick={() => handleDelete(dept.department_code)} className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100" title="Delete Department">
+                                        <button onClick={() => handleDelete(dept.department_code)} className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors sm:opacity-0 sm:group-hover:opacity-100" title="Delete Department">
                                             <Trash2 className="w-4 h-4" />
                                         </button>
                                     </div>

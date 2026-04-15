@@ -492,7 +492,7 @@ function App() {
                                         const uniqueLabCodes = [...new Set(labEntries.map(e => e.course_code))];
                                         cells.push(
                                             <td key={p} colSpan={2} className="p-0 border border-gray-300 text-center align-middle hover:bg-amber-100 transition-colors" style={{ backgroundColor: '#FEF9C3' }}>
-                                                <div className="flex flex-col h-full h-auto min-h-[80px]">
+                                                <div className="flex flex-col min-h-[80px]">
                                                     {uniqueLabCodes.map((code, idx) => {
                                                         const groupEntries = labEntries.filter(e => e.course_code === code);
                                                         const groupName = groupEntries[0]?.course_name || '';
@@ -610,7 +610,7 @@ function App() {
 
                                     cells.push(
                                         <td key={p} className="p-0 border border-gray-300 text-center align-middle hover:bg-blue-50 transition-colors">
-                                            <div className="flex flex-col h-full h-auto min-h-[80px]">
+                                            <div className="flex flex-col min-h-[80px]">
                                                 {regularCodes.map((code, idx) => renderCourseBlock(code, idx, false, regularEntries.filter(e => e.course_code === code)))}
                                                 {explicitOECodes.map((code, idx) => renderCourseBlock(code, regularCodes.length + idx, true, explicitOEEntries.filter(e => e.course_code === code)))}
 
@@ -654,7 +654,7 @@ function App() {
                     {semesters.map(s => <option key={s.semester_number} value={s.semester_number}>Semester {s.semester_number}</option>)}
                 </select>
             )}
-            <div className="flex-1 min-w-[200px]">
+            <div className="flex-1 min-w-0">
                 <div className="relative group">
                     <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-violet-500 transition-colors" />
                     <input type="text" placeholder="Search by name, code..." className="w-full pl-10 p-2.5 border border-violet-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm placeholder:text-gray-400 font-medium text-gray-700 transition-all hover:border-violet-300"
@@ -679,9 +679,9 @@ function App() {
 
         return (
             <div className="space-y-4">
-                <div className="flex justify-between items-center">
+                <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3">
                     <div className="flex-1">{renderFilterBar(true, filtered.length, allCourses.length)}</div>
-                    <button onClick={() => setShowAddCourse(!showAddCourse)} className="ml-3 flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-violet-200 hover:shadow-violet-300 transition-all whitespace-nowrap hover:-translate-y-0.5 active:scale-95">
+                    <button onClick={() => setShowAddCourse(!showAddCourse)} className="flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-violet-200 hover:shadow-violet-300 transition-all whitespace-nowrap hover:-translate-y-0.5 active:scale-95">
                         <Plus className="w-4 h-4" /> Add Course
                     </button>
                 </div>
@@ -689,7 +689,7 @@ function App() {
                 {showAddCourse && (
                     <div className="bg-white rounded-2xl border-2 border-violet-200 shadow-xl shadow-violet-100/50 p-6">
                         <h4 className="font-bold text-gray-800 mb-4 flex items-center gap-2"><Plus className="w-4 h-4 text-violet-600" /> Add New Course</h4>
-                        <form onSubmit={handleAddCourse} className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <form onSubmit={handleAddCourse} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
                             <div className="flex flex-col gap-1">
                                 <label className="text-xs font-semibold text-slate-500 uppercase">Course Code *</label>
                                 <input name="course_code" placeholder="e.g. 21CS101" required className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
@@ -790,7 +790,7 @@ function App() {
                 {editingCourse && (
                     <div className="bg-white rounded-2xl border-2 border-violet-400 shadow-xl shadow-violet-200/50 p-6">
                         <h4 className="font-bold text-gray-800 mb-4 flex items-center gap-2"><Pencil className="w-4 h-4 text-violet-600" /> Edit Course {editingCourse.course_code}</h4>
-                        <form onSubmit={(e) => handleUpdateCourse(e, editingCourse.course_code)} className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <form onSubmit={(e) => handleUpdateCourse(e, editingCourse.course_code)} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
                             <div className="flex flex-col gap-1">
                                 <label className="text-xs font-semibold text-slate-500 uppercase">Course Code</label>
                                 <input name="course_code" defaultValue={editingCourse.course_code} required className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
@@ -907,65 +907,120 @@ function App() {
                             <span className="bg-violet-100/50 px-3 py-1 rounded-lg border border-violet-100">{dept}</span>
                             <span className="bg-fuchsia-100 text-fuchsia-700 px-2.5 py-0.5 rounded-full text-xs font-bold border border-fuchsia-200 shadow-sm">{courses.length} Courses</span>
                         </h3>
-                        <div className="overflow-x-auto bg-white rounded-2xl border border-violet-100 shadow-lg shadow-violet-50/50">
-                            <table className="min-w-full text-sm">
-                                <thead>
-                                    <tr className="bg-gray-50 border-b border-gray-100">
-                                        <th className="p-3.5 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">Code</th>
-                                        <th className="p-3.5 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">Course Name</th>
-                                        <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider">Sem</th>
-                                        <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider">L</th>
-                                        <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider">T</th>
-                                        <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider">P</th>
-                                        <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider">Cr</th>
-                                        <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider">Weekly</th>
-                                        <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider">Type</th>
-                                        <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider w-16">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {courses.map((c, i) => (
-                                        <tr key={c.course_code} className={`border-b border-violet-50 hover:bg-violet-50/40 transition-colors duration-200 ${i % 2 === 0 ? 'bg-white' : 'bg-purple-50/20'}`}>
-                                            <td className="p-3.5 font-mono font-bold text-violet-800">{c.course_code}</td>
-                                            <td className="p-3.5 text-gray-800 font-medium">{c.course_name}</td>
-                                            <td className="p-3.5 text-center font-semibold text-gray-700">{c.semester}</td>
-                                            <td className="p-3.5 text-center text-gray-600">{c.lecture_hours || 0}</td>
-                                            <td className="p-3.5 text-center text-gray-600">{c.tutorial_hours || 0}</td>
-                                            <td className="p-3.5 text-center text-gray-600">{c.practical_hours || 0}</td>
-                                            <td className="p-3.5 text-center font-semibold text-gray-700">{c.credits || '-'}</td>
-                                            <td className="p-3.5 text-center"><span className="bg-violet-100 text-violet-800 px-2.5 py-1 rounded-full text-xs font-bold">{c.weekly_sessions}</span></td>
-                                            <td className="p-3.5 text-center">
-                                                <div className="flex flex-wrap gap-1 justify-center">
-                                                    {c.is_honours && <span className="bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-lg text-[10px] font-semibold">Honours</span>}
-                                                    {c.is_minor && <span className="bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded-lg text-[10px] font-semibold">Minor</span>}
-                                                    {c.is_lab && <span className="bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-lg text-[10px] font-semibold">Lab</span>}
-                                                    {c.is_elective && <span className="bg-green-100 text-green-700 px-1.5 py-0.5 rounded-lg text-[10px] font-semibold">Elective</span>}
-                                                    {c.is_open_elective && <span className="bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded-lg text-[10px] font-semibold">Open Elec</span>}
-                                                    {c.is_add_course && <span className="bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-lg text-[10px] font-semibold">Add Course</span>}
-                                                    {!c.is_honours && !c.is_minor && !c.is_lab && !c.is_elective && !c.is_open_elective && !c.is_add_course && <span className="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-lg text-[10px] font-medium">Regular</span>}
-                                                </div>
-                                            </td>
-                                            <td className="p-3.5 text-center flex gap-1 justify-center">
-                                                <button onClick={async () => {
-                                                    setEditingCourse(c);
-                                                    setNewCourseIsHonoursOrMinor(c.is_honours || c.is_minor);
-                                                    try {
-                                                        const { data: commonMap } = await api.getCommonCourses();
-                                                        const group = commonMap.find(g => g.course_code === c.course_code && g.semester === c.semester);
-                                                        if (group) {
-                                                            setNewCourseCommonDepts(group.departments.filter(d => d !== c.department_code));
-                                                        } else {
-                                                            setNewCourseCommonDepts([]);
-                                                        }
-                                                    } catch (e) { console.error("Could not load common departments", e); setNewCourseCommonDepts([]); }
-                                                    setShowAddCourse(false); // Close add if open
-                                                }} className="text-violet-400 hover:text-violet-700 transition-colors p-1 rounded-lg hover:bg-violet-50" title="Edit"><Pencil className="w-4 h-4" /></button>
-                                                <button onClick={() => handleDeleteCourse(c.course_code)} className="text-red-300 hover:text-red-600 transition-colors p-1 rounded-lg hover:bg-red-50" title="Delete"><Trash2 className="w-4 h-4" /></button>
-                                            </td>
+                        <div className="bg-white rounded-2xl border border-violet-100 shadow-lg shadow-violet-50/50">
+                            {/* Desktop View */}
+                            <div className="hidden md:block overflow-x-auto">
+                                <table className="min-w-full text-sm">
+                                    <thead>
+                                        <tr className="bg-gray-50 border-b border-gray-100">
+                                            <th className="p-3.5 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">Code</th>
+                                            <th className="p-3.5 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">Course Name</th>
+                                            <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider">Sem</th>
+                                            <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider">L</th>
+                                            <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider">T</th>
+                                            <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider">P</th>
+                                            <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider">Cr</th>
+                                            <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider">Weekly</th>
+                                            <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider">Type</th>
+                                            <th className="p-3.5 text-center font-semibold text-gray-500 text-xs uppercase tracking-wider w-16">Actions</th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody>
+                                        {courses.map((c, i) => (
+                                            <tr key={c.course_code} className={`border-b border-violet-50 hover:bg-violet-50/40 transition-colors duration-200 ${i % 2 === 0 ? 'bg-white' : 'bg-purple-50/20'}`}>
+                                                <td className="p-3.5 font-mono font-bold text-violet-800">{c.course_code}</td>
+                                                <td className="p-3.5 text-gray-800 font-medium">{c.course_name}</td>
+                                                <td className="p-3.5 text-center font-semibold text-gray-700">{c.semester}</td>
+                                                <td className="p-3.5 text-center text-gray-600">{c.lecture_hours || 0}</td>
+                                                <td className="p-3.5 text-center text-gray-600">{c.tutorial_hours || 0}</td>
+                                                <td className="p-3.5 text-center text-gray-600">{c.practical_hours || 0}</td>
+                                                <td className="p-3.5 text-center font-semibold text-gray-700">{c.credits || '-'}</td>
+                                                <td className="p-3.5 text-center"><span className="bg-violet-100 text-violet-800 px-2.5 py-1 rounded-full text-xs font-bold">{c.weekly_sessions}</span></td>
+                                                <td className="p-3.5 text-center">
+                                                    <div className="flex flex-wrap gap-1 justify-center">
+                                                        {c.is_honours && <span className="bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-lg text-[10px] font-semibold">Honours</span>}
+                                                        {c.is_minor && <span className="bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded-lg text-[10px] font-semibold">Minor</span>}
+                                                        {c.is_lab && <span className="bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-lg text-[10px] font-semibold">Lab</span>}
+                                                        {c.is_elective && <span className="bg-green-100 text-green-700 px-1.5 py-0.5 rounded-lg text-[10px] font-semibold">Elective</span>}
+                                                        {c.is_open_elective && <span className="bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded-lg text-[10px] font-semibold">Open Elec</span>}
+                                                        {c.is_add_course && <span className="bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-lg text-[10px] font-semibold">Add Course</span>}
+                                                        {!c.is_honours && !c.is_minor && !c.is_lab && !c.is_elective && !c.is_open_elective && !c.is_add_course && <span className="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-lg text-[10px] font-medium">Regular</span>}
+                                                    </div>
+                                                </td>
+                                                <td className="p-3.5 text-center flex gap-1 justify-center">
+                                                    <button onClick={async () => {
+                                                        setEditingCourse(c);
+                                                        setNewCourseIsHonoursOrMinor(c.is_honours || c.is_minor);
+                                                        try {
+                                                            const { data: commonMap } = await api.getCommonCourses();
+                                                            const group = commonMap.find(g => g.course_code === c.course_code && g.semester === c.semester);
+                                                            if (group) {
+                                                                setNewCourseCommonDepts(group.departments.filter(d => d !== c.department_code));
+                                                            } else {
+                                                                setNewCourseCommonDepts([]);
+                                                            }
+                                                        } catch (e) { console.error("Could not load common departments", e); setNewCourseCommonDepts([]); }
+                                                        setShowAddCourse(false); // Close add if open
+                                                    }} className="text-violet-400 hover:text-violet-700 transition-colors p-1 rounded-lg hover:bg-violet-50" title="Edit"><Pencil className="w-4 h-4" /></button>
+                                                    <button onClick={() => handleDeleteCourse(c.course_code)} className="text-red-300 hover:text-red-600 transition-colors p-1 rounded-lg hover:bg-red-50" title="Delete"><Trash2 className="w-4 h-4" /></button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            {/* Mobile View */}
+                            <div className="flex flex-col md:hidden divide-y divide-gray-100 p-2 gap-2 bg-slate-50 relative z-0">
+                                {courses.map((c, i) => (
+                                    <div key={c.course_code} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col gap-3 relative z-0">
+                                        <div className="flex justify-between items-start">
+                                            <div>
+                                                <span className="font-mono font-bold text-violet-800 tracking-tight text-sm inline-block">{c.course_code}</span>
+                                                <h4 className="text-gray-800 font-bold leading-tight mt-1 line-clamp-2">{c.course_name}</h4>
+                                            </div>
+                                            <span className="bg-indigo-50 text-indigo-700 px-2 py-1 rounded-lg text-xs font-bold border border-indigo-100">Sem {c.semester}</span>
+                                        </div>
+                                        
+                                        <div className="grid grid-cols-4 gap-2 text-center text-xs bg-gray-50 p-2 rounded-lg border border-gray-100">
+                                            <div><span className="block text-gray-400 font-semibold mb-0.5 text-[10px] uppercase">L</span><span className="font-bold text-gray-700">{c.lecture_hours || 0}</span></div>
+                                            <div><span className="block text-gray-400 font-semibold mb-0.5 text-[10px] uppercase">T</span><span className="font-bold text-gray-700">{c.tutorial_hours || 0}</span></div>
+                                            <div><span className="block text-gray-400 font-semibold mb-0.5 text-[10px] uppercase">P</span><span className="font-bold text-gray-700">{c.practical_hours || 0}</span></div>
+                                            <div><span className="block text-gray-400 font-semibold mb-0.5 text-[10px] uppercase">Cr</span><span className="font-bold text-violet-700">{c.credits || '-'}</span></div>
+                                        </div>
+
+                                        <div className="flex justify-between items-center mt-1">
+                                            <div className="flex flex-wrap gap-1">
+                                                {c.is_honours && <span className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide">Honours</span>}
+                                                {c.is_minor && <span className="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide">Minor</span>}
+                                                {c.is_lab && <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide">Lab</span>}
+                                                {c.is_elective && <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide">Elective</span>}
+                                                {c.is_open_elective && <span className="bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide">Open Elec</span>}
+                                                {c.is_add_course && <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide">Add Course</span>}
+                                            </div>
+                                            <span className="text-xs font-semibold text-gray-500 bg-gray-100 px-2 py-1 rounded-md">{c.weekly_sessions} session{c.weekly_sessions > 1 ? 's' : ''}/wk</span>
+                                        </div>
+
+                                        <div className="flex gap-2 pt-3 border-t border-gray-100">
+                                            <button onClick={async () => {
+                                                setEditingCourse(c);
+                                                setNewCourseIsHonoursOrMinor(c.is_honours || c.is_minor);
+                                                try {
+                                                    const { data: commonMap } = await api.getCommonCourses();
+                                                    const group = commonMap.find(g => g.course_code === c.course_code && g.semester === c.semester);
+                                                    if (group) {
+                                                        setNewCourseCommonDepts(group.departments.filter(d => d !== c.department_code));
+                                                    } else {
+                                                        setNewCourseCommonDepts([]);
+                                                    }
+                                                } catch (e) { console.error("Could not load common departments", e); setNewCourseCommonDepts([]); }
+                                                setShowAddCourse(false); 
+                                            }} className="flex-1 bg-violet-50 hover:bg-violet-100 text-violet-700 py-2 rounded-xl text-xs font-bold transition-colors flex justify-center items-center gap-1"><Pencil className="w-3.5 h-3.5" /> Edit</button>
+                                            <button onClick={() => handleDeleteCourse(c.course_code)} className="flex-1 bg-red-50 hover:bg-red-100 text-red-600 py-2 rounded-xl text-xs font-bold transition-colors flex justify-center items-center gap-1"><Trash2 className="w-3.5 h-3.5" /> Delete</button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     </div>
                 ))}
@@ -987,9 +1042,9 @@ function App() {
 
         return (
             <div className="space-y-4">
-                <div className="flex justify-between items-center">
+                <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3">
                     <div className="flex-1">{renderFilterBar(false, filtered.length, allFaculty.length)}</div>
-                    <button onClick={() => setShowAddFaculty(!showAddFaculty)} className="ml-3 flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-violet-200 hover:shadow-violet-300 transition-all whitespace-nowrap hover:-translate-y-0.5 active:scale-95">
+                    <button onClick={() => setShowAddFaculty(!showAddFaculty)} className="flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-violet-200 hover:shadow-violet-300 transition-all whitespace-nowrap hover:-translate-y-0.5 active:scale-95">
                         <Plus className="w-4 h-4" /> Add Faculty
                     </button>
                 </div>
@@ -997,7 +1052,7 @@ function App() {
                 {showAddFaculty && (
                     <div className="bg-white rounded-2xl border-2 border-violet-200 shadow-xl shadow-violet-100/50 p-6">
                         <h4 className="font-bold text-gray-800 mb-4 flex items-center gap-2"><Plus className="w-4 h-4 text-violet-600" /> Add New Faculty</h4>
-                        <form onSubmit={handleAddFaculty} className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <form onSubmit={handleAddFaculty} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
                             <input name="faculty_id" placeholder="Faculty ID *" required className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
                             <input name="faculty_name" placeholder="Faculty Name *" required className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
                             <input name="faculty_email" placeholder="Email (optional)" type="email" className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
@@ -1034,7 +1089,7 @@ function App() {
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center justify-between">
                                                 <h4 className="font-bold text-gray-900 text-sm truncate">{f.faculty_name || 'Unknown'}</h4>
-                                                <button onClick={() => handleDeleteFaculty(f.faculty_id)} className="text-red-300 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-all p-1 rounded-lg hover:bg-red-50" title="Delete">
+                                                <button onClick={() => handleDeleteFaculty(f.faculty_id)} className="text-red-300 hover:text-red-600 sm:opacity-0 sm:group-hover:opacity-100 transition-all p-1.5 rounded-lg hover:bg-red-50" title="Delete">
                                                     <Trash2 className="w-4 h-4" />
                                                 </button>
                                             </div>
@@ -1089,9 +1144,9 @@ function App() {
 
         return (
             <div className="space-y-4">
-                <div className="flex justify-between items-center">
+                <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3">
                     <div className="flex-1">{renderFilterBar(false, Object.keys(grouped).length, [...new Set(courseFacultyMappings.map(m => m.course_code))].length)}</div>
-                    <button onClick={() => setShowAddMapping(!showAddMapping)} className="ml-3 flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-violet-200 hover:shadow-violet-300 transition-all whitespace-nowrap hover:-translate-y-0.5 active:scale-95">
+                    <button onClick={() => setShowAddMapping(!showAddMapping)} className="flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-violet-200 hover:shadow-violet-300 transition-all whitespace-nowrap hover:-translate-y-0.5 active:scale-95">
                         <Plus className="w-4 h-4" /> Add Mapping
                     </button>
                 </div>
@@ -1099,7 +1154,7 @@ function App() {
                 {showAddMapping && (
                     <div className="bg-white rounded-2xl border-2 border-violet-200 shadow-xl shadow-violet-100/50 p-6">
                         <h4 className="font-bold text-gray-800 mb-4 flex items-center gap-2"><Plus className="w-4 h-4 text-violet-600" /> Add Course-Faculty Mapping</h4>
-                        <form onSubmit={handleAddMapping} className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                        <form onSubmit={handleAddMapping} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
                             <input name="course_code" placeholder="Course Code *" required className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
                             <input name="faculty_id" placeholder="Faculty ID *" required className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm" />
                             <select name="department_code" required className="p-2.5 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm">
@@ -1165,7 +1220,7 @@ function App() {
                                                     )}
                                                 </div>
                                             </div>
-                                            <button onClick={() => handleDeleteMapping(f.id)} className="text-red-300 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-all ml-1" title="Remove Mapping">
+                                            <button onClick={() => handleDeleteMapping(f.id)} className="text-red-300 hover:text-red-600 sm:opacity-0 sm:group-hover:opacity-100 transition-all ml-1 p-1" title="Remove Mapping">
                                                 <Trash2 className="w-3 h-3" />
                                             </button>
                                         </div>
@@ -1476,7 +1531,7 @@ function App() {
                                             <>
                                                 <div className="flex justify-between items-start mb-2">
                                                     <h4 className="font-extrabold text-orange-900">{b.break_type}</h4>
-                                                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <div className="flex gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                                                         <button onClick={() => { setEditingBreakId(b.id); setEditingBreakData({...b, semester_ids: b.semester_ids || []}); }} className="p-1 text-gray-400 hover:text-blue-600 rounded bg-gray-50 hover:bg-blue-50 transition-colors"><Pencil className="w-3 h-3" /></button>
                                                         <button onClick={() => handleDeleteBreak(b.id)} className="p-1 text-gray-400 hover:text-red-500 rounded bg-gray-50 hover:bg-red-50 transition-colors"><Trash2 className="w-3 h-3" /></button>
                                                     </div>
@@ -1539,20 +1594,20 @@ function App() {
                 </div>
                 
                 {/* --- TIME SLOTS SYSTEM --- */}
-                <div className="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-violet-100">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white p-4 rounded-2xl shadow-sm border border-violet-100">
                     <div>
                         <p className="text-sm font-semibold text-gray-700">Manage period timings across specific semesters.</p>
                     </div>
-                    <div className="flex items-center gap-4">
+                    <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
                         <select 
                             value={slotFilterSem} 
                             onChange={e => setSlotFilterSem(e.target.value)}
-                            className="p-2 border border-violet-200 rounded-xl text-sm font-semibold text-gray-700 bg-gray-50 focus:ring-2 focus:ring-violet-400 focus:outline-none"
+                            className="flex-1 sm:flex-none p-2 border border-violet-200 rounded-xl text-sm font-semibold text-gray-700 bg-gray-50 focus:ring-2 focus:ring-violet-400 focus:outline-none"
                         >
                             <option value="">All Semesters (Raw View)</option>
                             {[1,2,3,4,5,6,7,8].map(s => <option key={s} value={s}>Semester {s}</option>)}
                         </select>
-                        <button onClick={() => setShowAddSlot(!showAddSlot)} className="flex items-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-bold shadow-lg shadow-violet-200 hover:shadow-violet-300 transition-all hover:-translate-y-0.5 active:scale-95">
+                        <button onClick={() => setShowAddSlot(!showAddSlot)} className="flex items-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-bold shadow-lg shadow-violet-200 hover:shadow-violet-300 transition-all hover:-translate-y-0.5 active:scale-95 whitespace-nowrap">
                             <Plus className="w-4 h-4" /> Add Slot
                         </button>
                     </div>
@@ -1820,9 +1875,9 @@ function App() {
             )}
             
             <div className="bg-white rounded-2xl shadow-lg shadow-violet-50/50 border border-violet-100 overflow-hidden">
-                <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-white">
+                <div className="p-4 border-b border-gray-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white">
                     <h3 className="font-bold text-gray-700">{selectedDept && selectedSem ? `${selectedDept} - Semester ${selectedSem} ` : 'Timetable Preview'}</h3>
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center flex-wrap gap-2">
                         <button 
                             onClick={() => {
                                 if (selectedDept && selectedSem) {
@@ -1833,15 +1888,15 @@ function App() {
                                     alert('Please select a department and semester first.');
                                 }
                             }}
-                            className="flex items-center space-x-2 text-sm text-blue-700 hover:text-blue-900 border border-blue-200 px-4 py-1.5 rounded-xl bg-white shadow-sm hover:shadow-md hover:border-blue-300 font-semibold transition-all"
+                            className="flex items-center gap-1.5 text-sm text-blue-700 hover:text-blue-900 border border-blue-200 px-3 py-1.5 rounded-xl bg-white shadow-sm hover:shadow-md hover:border-blue-300 font-semibold transition-all"
                         >
-                            <Edit2 className="w-4 h-4" /><span>Edit Timetable</span>
+                            <Edit2 className="w-4 h-4" /><span>Edit</span>
                         </button>
-                        <button onClick={handleDownloadExcel} className="flex items-center space-x-2 text-sm text-emerald-700 hover:text-emerald-900 border border-emerald-200 px-4 py-1.5 rounded-xl bg-white shadow-sm hover:shadow-md hover:border-emerald-300 font-semibold transition-all">
-                            <FileSpreadsheet className="w-4 h-4" /><span>Export Excel</span>
+                        <button onClick={handleDownloadExcel} className="flex items-center gap-1.5 text-sm text-emerald-700 hover:text-emerald-900 border border-emerald-200 px-3 py-1.5 rounded-xl bg-white shadow-sm hover:shadow-md hover:border-emerald-300 font-semibold transition-all">
+                            <FileSpreadsheet className="w-4 h-4" /><span>Excel</span>
                         </button>
-                        <button onClick={handleDownloadPDF} className="flex items-center space-x-2 text-sm text-violet-700 hover:text-violet-900 border border-violet-200 px-4 py-1.5 rounded-xl bg-white shadow-sm hover:shadow-md hover:border-violet-300 font-semibold transition-all">
-                            <Download className="w-4 h-4" /><span>Export PDF</span>
+                        <button onClick={handleDownloadPDF} className="flex items-center gap-1.5 text-sm text-violet-700 hover:text-violet-900 border border-violet-200 px-3 py-1.5 rounded-xl bg-white shadow-sm hover:shadow-md hover:border-violet-300 font-semibold transition-all">
+                            <Download className="w-4 h-4" /><span>PDF</span>
                         </button>
                     </div>
                 </div>
@@ -1942,6 +1997,14 @@ function App() {
 
     return (
         <div className="flex h-screen bg-slate-50 font-sans text-gray-900 overflow-hidden">
+            {/* Mobile sidebar backdrop */}
+            {isSidebarOpen && (
+                <div 
+                    className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40 lg:hidden"
+                    onClick={() => setIsSidebarOpen(false)}
+                />
+            )}
+            {/* Desktop Sidebar (hidden on mobile, acts as slide-over if toggled) */}
             <aside className={`fixed inset-y-0 left-0 z-50 ${isCollapsed ? 'w-20' : 'w-64'} bg-white border-r border-gray-100 transform transition-all duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:relative lg:translate-x-0 shadow-xl shadow-gray-200/50 flex flex-col print:hidden`}>
                 <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'} p-6 border-b border-gray-50 transition-all duration-300`}>
                     <div className="flex items-center space-x-3 overflow-hidden">
@@ -2001,27 +2064,27 @@ function App() {
             {/* --- GENERATION ERRORS INLINE HAS MOVED TO DASHBOARD TAB --- */}
 
 
-            <main className="flex-1 flex flex-col h-screen overflow-hidden relative print:overflow-visible print:h-auto print:block">
-                <header className="bg-white border-b border-gray-100 shadow-sm z-10 px-8 py-4 flex items-center justify-between print:hidden">
+            <main className="flex-1 flex flex-col h-screen overflow-hidden relative print:overflow-visible print:h-auto print:block md:pb-0 pb-16">
+                <header className="bg-white border-b border-gray-100 shadow-sm z-10 px-4 md:px-8 py-4 flex items-center justify-between print:hidden">
                     <div className="flex items-center space-x-4">
                         <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 rounded-xl hover:bg-violet-50 lg:hidden text-gray-600"><Menu className="w-6 h-6" /></button>
-                        <h2 className="text-2xl font-bold text-gray-800">{pageTitle[activeTab] || 'Dashboard'}</h2>
+                        <h2 className="text-xl md:text-2xl font-bold text-gray-800 line-clamp-1">{pageTitle[activeTab] || 'Dashboard'}</h2>
                     </div>
-                    <div className="flex items-center space-x-4">
+                    <div className="flex items-center space-x-3">
                         {generationWarnings.length > 0 && (
                             <button 
                                 onClick={() => setIsWarningsPanelOpen(!isWarningsPanelOpen)}
                                 className="relative p-2 rounded-full text-amber-500 hover:bg-amber-50 transition-colors"
                             >
-                                <Bell className="w-6 h-6 animate-pulse" />
+                                <Bell className="w-5 h-5 md:w-6 md:h-6 animate-pulse" />
                                 <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></span>
                             </button>
                         )}
-                        <div className="h-10 w-10 bg-violet-100 rounded-full flex items-center justify-center text-violet-700 font-bold border-2 border-white shadow-sm">A</div>
+                        <div className="h-8 w-8 md:h-10 md:w-10 bg-violet-100 rounded-full flex items-center justify-center text-violet-700 font-bold border-2 border-white shadow-sm text-sm">A</div>
                     </div>
                 </header>
 
-                <div className="flex-1 overflow-x-hidden overflow-y-auto bg-transparent p-6">
+                <div className="flex-1 overflow-x-hidden overflow-y-auto bg-transparent p-4 md:p-6 custom-scrollbar">
                     <div className="max-w-7xl mx-auto">
                         {activeTab === 'dashboard' && renderDashboard()}
                         {activeTab === 'editor' && renderEditorPage()}
@@ -2122,6 +2185,30 @@ function App() {
                 </div>
             </aside>
 
+            {/* Mobile Bottom Navigation Bar */}
+            <nav className="lg:hidden fixed bottom-0 w-full bg-white/90 backdrop-blur-md border-t border-gray-200 flex justify-around items-center z-40 pb-safe shadow-[0_-4px_20px_-10px_rgba(0,0,0,0.1)] transition-all">
+                {[
+                    { id: 'dashboard', icon: LayoutDashboard, label: 'Home' },
+                    { id: 'subjects', icon: BookOpen, label: 'Subjects' },
+                    { id: 'editor', icon: Edit2, label: 'Editor' },
+                    { id: 'faculty', icon: Users, label: 'Faculty' },
+                    { id: 'menu', icon: Menu, label: 'Menu', isMenu: true }
+                ].map(item => (
+                    <button 
+                        key={item.id} 
+                        onClick={() => item.isMenu ? setIsSidebarOpen(true) : switchTab(item.id)}
+                        className={`flex flex-col items-center justify-center w-full py-3 h-16 transition-colors ${activeTab === item.id && !item.isMenu ? 'text-violet-600 font-bold' : 'text-gray-500 hover:text-violet-500'}`}
+                    >
+                        <div className={`relative ${activeTab === item.id && !item.isMenu ? 'transform -translate-y-1 transition-transform' : ''}`}>
+                            <item.icon className={`w-6 h-6 mb-1 ${activeTab === item.id && !item.isMenu ? 'text-violet-600' : ''}`} />
+                            {activeTab === item.id && !item.isMenu && (
+                                <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-violet-600 rounded-full"></span>
+                            )}
+                        </div>
+                        <span className="text-[10px] tracking-wide">{item.label}</span>
+                    </button>
+                ))}
+            </nav>
 
         </div>
     );

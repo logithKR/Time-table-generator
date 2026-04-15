@@ -201,7 +201,7 @@ const FacultyTimetable = ({ slots }) => {
                 </select>
 
                 {/* Search */}
-                <div className="flex-1 min-w-[200px]">
+                <div className="flex-1 min-w-0">
                     <div className="relative group">
                         <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-violet-500 transition-colors" />
                         <input
@@ -232,7 +232,7 @@ const FacultyTimetable = ({ slots }) => {
                 </div>
 
                 {/* View Toggles */}
-                <div className="flex flex-wrap items-center gap-4 bg-white px-4 py-2 rounded-xl border border-violet-200 shadow-sm ml-auto">
+                <div className="flex flex-wrap items-center gap-3 bg-white px-3 py-2 rounded-xl border border-violet-200 shadow-sm w-full sm:w-auto sm:ml-auto">
                     <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-gray-700 hover:text-violet-600 transition-colors">
                         <input type="checkbox" checked={showLabels} onChange={e => setShowLabels(e.target.checked)} className="rounded text-violet-600 focus:ring-violet-500 w-4 h-4 cursor-pointer" />
                         Labels
@@ -289,7 +289,7 @@ const FacultyTimetable = ({ slots }) => {
             ) : null}
 
             {selectedFacultyId && timetableData && (
-                <div className="bg-white p-4 shadow-xl border border-gray-300 overflow-x-auto print:shadow-none print:border-none rounded-xl">
+                <div className="bg-white p-4 shadow-xl border border-gray-300 overflow-x-auto custom-scrollbar pb-6 print:shadow-none print:border-none rounded-xl relative z-0">
                     <div id="printable-content" ref={componentRef} className="min-w-[1000px] bg-white text-black p-4">
                         <div className="text-center mb-6">
                             <h2 className="text-2xl font-bold uppercase tracking-wider text-gray-900 border-b-2 border-gray-800 pb-2 inline-block px-10">

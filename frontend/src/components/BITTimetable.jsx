@@ -312,7 +312,7 @@ const BITTimetable = ({ timetableData, department, semester, courses, slots, bre
             )}
 
             {/* Printable Content - Now managed simply by browser scaling */}
-            <div className="w-full bg-white print:shadow-none bg-transparent">
+            <div className="w-full bg-white print:shadow-none bg-transparent overflow-x-auto custom-scrollbar pb-6 relative z-0">
                 <div id="printable-content" ref={componentRef} className="w-full" style={{ backgroundColor: '#ffffff', padding: '6mm' }}>
                     {/* Header */}
                     <div className="flex bg-white" style={{ border: '2px solid #000000', borderBottom: 'none' }}>

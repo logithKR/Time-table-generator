@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Index, UniqueConstraint, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Index, UniqueConstraint
 from database import Base
 
 class DepartmentMaster(Base):

@@ -7,3 +7,4 @@ openpyxl
 ortools
 pydantic
 pydantic-settings
+python-dotenv

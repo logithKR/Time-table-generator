@@ -364,7 +364,6 @@ class ConstraintInterpreter:
             except Exception:
                 venue = None
 
-            already_there = (day, period) in filled_slots
             sec_num = 1  # reserved slots are guaranteed clean
 
             entry = models.TimetableEntry(
@@ -391,7 +390,7 @@ class ConstraintInterpreter:
                 next_p = period + 1
                 next_slot = slot_lookup.get((day, next_p))
                 if next_slot:
-                    already_there_2 = (day, next_p) in filled_slots
+
                     entry2 = models.TimetableEntry(
                         department_code=department_code,
                         semester=semester,

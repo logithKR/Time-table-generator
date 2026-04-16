@@ -1,4 +1,11 @@
 # ===========================
+# Environment / Secrets (NEVER commit)
+# ===========================
+.env
+.env.*
+!.env.example
+
+# ===========================
 # OS & System Files
 # ===========================
 .DS_Store

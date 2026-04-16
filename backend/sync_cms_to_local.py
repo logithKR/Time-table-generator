@@ -1,13 +1,21 @@
 import pymysql
 import pandas as pd
 import sqlite3
+import os
+
+# Load .env file if python-dotenv is available
+try:
+    from dotenv import load_dotenv
+    load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '.env'))
+except ImportError:
+    pass  # python-dotenv not installed, rely on system env vars
 
 SOURCE_DB_CONFIG = {
-    "host": "10.150.20.153",
-    "user": "aca_dev1",
-    "password": "academics1",
-    "port": 3306,
-    "database": "cms"
+    "host": os.getenv("CMS_DB_HOST", ""),
+    "user": os.getenv("CMS_DB_USER", ""),
+    "password": os.getenv("CMS_DB_PASSWORD", ""),
+    "port": int(os.getenv("CMS_DB_PORT", "3306")),
+    "database": os.getenv("CMS_DB_NAME", "cms")
 }
 
 LOCAL_DB_NAME = "cms_local.db"

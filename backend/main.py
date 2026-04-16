@@ -5,10 +5,16 @@ from pydantic import BaseModel
 import json
 import math
 import io
+import re
+import os
+import copy
+import uuid as uuid_lib
+from datetime import datetime
 from fastapi.responses import StreamingResponse
 import openpyxl
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import Alignment, PatternFill, Border, Side, Font
+import pandas as pd
 import models, schemas
 from database import engine, get_db
 from fastapi.middleware.cors import CORSMiddleware
@@ -34,10 +40,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.post("/import-book1")
-def run_import_book1(background_tasks: BackgroundTasks):
-    background_tasks.add_task(import_book1.import_book1_data)
-    return {"message": "Data import from Book1.xlsx has started in the background."}
 
 @app.post("/api/sync-cms")
 def run_sync_cms():
@@ -779,8 +781,6 @@ def get_conflicts(
 ):
     from conflict_detector import detect_conflicts
     return detect_conflicts(db, department_code, semester)
-        
-    return {"status": "success", "count": len(new_entries)}
 
 # ============================================
 # AVAILABILITY QUERIES (for Smart Editor)
@@ -959,8 +959,7 @@ def delete_venue(venue_id: int, db: Session = Depends(get_db)):
 
 @app.post("/venues/import")
 def import_venues(db: Session = Depends(get_db)):
-    import pandas as pd
-    import os
+
     
     base_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.dirname(base_dir)
@@ -1395,7 +1394,7 @@ def get_student_timetable(student_id: str, db: Session = Depends(get_db)):
 
     entries = list(valid_entries.values())
     
-    import re
+
     # Hydrate entries with course classification flags for the frontend labels,
     # and clean up noisy course names (like `/ OPEN ELECTIVE`) for regular electives.
     for e in entries:
@@ -1625,7 +1624,7 @@ def check_conflicts(request: schemas.ConflictCheckRequest, db: Session = Depends
 # SCHEDULER CONFIG (Constraint Management)
 # ============================================
 # ============================================
-import json
+
 
 DEFAULT_CONFIG = {
     "validation": {
@@ -1779,7 +1778,7 @@ DEFAULT_CONFIG = {
 }
 
 def merge_configs(default_c, saved_c):
-    import copy
+
     result = copy.deepcopy(default_c)
     if not isinstance(saved_c, dict):
         return result
@@ -1998,8 +1997,7 @@ def delete_common_course(course_code: str, semester: int, db: Session = Depends(
 # ============================================
 # USER-DEFINED CONSTRAINTS
 # ============================================
-import uuid as uuid_lib
-from datetime import datetime
+
 
 def _constraint_to_response(row: models.UserConstraint) -> dict:
     """Convert a UserConstraint DB row to a response dict."""
@@ -2291,7 +2289,7 @@ def export_timetable_excel(
         from openpyxl.drawing.image import Image
     except ImportError:
         Image = None
-    import os
+
 
     # Fetch Academic Year (global - stored at semester=0)
     academic_year = "___________"

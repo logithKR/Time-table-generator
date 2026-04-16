@@ -48,7 +48,7 @@ const DepartmentsManager = () => {
             setIsAdding(false);
             e.target.reset();
         } catch (err) {
-            alert(err.response?.data?.detail || err.message);
+            alert(api.getErrorMessage(err));
         }
     };
 
@@ -61,7 +61,7 @@ const DepartmentsManager = () => {
             setEditingDept(null);
             setEditCount('');
         } catch (err) {
-            alert(err.response?.data?.detail || err.message);
+            alert(api.getErrorMessage(err));
         }
     };
 
@@ -71,7 +71,7 @@ const DepartmentsManager = () => {
             await deleteDepartment(code);
             await fetchDepartments();
         } catch (err) {
-            alert(err.response?.data?.detail || err.message);
+            alert(api.getErrorMessage(err));
         }
     };
 

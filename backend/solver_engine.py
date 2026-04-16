@@ -1836,8 +1836,12 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
         print(f"❌ Hard mode generation aborted during save phase with {len(generation_errors)} errors.")
         return {"success": False, "errors": generation_errors, "warnings": generation_warnings, "entries_saved": 0}
 
-    db.commit()
-    print(f"💾 Saved {count} timetable entries.")
-    
+    try:
+        db.commit()
+        print(f"💾 Saved {count} timetable entries.")
+    except Exception as e:
+        db.rollback()
+        print(f"❌ Database commit failed: {str(e)}")
+        raise e
     # Return structured dict
     return {"success": True, "errors": generation_errors, "warnings": generation_warnings, "entries_saved": count}

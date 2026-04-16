@@ -174,7 +174,7 @@ const VenueMapping = () => {
             setSelectedVenue('');
         } catch (err) {
             console.error(err);
-            alert("Error mapping venue: " + (err.response?.data?.detail || err.message));
+            alert("Error mapping venue: " + (api.getErrorMessage(err)));
         } finally {
             setIsMapping(false);
         }
@@ -198,7 +198,7 @@ const VenueMapping = () => {
             setSelectedVenueType('BOTH');
         } catch (err) {
             console.error(err);
-            alert("Error mapping course venue: " + (err.response?.data?.detail || err.message));
+            alert("Error mapping course venue: " + (api.getErrorMessage(err)));
         } finally {
             setIsMappingCourse(false);
         }
@@ -212,7 +212,7 @@ const VenueMapping = () => {
             await fetchDepartmentData(selectedDept, selectedSemester);
         } catch (err) {
             console.error(err);
-            alert("Error removing mapping: " + (err.response?.data?.detail || err.message));
+            alert("Error removing mapping: " + (api.getErrorMessage(err)));
         }
     };
 
@@ -224,7 +224,7 @@ const VenueMapping = () => {
             await fetchDepartmentData(selectedDept, selectedSemester);
         } catch (err) {
             console.error(err);
-            alert("Error removing mapping: " + (err.response?.data?.detail || err.message));
+            alert("Error removing mapping: " + (api.getErrorMessage(err)));
         }
     };
 
@@ -289,7 +289,7 @@ const VenueMapping = () => {
             setCommonVenueType('BOTH');
         } catch (err) {
             console.error(err);
-            alert("Error assigning venue: " + (err.response?.data?.detail || err.message));
+            alert("Error assigning venue: " + (api.getErrorMessage(err)));
         }
     };
 
@@ -301,7 +301,7 @@ const VenueMapping = () => {
             setCommonCourses(ccRes.data);
         } catch (err) {
             console.error(err);
-            alert("Error clearing venue: " + (err.response?.data?.detail || err.message));
+            alert("Error clearing venue: " + (api.getErrorMessage(err)));
         }
     };
 

@@ -52,7 +52,7 @@ const SubjectManager = () => {
             fetchSubjects();
         } catch (err) {
             console.error(err);
-            alert("Error saving subject: " + (err.response?.data?.detail || err.message));
+            alert("Error saving subject: " + (api.getErrorMessage(err)));
         }
     };
 

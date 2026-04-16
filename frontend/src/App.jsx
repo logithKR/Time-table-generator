@@ -1996,7 +1996,7 @@ function App() {
     // Auth code removed
 
     return (
-        <div className="flex h-screen bg-slate-50 font-sans text-gray-900 overflow-hidden">
+        <div className="flex h-screen bg-white font-sans text-gray-900 overflow-hidden">
             {/* Mobile sidebar backdrop */}
             {isSidebarOpen && (
                 <div 
@@ -2005,13 +2005,13 @@ function App() {
                 />
             )}
             {/* Desktop Sidebar (hidden on mobile, acts as slide-over if toggled) */}
-            <aside className={`fixed inset-y-0 left-0 z-50 ${isCollapsed ? 'w-20' : 'w-64'} bg-white border-r border-gray-100 transform transition-all duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:relative lg:translate-x-0 shadow-xl shadow-gray-200/50 flex flex-col print:hidden`}>
-                <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'} p-6 border-b border-gray-50 transition-all duration-300`}>
+            <aside className={`fixed inset-y-0 left-0 z-50 ${isCollapsed ? 'w-20' : 'w-64'} bg-white border-r border-purple-100 transform transition-all duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:relative lg:translate-x-0 shadow-xl shadow-purple-100/50 flex flex-col print:hidden`}>
+                <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'} ${isCollapsed ? 'p-4' : 'px-5 py-5'} bg-gradient-to-br from-purple-700 via-violet-600 to-purple-600 transition-all duration-300`}>
                     <div className="flex items-center space-x-3 overflow-hidden">
-                        <div className="w-8 h-8 flex items-center justify-center flex-shrink-0">
+                        <div className="w-9 h-9 flex items-center justify-center flex-shrink-0 bg-white/90 rounded-xl shadow-lg shadow-purple-900/20 p-1">
                             <img src="/bitsathy-logo.png" alt="BITSATHY Logo" className="w-full h-full object-contain" />
                         </div>
-                        <span className={`text-xl font-bold tracking-tight text-gray-800 whitespace-nowrap transition-opacity duration-300 ${isCollapsed ? 'opacity-0 w-0 hidden' : 'opacity-100'}`}>
+                        <span className={`text-xl font-bold tracking-tight text-white whitespace-nowrap transition-opacity duration-300 ${isCollapsed ? 'opacity-0 w-0 hidden' : 'opacity-100'}`}>
                             BITSATHY
                         </span>
                     </div>
@@ -2019,11 +2019,11 @@ function App() {
 
                 {/* Collapse Toggle Button - Desktop Only */}
                 <button onClick={() => setIsCollapsed(!isCollapsed)}
-                    className="hidden lg:flex absolute -right-3 top-20 bg-white border border-gray-200 text-gray-500 rounded-full p-1 shadow-md hover:bg-gray-50 hover:text-violet-600 transition-colors z-50">
+                    className="hidden lg:flex absolute -right-3 top-20 bg-white border border-purple-200 text-purple-400 rounded-full p-1.5 shadow-md hover:bg-purple-50 hover:text-purple-600 transition-colors z-50">
                     {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
                 </button>
 
-                <nav className="mt-8 px-3 space-y-2 flex-grow overflow-y-auto">
+                <nav className="mt-4 px-3 space-y-1.5 flex-grow overflow-y-auto">
                     {[
                         { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
                         { id: 'editor', icon: Edit2, label: 'Editor' },
@@ -2044,18 +2044,18 @@ function App() {
                     ].map(item => (
                         <button key={item.id} onClick={() => switchTab(item.id)}
                             title={isCollapsed ? item.label : ''}
-                            className={`flex items-center ${isCollapsed ? 'justify-center px-0' : 'space-x-3 px-3'} w-full py-3 rounded-xl transition-all duration-200 font-medium ${activeTab === item.id ? 'bg-violet-600 text-white shadow-lg shadow-violet-200' : 'text-gray-500 hover:bg-gray-50 hover:text-violet-600'}`}>
+                            className={`flex items-center ${isCollapsed ? 'justify-center px-0' : 'space-x-3 px-3'} w-full py-2.5 rounded-xl transition-all duration-200 font-medium ${activeTab === item.id ? 'bg-purple-600 text-white shadow-lg shadow-purple-200' : 'text-gray-500 hover:bg-purple-50 hover:text-purple-600'}`}>
                             <item.icon className="w-5 h-5 flex-shrink-0" />
                             <span className={`whitespace-nowrap transition-all duration-300 ${isCollapsed ? 'opacity-0 w-0 hidden' : 'opacity-100'}`}>{item.label}</span>
                         </button>
                     ))}
                 </nav>
-                <div className="p-4 border-t border-gray-100">
-                    <div className={`bg-slate-50 rounded-xl p-3 border border-slate-100 flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} transition-all duration-300`}>
-                        <div className="h-9 w-9 rounded-full bg-violet-100 flex items-center justify-center text-violet-600 font-bold text-xs flex-shrink-0">A</div>
+                <div className="p-4 border-t border-purple-100">
+                    <div className={`bg-purple-50/50 rounded-xl p-3 border border-purple-100 flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} transition-all duration-300`}>
+                        <div className="h-9 w-9 rounded-full bg-purple-100 flex items-center justify-center text-purple-700 font-bold text-xs flex-shrink-0">A</div>
                         <div className={`overflow-hidden transition-all duration-300 ${isCollapsed ? 'w-0 opacity-0 hidden' : 'w-auto opacity-100'}`}>
                             <p className="text-sm font-bold text-gray-800 truncate">Admin</p>
-                            <p className="text-xs text-gray-500">System Administrator</p>
+                            <p className="text-xs text-purple-500">System Administrator</p>
                         </div>
                     </div>
                 </div>
@@ -2064,11 +2064,11 @@ function App() {
             {/* --- GENERATION ERRORS INLINE HAS MOVED TO DASHBOARD TAB --- */}
 
 
-            <main className="flex-1 flex flex-col h-screen overflow-hidden relative print:overflow-visible print:h-auto print:block md:pb-0 pb-16">
-                <header className="bg-white border-b border-gray-100 shadow-sm z-10 px-4 md:px-8 py-4 flex items-center justify-between print:hidden">
+            <main className="flex-1 flex flex-col h-screen overflow-hidden relative print:overflow-visible print:h-auto print:block lg:pb-0 pb-16">
+                <header className="bg-white border-b-2 border-purple-100 shadow-sm shadow-purple-50/50 z-10 px-4 md:px-8 py-4 flex items-center justify-between print:hidden">
                     <div className="flex items-center space-x-4">
                         <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 rounded-xl hover:bg-violet-50 lg:hidden text-gray-600"><Menu className="w-6 h-6" /></button>
-                        <h2 className="text-xl md:text-2xl font-bold text-gray-800 line-clamp-1">{pageTitle[activeTab] || 'Dashboard'}</h2>
+                        <h2 className="text-xl md:text-2xl font-bold text-purple-900 line-clamp-1">{pageTitle[activeTab] || 'Dashboard'}</h2>
                     </div>
                     <div className="flex items-center space-x-3">
                         {generationWarnings.length > 0 && (
@@ -2080,7 +2080,7 @@ function App() {
                                 <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></span>
                             </button>
                         )}
-                        <div className="h-8 w-8 md:h-10 md:w-10 bg-violet-100 rounded-full flex items-center justify-center text-violet-700 font-bold border-2 border-white shadow-sm text-sm">A</div>
+                        <div className="h-8 w-8 md:h-10 md:w-10 bg-purple-100 rounded-full flex items-center justify-center text-purple-700 font-bold border-2 border-purple-200 shadow-sm text-sm">A</div>
                     </div>
                 </header>
 
@@ -2186,7 +2186,7 @@ function App() {
             </aside>
 
             {/* Mobile Bottom Navigation Bar */}
-            <nav className="lg:hidden fixed bottom-0 w-full bg-white/90 backdrop-blur-md border-t border-gray-200 flex justify-around items-center z-40 pb-safe shadow-[0_-4px_20px_-10px_rgba(0,0,0,0.1)] transition-all">
+            <nav className="lg:hidden fixed bottom-0 w-full bg-white/95 backdrop-blur-md border-t-2 border-purple-100 flex justify-around items-center z-40 pb-safe shadow-[0_-4px_20px_-10px_rgba(124,58,237,0.08)] transition-all">
                 {[
                     { id: 'dashboard', icon: LayoutDashboard, label: 'Home' },
                     { id: 'subjects', icon: BookOpen, label: 'Subjects' },
@@ -2197,12 +2197,12 @@ function App() {
                     <button 
                         key={item.id} 
                         onClick={() => item.isMenu ? setIsSidebarOpen(true) : switchTab(item.id)}
-                        className={`flex flex-col items-center justify-center w-full py-3 h-16 transition-colors ${activeTab === item.id && !item.isMenu ? 'text-violet-600 font-bold' : 'text-gray-500 hover:text-violet-500'}`}
+                        className={`flex flex-col items-center justify-center w-full py-3 h-16 transition-all duration-200 ${activeTab === item.id && !item.isMenu ? 'text-purple-600 font-bold' : 'text-gray-400 hover:text-purple-500'}`}
                     >
                         <div className={`relative ${activeTab === item.id && !item.isMenu ? 'transform -translate-y-1 transition-transform' : ''}`}>
-                            <item.icon className={`w-6 h-6 mb-1 ${activeTab === item.id && !item.isMenu ? 'text-violet-600' : ''}`} />
+                            <item.icon className={`w-6 h-6 mb-1 ${activeTab === item.id && !item.isMenu ? 'text-purple-600' : ''}`} />
                             {activeTab === item.id && !item.isMenu && (
-                                <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-violet-600 rounded-full"></span>
+                                <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-purple-600 rounded-full"></span>
                             )}
                         </div>
                         <span className="text-[10px] tracking-wide">{item.label}</span>

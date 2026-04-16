@@ -3,11 +3,12 @@ import * as api from '../utils/api';
 
 const AuthContext = createContext(null);
 
-// =====================================================================
-// Replace the placeholder below with your actual Google OAuth Client ID
-// from https://console.cloud.google.com/apis/credentials
-// =====================================================================
-const GOOGLE_CLIENT_ID = '8910878399-u0ogb89cco0onu0hrqse59c9moo5uh58.apps.googleusercontent.com';
+// Google OAuth Client ID — MUST be set via VITE_GOOGLE_CLIENT_ID env var.
+// No fallback: missing value will cause a visible error, not silent misconfiguration.
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+if (!GOOGLE_CLIENT_ID) {
+    console.error('FATAL: VITE_GOOGLE_CLIENT_ID environment variable is not set.');
+}
 
 export function AuthProvider({ children }) {
     const [user, setUser] = useState(null);

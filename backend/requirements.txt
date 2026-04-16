@@ -10,3 +10,4 @@ pydantic-settings
 python-dotenv
 PyJWT
 google-auth
+requests

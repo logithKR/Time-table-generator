@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-const API_URL = '/api';
+// Use VITE_API_BASE_URL from environment, default to '/api' for dev proxy
+const API_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
 // Global Axios configuration for Secure Cookies
 axios.defaults.withCredentials = true;

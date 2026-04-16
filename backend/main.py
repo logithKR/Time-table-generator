@@ -8,6 +8,7 @@ import math
 import io
 import re
 import os
+import sys
 import copy
 import uuid as uuid_lib
 from datetime import datetime
@@ -23,6 +24,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 import jwt
 from auth import JWT_SECRET, ALGORITHM
 from auth_routes import router as auth_router
+from audit_logger import log_activity
 
 
 # Ensure tables exist
@@ -30,13 +32,25 @@ models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="BIT Scheduler Pro (Simplified)")
 
-# CORS
-origins = [
+# ---------------------------------------------------------------------------
+# CORS — from env var, no wildcards, credentials always enabled
+# Production domain is always included to prevent lockout.
+# ---------------------------------------------------------------------------
+_PRODUCTION_ORIGIN = "https://timetable.bitsathy.ac.in"
+_env_origins = os.environ.get("CORS_ORIGINS", "")
+origins = [o.strip() for o in _env_origins.split(",") if o.strip()] if _env_origins else [
     "http://localhost:5173", "http://127.0.0.1:5173",
     "http://localhost:5174", "http://127.0.0.1:5174",
     "http://localhost:5175", "http://127.0.0.1:5175",
-    "https://timetable.bitsathy.ac.in",
 ]
+if _PRODUCTION_ORIGIN not in origins:
+    origins.append(_PRODUCTION_ORIGIN)
+
+# Reject wildcard origins — fail-fast
+if "*" in origins:
+    print("FATAL: Wildcard '*' is not allowed in CORS_ORIGINS.", file=sys.stderr)
+    sys.exit(1)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -45,41 +59,86 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+# ---------------------------------------------------------------------------
+# Auth + Activity Logging Middleware
+# ---------------------------------------------------------------------------
+# Routes that bypass authentication entirely
+_PUBLIC_PREFIXES = ("/auth/", "/api/auth/")
+_PUBLIC_EXACT = {"/health", "/docs", "/openapi.json", "/redoc"}
+
+
 class AuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         path = request.url.path
-        if path.startswith("/auth/") or path.startswith("/api/auth/") or path in ["/docs", "/openapi.json"]:
+
+        # --- Public routes: skip auth ---
+        if any(path.startswith(p) for p in _PUBLIC_PREFIXES) or path in _PUBLIC_EXACT:
             return await call_next(request)
-            
+
+        # --- CORS preflight: skip auth ---
         if request.method == "OPTIONS":
             return await call_next(request)
-            
-        access_token = request.cookies.get("access_token")
-        
-        # Enforce CSRF protection for state-changing methods
-        if request.method in ["POST", "PUT", "DELETE", "PATCH"]:
+
+        # --- Extract client metadata for logging ---
+        forwarded = request.headers.get("x-forwarded-for")
+        client_ip = forwarded.split(",")[0].strip() if forwarded else (request.client.host if request.client else "")
+        user_agent = request.headers.get("user-agent", "")
+
+        # --- CSRF protection for state-changing methods ---
+        if request.method in ("POST", "PUT", "DELETE", "PATCH"):
             csrf_cookie = request.cookies.get("csrf_token")
             csrf_header = request.headers.get("x-csrf-token")
             if not csrf_cookie or not csrf_header or csrf_cookie != csrf_header:
+                log_activity(endpoint=path, method=request.method, status_code=403, ip=client_ip, user_agent=user_agent)
                 return JSONResponse(status_code=403, content={"detail": "CSRF token validation failed"})
 
+        # --- Access token validation ---
+        access_token = request.cookies.get("access_token")
         if not access_token:
+            log_activity(endpoint=path, method=request.method, status_code=401, ip=client_ip, user_agent=user_agent)
             return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
-            
+
         try:
             payload = jwt.decode(access_token, JWT_SECRET, algorithms=[ALGORITHM])
             if payload.get("type") != "access":
+                log_activity(endpoint=path, method=request.method, status_code=401, ip=client_ip, user_agent=user_agent)
                 return JSONResponse(status_code=401, content={"detail": "Invalid token type"})
             request.state.user = payload
         except jwt.ExpiredSignatureError:
+            log_activity(endpoint=path, method=request.method, status_code=401, ip=client_ip, user_agent=user_agent)
             return JSONResponse(status_code=401, content={"detail": "Token expired"})
         except jwt.InvalidTokenError:
+            log_activity(endpoint=path, method=request.method, status_code=401, ip=client_ip, user_agent=user_agent)
             return JSONResponse(status_code=401, content={"detail": "Invalid token"})
-            
-        return await call_next(request)
+
+        # --- Execute actual endpoint ---
+        response = await call_next(request)
+
+        # --- Audit log successful authenticated request ---
+        user_email = payload.get("email", "")
+        log_activity(
+            user_email=user_email,
+            endpoint=path,
+            method=request.method,
+            status_code=response.status_code,
+            ip=client_ip,
+            user_agent=user_agent,
+        )
+
+        return response
+
 
 app.add_middleware(AuthMiddleware)
 app.include_router(auth_router)
+
+
+# ---------------------------------------------------------------------------
+# Health check — public, no authentication required
+# ---------------------------------------------------------------------------
+@app.get("/health")
+def health_check():
+    return {"status": "ok"}
 
 SYNC_STATE = {
     "is_running": False,
@@ -347,10 +406,8 @@ def create_course(req: schemas.CourseCreate, db: Session = Depends(get_db)):
 
 @app.put("/courses/{code:path}")
 def update_course(code: str, req: schemas.CourseUpdate, db: Session = Depends(get_db)):
-    print(f"DEBUG PUT COURSE: received code={repr(code)}")
     # Find all course masters with this code
     existing_courses = db.query(models.CourseMaster).filter_by(course_code=code).all()
-    print(f"DEBUG PUT COURSE: found existing: {existing_courses}")
     if not existing_courses:
         raise HTTPException(status_code=404, detail="Course not found")
         

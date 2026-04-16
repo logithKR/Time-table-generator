@@ -54,6 +54,9 @@ import * as api from './utils/api';
 import { formatTime } from './utils/timeFormat';
 
 function App() {
+    // --- Authentication Gate ---
+    const { user, isAuthenticated, isLoading: authLoading, logout } = useAuth();
+
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [isCollapsed, setIsCollapsed] = useState(false);
     const [activeTab, setActiveTab] = useState('dashboard');
@@ -126,13 +129,19 @@ function App() {
     const [showFaculty, setShowFaculty] = useState(true);
     const [showVenues, setShowVenues] = useState(true);
 
-    useEffect(() => { fetchMasterData(); }, []);
+    useEffect(() => { 
+        if (isAuthenticated) {
+            fetchMasterData(); 
+        }
+    }, [isAuthenticated]);
 
     useEffect(() => {
-        if (activeTab === 'subjects') fetchCourses();
-        if (activeTab === 'faculty') fetchFaculty();
-        if (activeTab === 'mappings') fetchCourseFacultyMappings();
-    }, [activeTab, filterDept, filterSem]);
+        if (isAuthenticated) {
+            if (activeTab === 'subjects') fetchCourses();
+            if (activeTab === 'faculty') fetchFaculty();
+            if (activeTab === 'mappings') fetchCourseFacultyMappings();
+        }
+    }, [activeTab, filterDept, filterSem, isAuthenticated]);
 
     const fetchMasterData = async () => {
         try {
@@ -2017,9 +2026,8 @@ function App() {
         setShowAddMapping(false);
     };
 
-    // --- Authentication Gate ---
-    const { user, isAuthenticated, isLoading: authLoading, logout } = useAuth();
-
+    // --- Authentication Gate (variables moved to top) ---
+    
     // Show loading screen while checking auth state from localStorage
     if (authLoading) {
         return (

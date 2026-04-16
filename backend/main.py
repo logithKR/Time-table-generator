@@ -1,4 +1,5 @@
-from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks
+from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, Request
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from pydantic import BaseModel
@@ -18,6 +19,10 @@ import pandas as pd
 import models, schemas
 from database import engine, get_db
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
+import jwt
+from auth import JWT_SECRET, ALGORITHM
+from auth_routes import router as auth_router
 
 
 # Ensure tables exist
@@ -40,6 +45,41 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+class AuthMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        path = request.url.path
+        if path.startswith("/auth/") or path.startswith("/api/auth/") or path in ["/docs", "/openapi.json"]:
+            return await call_next(request)
+            
+        if request.method == "OPTIONS":
+            return await call_next(request)
+            
+        access_token = request.cookies.get("access_token")
+        
+        # Enforce CSRF protection for state-changing methods
+        if request.method in ["POST", "PUT", "DELETE", "PATCH"]:
+            csrf_cookie = request.cookies.get("csrf_token")
+            csrf_header = request.headers.get("x-csrf-token")
+            if not csrf_cookie or not csrf_header or csrf_cookie != csrf_header:
+                return JSONResponse(status_code=403, content={"detail": "CSRF token validation failed"})
+
+        if not access_token:
+            return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+            
+        try:
+            payload = jwt.decode(access_token, JWT_SECRET, algorithms=[ALGORITHM])
+            if payload.get("type") != "access":
+                return JSONResponse(status_code=401, content={"detail": "Invalid token type"})
+            request.state.user = payload
+        except jwt.ExpiredSignatureError:
+            return JSONResponse(status_code=401, content={"detail": "Token expired"})
+        except jwt.InvalidTokenError:
+            return JSONResponse(status_code=401, content={"detail": "Invalid token"})
+            
+        return await call_next(request)
+
+app.add_middleware(AuthMiddleware)
+app.include_router(auth_router)
 
 SYNC_STATE = {
     "is_running": False,

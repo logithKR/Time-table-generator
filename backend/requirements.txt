@@ -8,3 +8,5 @@ ortools
 pydantic
 pydantic-settings
 python-dotenv
+PyJWT
+google-auth

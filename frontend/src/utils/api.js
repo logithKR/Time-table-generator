@@ -2,6 +2,79 @@ import axios from 'axios';
 
 const API_URL = '/api';
 
+// Global Axios configuration for Secure Cookies
+axios.defaults.withCredentials = true;
+
+// Utility to get CSRF token
+function getCookie(name) {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop().split(';').shift();
+    return null;
+}
+
+// Request Interceptor to attach CSRF safely
+axios.interceptors.request.use((config) => {
+    if (['post', 'put', 'delete', 'patch'].includes(config.method)) {
+        const csrfToken = getCookie("csrf_token");
+        if (csrfToken) {
+            config.headers['X-CSRF-Token'] = csrfToken;
+        }
+    }
+    return config;
+}, (error) => Promise.reject(error));
+
+// Response Interceptor for Token Rotation
+let isRefreshing = false;
+let failedQueue = [];
+
+const processQueue = (error, token = null) => {
+    failedQueue.forEach(prom => {
+        if (error) {
+            prom.reject(error);
+        } else {
+            prom.resolve(token);
+        }
+    });
+    failedQueue = [];
+};
+
+axios.interceptors.response.use(
+    (response) => response,
+    async (error) => {
+        const originalRequest = error.config;
+        
+        // 401 Unauthorized interceptor
+        if (error.response?.status === 401 && !originalRequest._retry && !originalRequest.url.includes('/auth/')) {
+            if (isRefreshing) {
+                return new Promise(function(resolve, reject) {
+                    failedQueue.push({ resolve, reject });
+                }).then(() => axios(originalRequest)).catch(err => Promise.reject(err));
+            }
+
+            originalRequest._retry = true;
+            isRefreshing = true;
+
+            try {
+                await axios.post(`${API_URL}/auth/refresh`); // Refresh using cookie token
+                isRefreshing = false;
+                processQueue(null);
+                
+                // Try again after refresh
+                return axios(originalRequest);
+            } catch (err) {
+                isRefreshing = false;
+                processQueue(err, null);
+                // Silent force reload/logout if token completely gone
+                window.location.reload(); 
+                return Promise.reject(err);
+            }
+        }
+        return Promise.reject(error);
+    }
+);
+
+
 // --- GET ---
 export const getDepartments = () => axios.get(`${API_URL}/departments`);
 export const getSemesters = () => axios.get(`${API_URL}/semesters`);
@@ -181,3 +254,8 @@ export const deleteUserConstraint = (uuid) => axios.delete(`${API_URL}/api/user-
 export const toggleUserConstraint = (uuid) => axios.patch(`${API_URL}/api/user-constraints/${uuid}/toggle`);
 export const reorderUserConstraints = (order) => axios.post(`${API_URL}/api/user-constraints/reorder`, { order });
 export const validateUserConstraint = (data) => axios.post(`${API_URL}/api/user-constraints/validate`, data);
+
+// --- Auth Endpoints ---
+export const loginGoogle = (credential) => axios.post(`${API_URL}/auth/login`, { credential });
+export const logout = () => axios.post(`${API_URL}/auth/logout`);
+export const fetchSession = () => axios.get(`${API_URL}/auth/me`);

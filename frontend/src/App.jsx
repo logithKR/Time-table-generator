@@ -46,6 +46,8 @@ import FacultyTimetable from './components/FacultyTimetable';
 import StudentTimetable from './components/StudentTimetable';
 import BITTimetable from './components/BITTimetable';
 import VenueTimetable from './components/VenueTimetable';
+import LoginPage from './components/LoginPage';
+import { useAuth } from './contexts/AuthContext';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as api from './utils/api';
@@ -2015,7 +2017,36 @@ function App() {
         setShowAddMapping(false);
     };
 
-    // Auth code removed
+    // --- Authentication Gate ---
+    const { user, isAuthenticated, isLoading: authLoading, logout } = useAuth();
+
+    // Show loading screen while checking auth state from localStorage
+    if (authLoading) {
+        return (
+            <div className="auth-loading-screen">
+                <div className="auth-loading-content">
+                    <div className="auth-loading-spinner"></div>
+                    <p className="auth-loading-text">Loading BIT Scheduler...</p>
+                </div>
+            </div>
+        );
+    }
+
+    // Show login page if not authenticated
+    if (!isAuthenticated) {
+        return <LoginPage />;
+    }
+
+    // Helper: get user initials for avatar fallback
+    const getUserInitials = () => {
+        if (user?.name) {
+            return user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+        }
+        if (user?.email) {
+            return user.email[0].toUpperCase();
+        }
+        return 'U';
+    };
 
     return (
         <div className="flex h-screen bg-white font-sans text-gray-900 overflow-hidden">
@@ -2074,12 +2105,24 @@ function App() {
                 </nav>
                 <div className="p-4 border-t border-purple-100">
                     <div className={`bg-purple-50/50 rounded-xl p-3 border border-purple-100 flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} transition-all duration-300`}>
-                        <div className="h-9 w-9 rounded-full bg-purple-100 flex items-center justify-center text-purple-700 font-bold text-xs flex-shrink-0">A</div>
+                        {user?.picture ? (
+                            <img src={user.picture} alt="Profile" className="h-9 w-9 rounded-full flex-shrink-0 border-2 border-purple-200 object-cover" referrerPolicy="no-referrer" />
+                        ) : (
+                            <div className="h-9 w-9 rounded-full bg-purple-100 flex items-center justify-center text-purple-700 font-bold text-xs flex-shrink-0">{getUserInitials()}</div>
+                        )}
                         <div className={`overflow-hidden transition-all duration-300 ${isCollapsed ? 'w-0 opacity-0 hidden' : 'w-auto opacity-100'}`}>
-                            <p className="text-sm font-bold text-gray-800 truncate">Admin</p>
-                            <p className="text-xs text-purple-500">System Administrator</p>
+                            <p className="text-sm font-bold text-gray-800 truncate" title={user?.name || 'User'}>{user?.name || 'User'}</p>
+                            <p className="text-xs text-purple-500 truncate" title={user?.email || ''}>{user?.email || ''}</p>
                         </div>
                     </div>
+                    <button
+                        onClick={logout}
+                        title="Logout"
+                        className={`sidebar-logout-btn ${isCollapsed ? 'justify-center' : ''}`}
+                    >
+                        <LogOut className="w-4 h-4 flex-shrink-0" />
+                        <span className={`whitespace-nowrap transition-all duration-300 ${isCollapsed ? 'opacity-0 w-0 hidden' : 'opacity-100'}`}>Logout</span>
+                    </button>
                 </div>
             </aside>
 
@@ -2102,7 +2145,11 @@ function App() {
                                 <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></span>
                             </button>
                         )}
-                        <div className="h-8 w-8 md:h-10 md:w-10 bg-purple-100 rounded-full flex items-center justify-center text-purple-700 font-bold border-2 border-purple-200 shadow-sm text-sm">A</div>
+                        {user?.picture ? (
+                            <img src={user.picture} alt="Profile" className="h-8 w-8 md:h-10 md:w-10 rounded-full border-2 border-purple-200 shadow-sm object-cover" referrerPolicy="no-referrer" />
+                        ) : (
+                            <div className="h-8 w-8 md:h-10 md:w-10 bg-purple-100 rounded-full flex items-center justify-center text-purple-700 font-bold border-2 border-purple-200 shadow-sm text-sm">{getUserInitials()}</div>
+                        )}
                     </div>
                 </header>
 

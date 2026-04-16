@@ -1,13 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import * as api from '../utils/api';
-import { Plus, Trash2, Upload, MapPin, Box, Users, Search } from 'lucide-react';
-
+import { Plus, Trash2, MapPin, Box, Users, Search } from 'lucide-react';
 const Venues = () => {
     const [venues, setVenues] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showAdd, setShowAdd] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
-    const [importing, setImporting] = useState(false);
     const [selectedBlock, setSelectedBlock] = useState('All');
     const [selectedType, setSelectedType] = useState('All'); // 'All', 'Class', 'Lab'
 
@@ -27,19 +25,6 @@ const Venues = () => {
         }
     };
 
-    const handleImport = async () => {
-        if (!confirm("This will import venues from 'campus_classrooms_labs_simplified.xlsx' in the data folder. Continue?")) return;
-        setImporting(true);
-        try {
-            const res = await api.importVenues();
-            alert(`Successfully imported ${res.data.imported_count} venues!`);
-            fetchVenues();
-        } catch (err) {
-            alert("Import failed: " + (err.response?.data?.detail || err.message));
-        } finally {
-            setImporting(false);
-        }
-    };
 
     const handleDelete = async (id) => {
         if (!confirm("Are you sure you want to delete this venue?")) return;
@@ -100,14 +85,7 @@ const Venues = () => {
                     <p className="text-gray-500 text-sm mt-1">Manage classrooms, labs, and seminar halls.</p>
                 </div>
                 <div className="flex items-center gap-3">
-                    <button
-                        onClick={handleImport}
-                        disabled={importing}
-                        className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-100 hover:text-emerald-700 font-semibold transition-colors disabled:opacity-50 border border-emerald-100"
-                    >
-                        <Upload className={`w-4 h-4 ${importing ? 'animate-bounce' : ''}`} />
-                        {importing ? 'Importing...' : 'Import from Excel'}
-                    </button>
+
                     <button
                         onClick={() => setShowAdd(true)}
                         className="flex items-center gap-2 px-4 py-2 bg-violet-600 text-white rounded-xl hover:bg-violet-700 font-semibold shadow-lg shadow-violet-200 transition-all hover:-translate-y-0.5"

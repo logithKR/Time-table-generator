@@ -41,14 +41,40 @@ app.add_middleware(
 )
 
 
-@app.post("/api/sync-cms")
-def run_sync_cms():
+SYNC_STATE = {
+    "is_running": False,
+    "status": "idle", # "idle", "syncing", "complete", "error"
+    "error": None
+}
+
+def _run_sync_job():
+    global SYNC_STATE
     from sync_cms_to_local import sync_databases
+    SYNC_STATE["is_running"] = True
+    SYNC_STATE["status"] = "syncing"
+    SYNC_STATE["error"] = None
     try:
         sync_databases()
-        return {"status": "success", "message": "CMS data synchronized successfully."}
+        SYNC_STATE["status"] = "complete"
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Sync failed: {str(e)}")
+        SYNC_STATE["status"] = "error"
+        SYNC_STATE["error"] = str(e)
+    finally:
+        SYNC_STATE["is_running"] = False
+
+@app.post("/api/sync-cms")
+def run_sync_cms(background_tasks: BackgroundTasks):
+    global SYNC_STATE
+    if SYNC_STATE["is_running"]:
+        return {"status": "started", "message": "A sync is already in progress."}
+    
+    background_tasks.add_task(_run_sync_job)
+    return {"status": "started", "message": "CMS Data sync started in the background."}
+
+@app.get("/api/sync-cms/status")
+def get_sync_status():
+    global SYNC_STATE
+    return SYNC_STATE
 
 
 # ============================================
@@ -957,62 +983,6 @@ def delete_venue(venue_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"status": "deleted", "venue_id": venue_id}
 
-@app.post("/venues/import")
-def import_venues(db: Session = Depends(get_db)):
-
-    
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    project_root = os.path.dirname(base_dir)
-    file_path = os.path.join(project_root, "data", "campus_classrooms_labs_simplified.xlsx")
-    
-    if not os.path.exists(file_path):
-        raise HTTPException(status_code=404, detail=f"File not found: campus_classrooms_labs_simplified.xlsx")
-    
-    try:
-        df = pd.read_excel(file_path)
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to read Excel file: {str(e)}")
-    
-    # Expected columns: 'Room Name', 'Block ID'
-    if 'Room Name' not in df.columns:
-        raise HTTPException(status_code=400, detail=f"Excel file missing 'Room Name' column. Found: {list(df.columns)}")
-    
-    imported_count = 0
-    skipped_count = 0
-    lab_keywords = ['lab', 'workshop', 'studio', 'drawing']
-    
-    for _, row in df.iterrows():
-        venue_name = str(row.get('Room Name', '')).strip()
-        block = str(row.get('Block ID', '')).strip() if pd.notna(row.get('Block ID')) else None
-        
-        if not venue_name or venue_name.lower() == 'nan':
-            continue
-        
-        # Auto-detect if it's a lab based on name
-        is_lab = any(kw in venue_name.lower() for kw in lab_keywords)
-        
-        # Skip if already exists
-        existing = db.query(models.VenueMaster).filter_by(venue_name=venue_name).first()
-        if existing:
-            skipped_count += 1
-            continue
-        
-        venue = models.VenueMaster(
-            venue_name=venue_name,
-            block=block,
-            is_lab=is_lab,
-            capacity=60
-        )
-        db.add(venue)
-        imported_count += 1
-    
-    try:
-        db.commit()
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=400, detail=f"Import failed: {str(e)}")
-    
-    return {"status": "success", "imported_count": imported_count, "skipped_count": skipped_count}
 
 # --- Department Venue Mapping ---
 @app.get("/department-venues", response_model=List[schemas.DepartmentVenueResponse])

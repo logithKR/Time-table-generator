@@ -331,12 +331,34 @@ function App() {
     const handleSyncCms = async () => {
         setSyncingCms(true);
         try {
-            const res = await api.syncCmsData();
-            alert(res.data.message || 'CMS Data Synchronized successfully!');
+            await api.syncCmsData();
+            
+            // Start polling for status
+            const intervalId = setInterval(async () => {
+                try {
+                    const statusRes = await api.getSyncStatus();
+                    const state = statusRes.data;
+                    
+                    if (state.status === "complete") {
+                        clearInterval(intervalId);
+                        setSyncingCms(false);
+                        alert('CMS Data Synchronized successfully!');
+                    } else if (state.status === "error") {
+                        clearInterval(intervalId);
+                        setSyncingCms(false);
+                        alert('Failed to sync CMS data: ' + state.error);
+                    }
+                    // if "syncing", just continue polling
+                } catch (pollErr) {
+                    clearInterval(intervalId);
+                    setSyncingCms(false);
+                    console.error("Polling error:", pollErr);
+                }
+            }, 2000);
+            
         } catch (err) {
-            alert('Failed to sync CMS data: ' + (err.response?.data?.detail || err.message));
-        } finally {
             setSyncingCms(false);
+            alert('Failed to start CMS sync: ' + (err.response?.data?.detail || err.message));
         }
     };
 

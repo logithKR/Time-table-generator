@@ -35,6 +35,7 @@ export const createCourseFaculty = (data) => axios.post(`${API_URL}/course-facul
 export const createSlot = (data) => axios.post(`${API_URL}/slots`, data);
 export const createBreak = (data) => axios.post(`${API_URL}/breaks`, data);
 export const syncCmsData = () => axios.post(`${API_URL}/api/sync-cms`);
+export const getSyncStatus = () => axios.get(`${API_URL}/api/sync-cms/status`);
 
 // --- PUT (Update) ---
 export const updateDepartment = (code, data) => axios.put(`${API_URL}/departments/${code}`, data);
@@ -75,7 +76,6 @@ export const exportTimetableExcel = (deptCode, sem) => {
 export const getVenues = () => axios.get(`${API_URL}/venues`);
 export const createVenue = (data) => axios.post(`${API_URL}/venues`, data);
 export const deleteVenue = (id) => axios.delete(`${API_URL}/venues/${id}`);
-export const importVenues = () => axios.post(`${API_URL}/venues/import`);
 
 // --- Department Venues ---
 export const getDepartmentVenues = (deptCode, semester) => {

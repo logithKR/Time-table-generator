@@ -50,7 +50,7 @@ const FacultyManager = () => {
             alert("Faculty member saved successfully!");
         } catch (err) {
             console.error(err);
-            alert("Error saving member: " + (err.response?.data?.detail || err.message));
+            alert("Error saving member: " + (api.getErrorMessage(err)));
         }
     };
 

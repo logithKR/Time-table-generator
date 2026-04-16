@@ -32,7 +32,7 @@ const Venues = () => {
             await api.deleteVenue(id);
             setVenues(venues.filter(v => v.venue_id !== id));
         } catch (err) {
-            alert("Delete failed: " + (err.response?.data?.detail || err.message));
+            alert("Delete failed: " + (api.getErrorMessage(err)));
         }
     };
 
@@ -51,7 +51,7 @@ const Venues = () => {
             fetchVenues();
             e.target.reset();
         } catch (err) {
-            alert("Create failed: " + (err.response?.data?.detail || err.message));
+            alert("Create failed: " + (api.getErrorMessage(err)));
         }
     };
 

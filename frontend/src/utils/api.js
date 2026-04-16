@@ -181,3 +181,12 @@ export const deleteUserConstraint = (uuid) => axios.delete(`${API_URL}/api/user-
 export const toggleUserConstraint = (uuid) => axios.patch(`${API_URL}/api/user-constraints/${uuid}/toggle`);
 export const reorderUserConstraints = (order) => axios.post(`${API_URL}/api/user-constraints/reorder`, { order });
 export const validateUserConstraint = (data) => axios.post(`${API_URL}/api/user-constraints/validate`, data);
+
+// --- Error Parsing Helper ---
+export const getErrorMessage = (err) => {
+    if (err.response?.data?.error_code) {
+        const data = err.response.data;
+        return `${data.message}\n\nReason: ${data.details}\nSuggestion: ${data.suggestion}`;
+    }
+    return api.getErrorMessage(err) || "An unexpected error occurred.";
+};

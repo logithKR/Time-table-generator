@@ -723,7 +723,7 @@ const UserConstraints = () => {
                 const res = await api.createUserConstraint(data);
                 setConstraints(prev => [...prev, res.data]);
             }
-        } catch (err) { alert('Save failed: ' + (err.response?.data?.detail || err.message)); }
+        } catch (err) { alert('Save failed: ' + (api.getErrorMessage(err))); }
     };
 
     const handleEdit = (constraint) => {

@@ -185,7 +185,7 @@ function App() {
             fetchCourses();
             fetchMasterData();
             e.target.reset();
-        } catch (err) { alert(err.response?.data?.detail || err.message); }
+        } catch (err) { alert(api.getErrorMessage(err)); }
     };
 
     const handleUpdateCourse = async (e, originalCode) => {
@@ -215,13 +215,13 @@ function App() {
             setNewCourseCommonDepts([]);
             fetchCourses();
             fetchMasterData();
-        } catch (err) { alert(err.response?.data?.detail || err.message); }
+        } catch (err) { alert(api.getErrorMessage(err)); }
     };
 
     const handleDeleteCourse = async (code) => {
         if (!confirm(`Delete course ${code}? This also removes faculty mappings.`)) return;
         try { await api.deleteCourse(code); fetchCourses(); }
-        catch (err) { alert(err.response?.data?.detail || err.message); }
+        catch (err) { alert(api.getErrorMessage(err)); }
     };
 
     const handleAddFaculty = async (e) => {
@@ -239,13 +239,13 @@ function App() {
             setShowAddFaculty(false);
             fetchFaculty();
             e.target.reset();
-        } catch (err) { alert(err.response?.data?.detail || err.message); }
+        } catch (err) { alert(api.getErrorMessage(err)); }
     };
 
     const handleDeleteFaculty = async (fid) => {
         if (!confirm(`Delete faculty ${fid}? This also removes their course mappings.`)) return;
         try { await api.deleteFaculty(fid); fetchFaculty(); }
-        catch (err) { alert(err.response?.data?.detail || err.message); }
+        catch (err) { alert(api.getErrorMessage(err)); }
     };
 
     const handleAddMapping = async (e) => {
@@ -262,13 +262,13 @@ function App() {
             setShowAddMapping(false);
             fetchCourseFacultyMappings();
             e.target.reset();
-        } catch (err) { alert(err.response?.data?.detail || err.message); }
+        } catch (err) { alert(api.getErrorMessage(err)); }
     };
 
     const handleDeleteMapping = async (mid) => {
         if (!confirm('Remove this faculty-course mapping?')) return;
         try { await api.deleteCourseFaculty(mid); fetchCourseFacultyMappings(); }
-        catch (err) { alert(err.response?.data?.detail || err.message); }
+        catch (err) { alert(api.getErrorMessage(err)); }
     };
 
     // --- Timetable Generation ---
@@ -321,7 +321,7 @@ function App() {
                     warnings: err.response.data.detail.warnings || []
                 });
             } else {
-                alert('Failed to generate: ' + (err.response?.data?.detail || err.message));
+                alert('Failed to generate: ' + (api.getErrorMessage(err)));
             }
         } finally {
             setLoading(false);
@@ -358,7 +358,7 @@ function App() {
             
         } catch (err) {
             setSyncingCms(false);
-            alert('Failed to start CMS sync: ' + (err.response?.data?.detail || err.message));
+            alert('Failed to start CMS sync: ' + (api.getErrorMessage(err)));
         }
     };
 
@@ -1331,7 +1331,7 @@ function App() {
             const res = await api.getSlots();
             setSlots(res.data);
         } catch (err) {
-            alert('Failed to delete slot: ' + (err.response?.data?.detail || err.message));
+            alert('Failed to delete slot: ' + (api.getErrorMessage(err)));
         }
     };
 
@@ -1343,7 +1343,7 @@ function App() {
             const res = await api.getSlots();
             setSlots(res.data);
         } catch (err) {
-            alert('Failed to update slot: ' + (err.response?.data?.detail || err.message));
+            alert('Failed to update slot: ' + (api.getErrorMessage(err)));
         }
     };
 
@@ -1355,7 +1355,7 @@ function App() {
             const res = await api.getBreaks();
             setBreakConfigs(res.data);
         } catch (err) {
-            alert('Failed to update break: ' + (err.response?.data?.detail || err.message));
+            alert('Failed to update break: ' + (api.getErrorMessage(err)));
         }
     };
 
@@ -1366,7 +1366,7 @@ function App() {
             const res = await api.getBreaks();
             setBreakConfigs(res.data);
         } catch (err) {
-            alert('Failed to delete break: ' + (err.response?.data?.detail || err.message));
+            alert('Failed to delete break: ' + (api.getErrorMessage(err)));
         }
     };
 
@@ -1393,7 +1393,7 @@ function App() {
             const res = await api.getSlots();
             setSlots(res.data);
         } catch (err) {
-            alert('Failed to add slot: ' + (err.response?.data?.detail || err.message));
+            alert('Failed to add slot: ' + (api.getErrorMessage(err)));
         }
     };
 
@@ -1415,7 +1415,7 @@ function App() {
             const res = await api.getBreaks();
             setBreakConfigs(res.data);
         } catch (err) {
-            alert('Failed to add break: ' + (err.response?.data?.detail || err.message));
+            alert('Failed to add break: ' + (api.getErrorMessage(err)));
         }
     };
 

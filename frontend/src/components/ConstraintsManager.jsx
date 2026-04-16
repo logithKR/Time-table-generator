@@ -366,7 +366,7 @@ const ConstraintsManager = () => {
             const res = await getDepartments();
             setDepartments(res.data);
         } catch (err) {
-            alert('Failed to toggle Mini Project display: ' + (err.response?.data?.detail || err.message));
+            alert('Failed to toggle Mini Project display: ' + (api.getErrorMessage(err)));
         }
     };
 

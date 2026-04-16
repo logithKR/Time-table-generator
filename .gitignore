@@ -1,35 +1,102 @@
-# Systems
+# ===========================
+# OS & System Files
+# ===========================
 .DS_Store
+Thumbs.db
+Desktop.ini
 
+# ===========================
+# Python
+# ===========================
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+*.egg
+*.whl
 
-# Environments
+# Virtual Environments
 venv/
 venv2/
 ttvenv/
+.venv/
+backend/venv*/
+
+# ===========================
+# Node.js
+# ===========================
 node_modules/
-__pycache__/
-# Logs & temp output
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ===========================
+# Build Artifacts
+# ===========================
+dist/
+build/
+frontend/dist/
+
+# ===========================
+# Database Files
+# ===========================
+*.sqlite
+*.sqlite3
+backend/time_table.db
+
+# ===========================
+# SQL Dumps
+# ===========================
+*.sql
+
+# ===========================
+# Data Exports & Generated Data
+# ===========================
+backend/cms_exports/
+backend/cms_schema.json
+*.csv
+
+# ===========================
+# Excel & Data Files
+# ===========================
+data/
+
+# ===========================
+# Logs & Temp Output
+# ===========================
 *.log
 *.txt
 !requirements.txt
-!RUN_GUIDE.md
 
-# Excel/Data files (User requested exclusion of excel/checks)
-# *.xlsx
-*.csv
-backend/data/
-
-# Debug scripts
+# ===========================
+# Patch & Debug Scripts (Antigravity/AI-generated)
+# ===========================
+patch_app.py
+backend/patch.py
+backend/get_schema.py
 backend/check_*.py
 backend/debug_*.py
 backend/test_*.py
 debug_db.py
+*_patched.py
 
-# Editor temporaries
+# ===========================
+# AI / Antigravity Generated
+# ===========================
+project_context.md
+.gemini/
+
+# ===========================
+# Editor & IDE
+# ===========================
 .vscode/
 .idea/
+*.swp
+*.swo
+*~
 
-# Build artifacts
-dist/
-build/
-
+# ===========================
+# Root-level NPM (accidental install)
+# ===========================
+/package.json
+/package-lock.json

@@ -1058,9 +1058,6 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                             
                             if not fac_assigned and gc_fac:
                                 if hard_mode and not is_mini_project(gc.course_code):
-                                    print(f"DEBUG! fac_assigned=None! gc={gc.course_code}, day={day}, period={period}")
-                                    for dfid, dfname, dtype in gc_fac:
-                                        print(f"  -> checking fid={dfid}: free={is_faculty_free(dfid, day, period)}, run={dfid in run_faculty_busy.get((day, period), set())}, global={dfid in global_faculty_busy.get((day, period), set())}")
                                     generation_errors.append(make_error("FACULTY_DEFICIT", gc.course_code, gc_name, {"required": total_secs, "available": len(gc_fac), "deficit": total_secs - len(gc_fac), "type": "THEORY"}, {"day": day, "period": period}, "Add more unique theory faculty to handle parallel sections without clashes."))
                                     continue
                                 fac_assigned = (None, 'Unassigned')

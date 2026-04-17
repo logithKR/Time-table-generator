@@ -72,6 +72,7 @@ data/
 # Logs & Temp Output
 # ===========================
 *.log
+logs/
 *.txt
 !requirements.txt
 

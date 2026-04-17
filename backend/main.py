@@ -1,4 +1,5 @@
-from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks
+from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, Request
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from pydantic import BaseModel
@@ -7,6 +8,7 @@ import math
 import io
 import re
 import os
+import sys
 import copy
 import uuid as uuid_lib
 from datetime import datetime
@@ -18,6 +20,11 @@ import pandas as pd
 import models, schemas
 from database import engine, get_db
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
+import jwt
+from auth import JWT_SECRET, ALGORITHM
+from auth_routes import router as auth_router
+from audit_logger import log_activity
 
 
 # Ensure tables exist
@@ -25,13 +32,25 @@ models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="BIT Scheduler Pro (Simplified)")
 
-# CORS
-origins = [
+# ---------------------------------------------------------------------------
+# CORS — from env var, no wildcards, credentials always enabled
+# Production domain is always included to prevent lockout.
+# ---------------------------------------------------------------------------
+_PRODUCTION_ORIGIN = "https://timetable.bitsathy.ac.in"
+_env_origins = os.environ.get("CORS_ORIGINS", "")
+origins = [o.strip() for o in _env_origins.split(",") if o.strip()] if _env_origins else [
     "http://localhost:5173", "http://127.0.0.1:5173",
     "http://localhost:5174", "http://127.0.0.1:5174",
     "http://localhost:5175", "http://127.0.0.1:5175",
-    "https://timetable.bitsathy.ac.in",
 ]
+if _PRODUCTION_ORIGIN not in origins:
+    origins.append(_PRODUCTION_ORIGIN)
+
+# Reject wildcard origins — fail-fast
+if "*" in origins:
+    print("FATAL: Wildcard '*' is not allowed in CORS_ORIGINS.", file=sys.stderr)
+    sys.exit(1)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -40,71 +59,86 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-import logging
-from fastapi.responses import JSONResponse
-from fastapi.exceptions import RequestValidationError
-from sqlalchemy.exc import SQLAlchemyError
-from exceptions import AppException
 
-# Set up logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[logging.StreamHandler()]
-)
-logger = logging.getLogger(__name__)
+# ---------------------------------------------------------------------------
+# Auth + Activity Logging Middleware
+# ---------------------------------------------------------------------------
+# Routes that bypass authentication entirely
+_PUBLIC_PREFIXES = ("/auth/", "/api/auth/")
+_PUBLIC_EXACT = {"/health", "/docs", "/openapi.json", "/redoc"}
 
-# --- GLOBAL EXCEPTION HANDLERS ---
 
-@app.exception_handler(AppException)
-async def app_exception_handler(request, exc: AppException):
-    logger.warning(f"AppException: {exc.error_code} - {exc.message}")
-    return JSONResponse(
-        status_code=exc.status_code,
-        content=exc.to_dict()
-    )
+class AuthMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        path = request.url.path
 
-@app.exception_handler(RequestValidationError)
-async def validation_exception_handler(request, exc: RequestValidationError):
-    logger.warning(f"Validation Error: {exc.errors()}")
-    return JSONResponse(
-        status_code=422,
-        content={
-            "status": "error",
-            "error_code": "VALIDATION_ERROR",
-            "message": "Invalid request parameters.",
-            "details": str(exc.errors()),
-            "suggestion": "Please check your input data formatting."
-        }
-    )
+        # --- Public routes: skip auth ---
+        if any(path.startswith(p) for p in _PUBLIC_PREFIXES) or path in _PUBLIC_EXACT:
+            return await call_next(request)
 
-@app.exception_handler(SQLAlchemyError)
-async def database_exception_handler(request, exc: SQLAlchemyError):
-    logger.error(f"Database Error: {str(exc)}", exc_info=True)
-    return JSONResponse(
-        status_code=500,
-        content={
-            "status": "error",
-            "error_code": "DATABASE_ERROR",
-            "message": "A database operation failed.",
-            "details": "Internal database error.",
-            "suggestion": "Please try again later. If the problem persists, contact support."
-        }
-    )
+        # --- CORS preflight: skip auth ---
+        if request.method == "OPTIONS":
+            return await call_next(request)
 
-@app.exception_handler(Exception)
-async def global_exception_handler(request, exc: Exception):
-    logger.error(f"Unhandled Exception: {str(exc)}", exc_info=True)
-    return JSONResponse(
-        status_code=500,
-        content={
-            "status": "error",
-            "error_code": "INTERNAL_SERVER_ERROR",
-            "message": "An unexpected error occurred.",
-            "details": "Internal service failure.",
-            "suggestion": "Please try again later."
-        }
-    )
+        # --- Extract client metadata for logging ---
+        forwarded = request.headers.get("x-forwarded-for")
+        client_ip = forwarded.split(",")[0].strip() if forwarded else (request.client.host if request.client else "")
+        user_agent = request.headers.get("user-agent", "")
+
+        # --- CSRF protection for state-changing methods ---
+        if request.method in ("POST", "PUT", "DELETE", "PATCH"):
+            csrf_cookie = request.cookies.get("csrf_token")
+            csrf_header = request.headers.get("x-csrf-token")
+            if not csrf_cookie or not csrf_header or csrf_cookie != csrf_header:
+                log_activity(endpoint=path, method=request.method, status_code=403, ip=client_ip, user_agent=user_agent)
+                return JSONResponse(status_code=403, content={"detail": "CSRF token validation failed"})
+
+        # --- Access token validation ---
+        access_token = request.cookies.get("access_token")
+        if not access_token:
+            log_activity(endpoint=path, method=request.method, status_code=401, ip=client_ip, user_agent=user_agent)
+            return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+
+        try:
+            payload = jwt.decode(access_token, JWT_SECRET, algorithms=[ALGORITHM])
+            if payload.get("type") != "access":
+                log_activity(endpoint=path, method=request.method, status_code=401, ip=client_ip, user_agent=user_agent)
+                return JSONResponse(status_code=401, content={"detail": "Invalid token type"})
+            request.state.user = payload
+        except jwt.ExpiredSignatureError:
+            log_activity(endpoint=path, method=request.method, status_code=401, ip=client_ip, user_agent=user_agent)
+            return JSONResponse(status_code=401, content={"detail": "Token expired"})
+        except jwt.InvalidTokenError:
+            log_activity(endpoint=path, method=request.method, status_code=401, ip=client_ip, user_agent=user_agent)
+            return JSONResponse(status_code=401, content={"detail": "Invalid token"})
+
+        # --- Execute actual endpoint ---
+        response = await call_next(request)
+
+        # --- Audit log successful authenticated request ---
+        user_email = payload.get("email", "")
+        log_activity(
+            user_email=user_email,
+            endpoint=path,
+            method=request.method,
+            status_code=response.status_code,
+            ip=client_ip,
+            user_agent=user_agent,
+        )
+
+        return response
+
+
+app.add_middleware(AuthMiddleware)
+app.include_router(auth_router)
+
+
+# ---------------------------------------------------------------------------
+# Health check — public, no authentication required
+# ---------------------------------------------------------------------------
+@app.get("/health")
+def health_check():
+    return {"status": "ok"}
 
 SYNC_STATE = {
     "is_running": False,
@@ -174,7 +208,7 @@ def get_departments(db: Session = Depends(get_db)):
 def create_department(req: schemas.DepartmentCreate, db: Session = Depends(get_db)):
     existing = db.query(models.DepartmentMaster).filter_by(department_code=req.department_code).first()
     if existing:
-        raise AppException(status_code=400, error_code="BAD_REQUEST", message=f"Department {req.department_code} already exists")
+        raise HTTPException(status_code=400, detail=f"Department {req.department_code} already exists")
     dept = models.DepartmentMaster(
         department_code=req.department_code,
         student_count=req.student_count,
@@ -188,7 +222,7 @@ def create_department(req: schemas.DepartmentCreate, db: Session = Depends(get_d
 def update_department(code: str, req: schemas.DepartmentUpdate, db: Session = Depends(get_db)):
     dept = db.query(models.DepartmentMaster).filter_by(department_code=code).first()
     if not dept:
-        raise AppException(status_code=404, error_code="NOT_FOUND", message="Department not found")
+        raise HTTPException(status_code=404, detail="Department not found")
     
     if req.student_count is not None:
         dept.student_count = req.student_count
@@ -204,7 +238,7 @@ def update_department(code: str, req: schemas.DepartmentUpdate, db: Session = De
 def get_department_capacities(code: str, db: Session = Depends(get_db)):
     dept = db.query(models.DepartmentMaster).filter_by(department_code=code).first()
     if not dept:
-        raise AppException(status_code=404, error_code="NOT_FOUND", message="Department not found")
+        raise HTTPException(status_code=404, detail="Department not found")
     
     return db.query(models.DepartmentSemesterCount).filter_by(department_code=code).order_by(models.DepartmentSemesterCount.semester).all()
 
@@ -217,7 +251,7 @@ def upsert_department_capacity(
 ):
     dept = db.query(models.DepartmentMaster).filter_by(department_code=code).first()
     if not dept:
-        raise AppException(status_code=404, error_code="NOT_FOUND", message="Department not found")
+        raise HTTPException(status_code=404, detail="Department not found")
     
     record = db.query(models.DepartmentSemesterCount).filter_by(
         department_code=code, semester=semester
@@ -241,12 +275,12 @@ def upsert_department_capacity(
 def delete_department(code: str, db: Session = Depends(get_db)):
     dept = db.query(models.DepartmentMaster).filter_by(department_code=code).first()
     if not dept:
-        raise AppException(status_code=404, error_code="NOT_FOUND", message="Department not found")
+        raise HTTPException(status_code=404, detail="Department not found")
     # Check for dependent records
     fac_count = db.query(models.FacultyMaster).filter_by(department_code=code).count()
     course_count = db.query(models.CourseMaster).filter_by(department_code=code).count()
     if fac_count > 0 or course_count > 0:
-        raise AppException(status_code=400, error_code="BAD_REQUEST", message=f"Cannot delete: {fac_count} faculty and {course_count} courses still linked.")
+        raise HTTPException(status_code=400, detail=f"Cannot delete: {fac_count} faculty and {course_count} courses still linked.")
     db.delete(dept)
     db.commit()
     return {"status": "deleted"}
@@ -270,11 +304,11 @@ def get_faculty(department_code: str = None, db: Session = Depends(get_db)):
 def create_faculty(req: schemas.FacultyCreate, db: Session = Depends(get_db)):
     existing = db.query(models.FacultyMaster).filter_by(faculty_id=req.faculty_id).first()
     if existing:
-        raise AppException(status_code=400, error_code="BAD_REQUEST", message=f"Faculty {req.faculty_id} already exists")
+        raise HTTPException(status_code=400, detail=f"Faculty {req.faculty_id} already exists")
     # Ensure department exists
     dept = db.query(models.DepartmentMaster).filter_by(department_code=req.department_code).first()
     if not dept:
-        raise AppException(status_code=400, error_code="BAD_REQUEST", message=f"Department {req.department_code} does not exist")
+        raise HTTPException(status_code=400, detail=f"Department {req.department_code} does not exist")
     fac = models.FacultyMaster(
         faculty_id=req.faculty_id,
         faculty_name=req.faculty_name,
@@ -290,7 +324,7 @@ def create_faculty(req: schemas.FacultyCreate, db: Session = Depends(get_db)):
 def delete_faculty(fid: str, db: Session = Depends(get_db)):
     fac = db.query(models.FacultyMaster).filter_by(faculty_id=fid).first()
     if not fac:
-        raise AppException(status_code=404, error_code="NOT_FOUND", message="Faculty not found")
+        raise HTTPException(status_code=404, detail="Faculty not found")
     # Remove course-faculty mappings first
     db.query(models.CourseFacultyMap).filter_by(faculty_id=fid).delete()
     db.delete(fac)
@@ -321,7 +355,7 @@ def create_course(req: schemas.CourseCreate, db: Session = Depends(get_db)):
     for d_code in target_depts:
         dept = db.query(models.DepartmentMaster).filter_by(department_code=d_code).first()
         if not dept:
-            raise AppException(status_code=400, error_code="BAD_REQUEST", message=f"Department {d_code} does not exist")
+            raise HTTPException(status_code=400, detail=f"Department {d_code} does not exist")
 
     is_honours = req.is_honours or ('H' in req.course_code[-3:].upper())
     
@@ -333,7 +367,7 @@ def create_course(req: schemas.CourseCreate, db: Session = Depends(get_db)):
         
         if existing:
             if d_code == req.department_code:
-                raise AppException(status_code=400, error_code="BAD_REQUEST", message=f"Course {req.course_code} already exists in {d_code}")
+                raise HTTPException(status_code=400, detail=f"Course {req.course_code} already exists in {d_code}")
             continue
 
         course = models.CourseMaster(
@@ -372,12 +406,10 @@ def create_course(req: schemas.CourseCreate, db: Session = Depends(get_db)):
 
 @app.put("/courses/{code:path}")
 def update_course(code: str, req: schemas.CourseUpdate, db: Session = Depends(get_db)):
-    print(f"DEBUG PUT COURSE: received code={repr(code)}")
     # Find all course masters with this code
     existing_courses = db.query(models.CourseMaster).filter_by(course_code=code).all()
-    print(f"DEBUG PUT COURSE: found existing: {existing_courses}")
     if not existing_courses:
-        raise AppException(status_code=404, error_code="NOT_FOUND", message="Course not found")
+        raise HTTPException(status_code=404, detail="Course not found")
         
     base_course = existing_courses[0]
     
@@ -387,7 +419,7 @@ def update_course(code: str, req: schemas.CourseUpdate, db: Session = Depends(ge
         # Check if new_code already exists
         conflict = db.query(models.CourseMaster).filter_by(course_code=new_code).first()
         if conflict:
-            raise AppException(status_code=400, error_code="BAD_REQUEST", message=f"Course {new_code} already exists")
+            raise HTTPException(status_code=400, detail=f"Course {new_code} already exists")
             
         # 0.1 Create identical CourseMaster records mapped to new_code
         for existing in existing_courses:
@@ -448,7 +480,7 @@ def update_course(code: str, req: schemas.CourseUpdate, db: Session = Depends(ge
     # Validate DEPARTMENTS
     for d_code in target_depts:
         if not db.query(models.DepartmentMaster).filter_by(department_code=d_code).first():
-            raise AppException(status_code=400, error_code="BAD_REQUEST", message=f"Department {d_code} does not exist")
+            raise HTTPException(status_code=400, detail=f"Department {d_code} does not exist")
 
     is_honours = req.is_honours if req.is_honours is not None else base_course.is_honours
     # Auto-detect honours if changed course code ends in H? (course code edit not supported via PUT right now)
@@ -496,7 +528,7 @@ def update_course(code: str, req: schemas.CourseUpdate, db: Session = Depends(ge
 def delete_course(code: str, db: Session = Depends(get_db)):
     courses = db.query(models.CourseMaster).filter_by(course_code=code).all()
     if not courses:
-        raise AppException(status_code=404, error_code="NOT_FOUND", message="Course not found")
+        raise HTTPException(status_code=404, detail="Course not found")
     
     # Remove course-faculty mappings
     db.query(models.CourseFacultyMap).filter_by(course_code=code).delete()
@@ -541,16 +573,16 @@ def create_course_faculty(req: schemas.CourseFacultyCreate, db: Session = Depend
     # Validate
     course = db.query(models.CourseMaster).filter_by(course_code=req.course_code).first()
     if not course:
-        raise AppException(status_code=400, error_code="BAD_REQUEST", message=f"Course {req.course_code} does not exist")
+        raise HTTPException(status_code=400, detail=f"Course {req.course_code} does not exist")
     fac = db.query(models.FacultyMaster).filter_by(faculty_id=req.faculty_id).first()
     if not fac:
-        raise AppException(status_code=400, error_code="BAD_REQUEST", message=f"Faculty {req.faculty_id} does not exist")
+        raise HTTPException(status_code=400, detail=f"Faculty {req.faculty_id} does not exist")
     # Check duplicate
     existing = db.query(models.CourseFacultyMap).filter_by(
         course_code=req.course_code, faculty_id=req.faculty_id
     ).first()
     if existing:
-        raise AppException(status_code=400, error_code="BAD_REQUEST", message="This mapping already exists")
+        raise HTTPException(status_code=400, detail="This mapping already exists")
     m = models.CourseFacultyMap(
         course_code=req.course_code,
         faculty_id=req.faculty_id,
@@ -565,7 +597,7 @@ def create_course_faculty(req: schemas.CourseFacultyCreate, db: Session = Depend
 def delete_course_faculty(mid: int, db: Session = Depends(get_db)):
     m = db.query(models.CourseFacultyMap).filter_by(id=mid).first()
     if not m:
-        raise AppException(status_code=404, error_code="NOT_FOUND", message="Mapping not found")
+        raise HTTPException(status_code=404, detail="Mapping not found")
     db.delete(m)
     db.commit()
     return {"status": "deleted"}
@@ -602,7 +634,7 @@ def create_slot(req: schemas.SlotCreate, db: Session = Depends(get_db)):
         day_of_week=req.day_of_week, period_number=req.period_number
     ).first()
     if existing:
-        raise AppException(status_code=400, error_code="BAD_REQUEST", message=f"Slot already exists for {req.day_of_week} Period {req.period_number}")
+        raise HTTPException(status_code=400, detail=f"Slot already exists for {req.day_of_week} Period {req.period_number}")
     slot = models.SlotMaster(
         day_of_week=req.day_of_week,
         period_number=req.period_number,
@@ -634,7 +666,7 @@ def create_slot(req: schemas.SlotCreate, db: Session = Depends(get_db)):
 def update_slot(slot_id: int, req: schemas.SlotUpdate, db: Session = Depends(get_db)):
     slot = db.query(models.SlotMaster).filter_by(slot_id=slot_id).first()
     if not slot:
-        raise AppException(status_code=404, error_code="NOT_FOUND", message="Slot not found")
+        raise HTTPException(status_code=404, detail="Slot not found")
     if req.start_time is not None:
         slot.start_time = req.start_time
     if req.end_time is not None:
@@ -667,7 +699,7 @@ def update_slot(slot_id: int, req: schemas.SlotUpdate, db: Session = Depends(get
 def delete_slot(slot_id: int, db: Session = Depends(get_db)):
     slot = db.query(models.SlotMaster).filter_by(slot_id=slot_id).first()
     if not slot:
-        raise AppException(status_code=404, error_code="NOT_FOUND", message="Slot not found")
+        raise HTTPException(status_code=404, detail="Slot not found")
     db.delete(slot)
     db.commit()
     return {"status": "deleted", "slot_id": slot_id}
@@ -722,7 +754,7 @@ def create_break(req: schemas.BreakConfigCreate, db: Session = Depends(get_db)):
 def update_break(break_id: int, req: schemas.BreakConfigUpdate, db: Session = Depends(get_db)):
     b = db.query(models.BreakConfigMaster).filter_by(id=break_id).first()
     if not b:
-        raise AppException(status_code=404, error_code="NOT_FOUND", message="Break config not found")
+        raise HTTPException(status_code=404, detail="Break config not found")
         
     if req.break_type is not None:
         b.break_type = req.break_type
@@ -751,7 +783,7 @@ def update_break(break_id: int, req: schemas.BreakConfigUpdate, db: Session = De
 def delete_break(break_id: int, db: Session = Depends(get_db)):
     b = db.query(models.BreakConfigMaster).filter_by(id=break_id).first()
     if not b:
-        raise AppException(status_code=404, error_code="NOT_FOUND", message="Break config not found")
+        raise HTTPException(status_code=404, detail="Break config not found")
     db.delete(b)
     db.commit()
     return {"status": "deleted", "id": break_id}
@@ -800,21 +832,21 @@ def generate_timetable(request: schemas.GenerateRequest, db: Session = Depends(g
                 department_code=request.department_code, semester=request.semester, is_open_elective=False
             ).all()
             if not courses:
-                raise AppException(status_code=400, error_code="BAD_REQUEST", message=f"No courses found for {request.department_code} Sem {request.semester}. Check data import.")
+                raise HTTPException(status_code=400, detail=f"No courses found for {request.department_code} Sem {request.semester}. Check data import.")
             total_ws = sum(c.weekly_sessions for c in courses)
-            raise AppException(status_code=400, error_code="BAD_REQUEST", message=f"Cannot generate: {total_ws} weekly sessions for ~47 available slots. Schedule may be overloaded. Review course data for {request.department_code} Sem {request.semester}.")
+            raise HTTPException(status_code=400, detail=f"Cannot generate: {total_ws} weekly sessions for ~47 available slots. Schedule may be overloaded. Review course data for {request.department_code} Sem {request.semester}.")
             
     # New structured response handling
     if not result.get("success", False):
         if result.get("errors"):
             # If we have structured errors and hard mode blocked generation, return 422 Unprocessable Entity
-            raise AppException(status_code=422, error_code="VALIDATION_ERROR", message={
+            raise HTTPException(status_code=422, detail={
                 "message": "Resource verification failed. Schedule generation aborted.",
                 "errors": result.get("errors", []),
                 "warnings": result.get("warnings", [])
             })
         else:
-            raise AppException(status_code=400, error_code="BAD_REQUEST", message="Solver exhausted all possibilities and failed to find a valid arrangement. Try reducing constraints.")
+            raise HTTPException(status_code=400, detail="Solver exhausted all possibilities and failed to find a valid arrangement. Try reducing constraints.")
             
     # Success with potential warnings
     return {
@@ -862,7 +894,7 @@ def save_timetable(request: schemas.TimetableSaveRequest, db: Session = Depends(
         db.commit()
     except Exception as e:
         db.rollback()
-        raise AppException(status_code=400, error_code="BAD_REQUEST", message=f"Save failed: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Save failed: {str(e)}")
 
 @app.get("/api/conflicts")
 def get_conflicts(
@@ -1022,7 +1054,7 @@ def create_venue(req: schemas.VenueCreate, db: Session = Depends(get_db)):
     # Check for duplicate
     existing = db.query(models.VenueMaster).filter_by(venue_name=req.venue_name).first()
     if existing:
-        raise AppException(status_code=400, error_code="BAD_REQUEST", message=f"Venue '{req.venue_name}' already exists")
+        raise HTTPException(status_code=400, detail=f"Venue '{req.venue_name}' already exists")
     
     venue = models.VenueMaster(
         venue_name=req.venue_name,
@@ -1036,14 +1068,14 @@ def create_venue(req: schemas.VenueCreate, db: Session = Depends(get_db)):
         db.refresh(venue)
     except Exception as e:
         db.rollback()
-        raise AppException(status_code=400, error_code="BAD_REQUEST", message=str(e))
+        raise HTTPException(status_code=400, detail=str(e))
     return venue
 
 @app.delete("/venues/{venue_id}")
 def delete_venue(venue_id: int, db: Session = Depends(get_db)):
     venue = db.query(models.VenueMaster).filter_by(venue_id=venue_id).first()
     if not venue:
-        raise AppException(status_code=404, error_code="NOT_FOUND", message="Venue not found")
+        raise HTTPException(status_code=404, detail="Venue not found")
     db.delete(venue)
     db.commit()
     return {"status": "deleted", "venue_id": venue_id}
@@ -1082,7 +1114,7 @@ def create_department_venue(req: schemas.DepartmentVenueCreate, db: Session = De
         venue_id=req.venue_id
     ).first()
     if existing:
-        raise AppException(status_code=400, error_code="BAD_REQUEST", message="This venue is already mapped to this department's semester.")
+        raise HTTPException(status_code=400, detail="This venue is already mapped to this department's semester.")
     
     new_map = models.DepartmentVenueMap(department_code=req.department_code, semester=req.semester, venue_id=req.venue_id)
     db.add(new_map)
@@ -1104,7 +1136,7 @@ def create_department_venue(req: schemas.DepartmentVenueCreate, db: Session = De
 def delete_department_venue(map_id: int, db: Session = Depends(get_db)):
     m = db.query(models.DepartmentVenueMap).filter_by(id=map_id).first()
     if not m:
-        raise AppException(status_code=404, error_code="NOT_FOUND", message="Mapping not found")
+        raise HTTPException(status_code=404, detail="Mapping not found")
     db.delete(m)
     db.commit()
     return {"status": "success", "id": map_id}
@@ -1140,8 +1172,11 @@ def create_course_venue(req: schemas.CourseVenueCreate, db: Session = Depends(ge
         course_code=req.course_code
     ).first()
     if is_common:
-        raise AppException(status_code=400, error_code="BAD_REQUEST", message=f"'{req.course_code}' is a common course shared across departments. "
-                   f"Use the Common Course Venues section to assign its venue globally.")
+        raise HTTPException(
+            status_code=400,
+            detail=f"'{req.course_code}' is a common course shared across departments. "
+                   f"Use the Common Course Venues section to assign its venue globally."
+        )
 
     existing = db.query(models.CourseVenueMap).filter_by(
         department_code=req.department_code,
@@ -1149,7 +1184,7 @@ def create_course_venue(req: schemas.CourseVenueCreate, db: Session = Depends(ge
         venue_id=req.venue_id
     ).first()
     if existing:
-        raise AppException(status_code=400, error_code="BAD_REQUEST", message="This venue is already mapped to the course.")
+        raise HTTPException(status_code=400, detail="This venue is already mapped to the course.")
     
     new_map = models.CourseVenueMap(
         department_code=req.department_code, 
@@ -1177,7 +1212,7 @@ def create_course_venue(req: schemas.CourseVenueCreate, db: Session = Depends(ge
 def delete_course_venue(map_id: int, db: Session = Depends(get_db)):
     m = db.query(models.CourseVenueMap).filter_by(id=map_id).first()
     if not m:
-        raise AppException(status_code=404, error_code="NOT_FOUND", message="Mapping not found")
+        raise HTTPException(status_code=404, detail="Mapping not found")
     db.delete(m)
     db.commit()
     return {"status": "success", "id": map_id}
@@ -1206,7 +1241,7 @@ def get_registrations(course_code: Optional[str] = None, semester: Optional[int]
 def create_registration(req: schemas.CourseRegistrationCreate, db: Session = Depends(get_db)):
     student = db.query(models.StudentMaster).filter_by(student_id=req.student_id).first()
     if not student:
-        raise AppException(status_code=404, error_code="NOT_FOUND", message="Student not found")
+        raise HTTPException(status_code=404, detail="Student not found")
 
     course = db.query(models.CourseMaster).filter_by(
         course_code=req.course_code, 
@@ -1215,11 +1250,11 @@ def create_registration(req: schemas.CourseRegistrationCreate, db: Session = Dep
     ).first()
     
     if not course:
-        raise AppException(status_code=404, error_code="NOT_FOUND", message=f"Course {req.course_code} not mapped to this student's department ({student.department_code})")
+        raise HTTPException(status_code=404, detail=f"Course {req.course_code} not mapped to this student's department ({student.department_code})")
         
     existing = db.query(models.CourseRegistration).filter_by(student_id=req.student_id, course_code=req.course_code, semester=req.semester).first()
     if existing:
-        raise AppException(status_code=400, error_code="BAD_REQUEST", message="Student already registered for this course")
+        raise HTTPException(status_code=400, detail="Student already registered for this course")
         
     reg = models.CourseRegistration(**req.dict())
     db.add(reg)
@@ -1232,7 +1267,7 @@ def create_registration(req: schemas.CourseRegistrationCreate, db: Session = Dep
 def delete_registration(reg_id: int, db: Session = Depends(get_db)):
     reg = db.query(models.CourseRegistration).filter_by(id=reg_id).first()
     if not reg:
-        raise AppException(status_code=404, error_code="NOT_FOUND", message="Registration not found")
+        raise HTTPException(status_code=404, detail="Registration not found")
         
     student = db.query(models.StudentMaster).filter_by(student_id=reg.student_id).first()
     if student:
@@ -1252,7 +1287,7 @@ def delete_registration(reg_id: int, db: Session = Depends(get_db)):
 def create_student(req: schemas.StudentCreate, db: Session = Depends(get_db)):
     student = db.query(models.StudentMaster).filter_by(student_id=req.student_id).first()
     if student:
-        raise AppException(status_code=400, error_code="BAD_REQUEST", message="Student ID already exists")
+        raise HTTPException(status_code=400, detail="Student ID already exists")
     student = models.StudentMaster(**req.dict())
     db.add(student)
     db.commit()
@@ -1263,7 +1298,7 @@ def create_student(req: schemas.StudentCreate, db: Session = Depends(get_db)):
 def delete_student(student_id: str, db: Session = Depends(get_db)):
     student = db.query(models.StudentMaster).filter_by(student_id=student_id).first()
     if not student:
-        raise AppException(status_code=404, error_code="NOT_FOUND", message="Student not found")
+        raise HTTPException(status_code=404, detail="Student not found")
         
     regs = db.query(models.CourseRegistration).filter_by(student_id=student_id).all()
     for r in regs:
@@ -1311,7 +1346,7 @@ def get_faculty_timetable(faculty_id: str, db: Session = Depends(get_db)):
 def get_student_timetable(student_id: str, db: Session = Depends(get_db)):
     student = db.query(models.StudentMaster).filter_by(student_id=student_id).first()
     if not student:
-        raise AppException(status_code=404, error_code="NOT_FOUND", message="Student not found")
+        raise HTTPException(status_code=404, detail="Student not found")
         
     regs = db.query(models.CourseRegistration).filter_by(student_id=student_id).all()
     
@@ -1958,7 +1993,7 @@ def set_common_course_venue(req: CommonCourseVenueRequest, db: Session = Depends
         course_code=req.course_code, semester=req.semester
     ).all()
     if not rows:
-        raise AppException(status_code=404, error_code="NOT_FOUND", message=f"No common course found for {req.course_code} semester {req.semester}")
+        raise HTTPException(status_code=404, detail=f"No common course found for {req.course_code} semester {req.semester}")
     
     vtype = (req.venue_type or 'BOTH').upper()
     # Update all rows atomically
@@ -2001,7 +2036,7 @@ def get_common_course_students(course_code: str, semester: int, db: Session = De
         course_code=course_code, semester=semester
     ).all()
     if not rows:
-        raise AppException(status_code=404, error_code="NOT_FOUND", message="Common course not found")
+        raise HTTPException(status_code=404, detail="Common course not found")
     
     breakdown = []
     total = 0
@@ -2119,7 +2154,7 @@ def update_user_constraint(
     """Update an existing user-defined constraint."""
     row = db.query(models.UserConstraint).filter_by(uuid=constraint_uuid).first()
     if not row:
-        raise AppException(status_code=404, error_code="NOT_FOUND", message="Constraint not found")
+        raise HTTPException(status_code=404, detail="Constraint not found")
 
     now = datetime.utcnow().isoformat()
     if data.name is not None:
@@ -2155,7 +2190,7 @@ def delete_user_constraint(
     """Delete a user-defined constraint."""
     deleted = db.query(models.UserConstraint).filter_by(uuid=constraint_uuid).delete()
     if not deleted:
-        raise AppException(status_code=404, error_code="NOT_FOUND", message="Constraint not found")
+        raise HTTPException(status_code=404, detail="Constraint not found")
     db.commit()
     return {"status": "deleted", "uuid": constraint_uuid}
 
@@ -2168,7 +2203,7 @@ def toggle_user_constraint(
     """Toggle the enabled status of a constraint."""
     row = db.query(models.UserConstraint).filter_by(uuid=constraint_uuid).first()
     if not row:
-        raise AppException(status_code=404, error_code="NOT_FOUND", message="Constraint not found")
+        raise HTTPException(status_code=404, detail="Constraint not found")
     row.enabled = not row.enabled
     row.updated_at = datetime.utcnow().isoformat()
     db.commit()
@@ -2275,7 +2310,7 @@ def export_timetable_excel(
     # Fetch slots
     slots = db.query(models.SlotMaster).order_by(models.SlotMaster.day_of_week, models.SlotMaster.period_number).all()
     if not slots:
-        raise AppException(status_code=400, error_code="BAD_REQUEST", message="No slots configured")
+        raise HTTPException(status_code=400, detail="No slots configured")
         
     days_order = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
     active_days = [d for d in days_order if any(s.day_of_week == d for s in slots)]

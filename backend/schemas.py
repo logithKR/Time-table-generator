@@ -179,7 +179,7 @@ class TimetableEntry(BaseModel):
     id: int
     department_code: str
     semester: int
-    course_code: str
+    course_code: Optional[str] = None
     course_name: Optional[str] = None
     faculty_id: Optional[str] = None
     faculty_name: Optional[str] = None
@@ -199,6 +199,8 @@ class TimetableEntry(BaseModel):
     dept_breakdown: Optional[list] = None  # [{dept: "CSE", count: 60}, ...] for common courses
     combined_strength: Optional[int] = None  # total across all depts in a common course
     is_common_course: Optional[bool] = False
+    is_locked: Optional[bool] = False
+    student_count: Optional[int] = None
     
     class Config:
         orm_mode = True
@@ -207,7 +209,7 @@ class TimetableEntry(BaseModel):
 class TimetableEntryCreate(BaseModel):
     department_code: str
     semester: int
-    course_code: str
+    course_code: Optional[str] = None
     course_name: Optional[str] = None
     faculty_id: Optional[str] = None
     faculty_name: Optional[str] = None
@@ -217,6 +219,8 @@ class TimetableEntryCreate(BaseModel):
     period_number: int
     venue_name: Optional[str] = None
     section_number: Optional[int] = 1
+    is_locked: Optional[bool] = False
+    student_count: Optional[int] = None
 
 class TimetableSaveRequest(BaseModel):
     department_code: str

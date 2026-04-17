@@ -123,7 +123,7 @@ class TimetableEntry(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     department_code = Column(String, ForeignKey('department_master.department_code'), nullable=False)
     semester = Column(Integer, nullable=False)
-    course_code = Column(String, nullable=False)  # No FK - allows OPEN_ELECTIVE, MENTOR
+    course_code = Column(String, nullable=True)  # No FK - allows OPEN_ELECTIVE, MENTOR, or CUSTOM
     course_name = Column(String, nullable=True)
     faculty_id = Column(String, nullable=True)
     faculty_name = Column(String, nullable=True)
@@ -135,6 +135,10 @@ class TimetableEntry(Base):
     period_number = Column(Integer)
     venue_name = Column(String, nullable=True) # Override venue specifically for this class
     section_number = Column(Integer, default=1, nullable=True) # For multi-section classes
+    
+    # Advanced Editing & Generation logic fields
+    is_locked = Column(Boolean, default=False, nullable=True)
+    student_count = Column(Integer, nullable=True)
     
     created_at = Column(String)
 

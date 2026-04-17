@@ -227,17 +227,45 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
         priority = {'LAB': 0, 'THEORY WITH LAB': 1, 'THEORY': 2, 'OFFLINE': 1}
         return sorted(all_fac, key=lambda f: priority.get(f[2], 3))
 
-    # Global faculty occupancy: check what faculty are busy across ALL departments
+    # ---------------------------------------------------------
+    # PARTIAL SLOT / MANUAL LOCK LOGIC
+    # ---------------------------------------------------------
+    db.query(models.TimetableEntry).filter_by(
+        department_code=department_code, semester=semester, is_locked=False
+    ).delete()
+    
+    locked_entries = db.query(models.TimetableEntry).filter_by(
+        department_code=department_code, semester=semester, is_locked=True
+    ).all()
+
+    locked_student_loads = {}  # (day, period) -> int
+    locked_course_theory_deductions = {} # course_code -> int
+    locked_course_lab_blocks_deductions = {} # course_code -> int
+    
+    for le in locked_entries:
+        key = (le.day_of_week, le.period_number)
+        st_count = le.student_count if le.student_count and le.student_count > 0 else student_count
+        locked_student_loads[key] = locked_student_loads.get(key, 0) + st_count
+            
+        if le.course_code:
+            if le.session_type == 'LAB':
+                locked_course_lab_blocks_deductions[le.course_code] = locked_course_lab_blocks_deductions.get(le.course_code, 0) + 0.5
+            else:
+                locked_course_theory_deductions[le.course_code] = locked_course_theory_deductions.get(le.course_code, 0) + 1
+
+    # Global faculty & occupancy tracker
     global_faculty_busy = {}  # (day, period) -> set(faculty_ids)
     all_existing = db.query(models.TimetableEntry).filter(
         models.TimetableEntry.department_code != department_code
     ).all()
-    for e in all_existing:
+    for e in (all_existing + locked_entries):
         key = (e.day_of_week, e.period_number)
         if key not in global_faculty_busy:
             global_faculty_busy[key] = set()
         if e.faculty_id:
             global_faculty_busy[key].add(e.faculty_id)
+        if hasattr(e, 'faculty_name') and e.faculty_name:
+            global_faculty_busy[key].add(e.faculty_name)
 
     # Current run faculty occupancy (within this generation)
     run_faculty_busy = {}  # (day, period) -> set(faculty_ids)
@@ -346,8 +374,12 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
         lab_blocks = lab_periods // 2 if lab_periods >= 2 else 0
         if lab_periods % 2 == 1:
             theory += 1
-        course_theory_count[c.course_code] = theory
-        course_lab_blocks[c.course_code] = lab_blocks
+            
+        deducted_theory = max(0, theory - locked_course_theory_deductions.get(c.course_code, 0))
+        deducted_lab_blocks = max(0, lab_blocks - int(locked_course_lab_blocks_deductions.get(c.course_code, 0)))
+
+        course_theory_count[c.course_code] = deducted_theory
+        course_lab_blocks[c.course_code] = deducted_lab_blocks
 
     # Calculate available slots
     p17_slots = sum(1 for day in all_days for p in day_periods.get(day, [])
@@ -659,20 +691,22 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
             for c in regular_courses:
                 key = (c.course_code, day, period)
                 if key in theory_vars:
-                    occupants.append(theory_vars[key])
+                    sec_count = get_course_sections(c.course_code, False)
+                    occupants.append(sec_count * theory_vars[key])
                 if course_lab_blocks[c.course_code] > 0:
                     for bs in lab_block_starts:
                         if period in [bs, bs + 1]:
                             lkey = (c.course_code, day, bs)
                             if lkey in lab_vars:
-                                occupants.append(lab_vars[lkey])
+                                sec_count = get_course_sections(c.course_code, True)
+                                occupants.append(sec_count * lab_vars[lkey])
 
             if batch_rotation_needed:
                 for bs in lab_block_starts:
                     if period in [bs, bs + 1]:
                         mkey = (day, bs)
                         if mkey in merged_lab_vars:
-                            occupants.append(merged_lab_vars[mkey])
+                            occupants.append(merged_batch_count * merged_lab_vars[mkey])
                             break
 
             if not occupants:
@@ -682,8 +716,16 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
             if is_mentor and c_mentor_blocked:
                 model.Add(sum(occupants) == 0)
             else:
-                model.Add(sum(occupants) <= 1)
-                core_slot_fills.extend(occupants)
+                cap_used = locked_student_loads.get((day, period), 0)
+                remaining_cap = max(0, student_count - cap_used)
+                max_sections = max(0, math.ceil(remaining_cap / max(1, max_classroom_cap)))
+
+                if max_sections <= 0:
+                    model.Add(sum(occupants) == 0)
+                else:
+                    model.Add(sum(occupants) <= max_sections)
+                    
+                core_slot_fills.extend([var for c, day, p in theory_vars if (day, p) == (day, period) and (var := theory_vars[(c, day, p)])])
 
     # --- C7: No back-to-back theory of same course ---
     # Only enforced when schedule is NOT overloaded OR if user strictly demands it

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { DndContext, useDroppable, useDraggable, DragOverlay, MouseSensor, TouchSensor, useSensor, useSensors, pointerWithin } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import * as api from '../utils/api';
-import { Search, Save, Trash2, Download, Undo2, Coffee, X, BookOpen, FlaskConical, Users2, LayoutTemplate, Palette, ArrowLeftRight, Plus, ChevronDown, Pencil, Type, AlertTriangle, Eye, Merge, Lock } from 'lucide-react';
+import { Search, Save, Trash2, Download, Undo2, Coffee, X, BookOpen, FlaskConical, Users2, LayoutTemplate, Palette, ArrowLeftRight, Plus, ChevronDown, Pencil, Type, AlertTriangle, Eye, Merge } from 'lucide-react';
 
 // ─── Simplified Color Palette (Preserved) ───
 const THEORY_STYLE = {
@@ -205,16 +205,9 @@ const CellContent = ({ entry, sections, cellId, isLabStart, isSwapMode, isSelect
         );
     };
 
-    const isAnyLocked = allSections.some(sec => sec.is_locked);
-
     return (
         <div ref={setNodeRef} style={style} {...listeners} {...attributes} onClick={onClick}
             className={`w-full h-full rounded-xl border-[1.5px] ${bg} ${border} ${text} ${isSwapMode ? 'cursor-pointer hover:ring-2 hover:ring-violet-400' : 'cursor-pointer hover:ring-2 hover:ring-violet-200'} ${isSelected ? 'ring-4 ring-fuchsia-500 shadow-xl scale-105 z-50' : ''} transition-all hover:shadow-md group relative flex flex-col justify-center p-2 shadow-sm min-h-[64px]`}>
-            {isAnyLocked && (
-                <div className="absolute top-1 right-1 text-gray-500 opacity-70" title="Locked by user">
-                    <Lock className="w-3 h-3" />
-                </div>
-            )}
             {isMentor ? (
                 <div className="text-center">
                     <div className="font-bold text-[10px] uppercase tracking-wider opacity-90">MENTOR</div>
@@ -411,10 +404,7 @@ const ManualEntryModal = ({ isOpen, onClose, onSave, initialData, allSections, i
     };
 
     const addNewCourseGroup = (courseCode) => {
-        let courseObj = allCourses.find(c => c.course_code === courseCode);
-        if (courseCode === 'CUSTOM_NEW') {
-            courseObj = { course_code: 'CUSTOM', course_name: '', is_lab: false };
-        }
+        const courseObj = allCourses.find(c => c.course_code === courseCode);
         if (!courseObj) return;
 
         setSectionEdits(prev => [...prev, {
@@ -542,21 +532,17 @@ const ManualEntryModal = ({ isOpen, onClose, onSave, initialData, allSections, i
     // Render sections for a specific course group
     const renderCourseGroup = (courseCode, courseName) => {
         const groupSections = sectionEdits.map((s, i) => ({ ...s, _globalIdx: i })).filter(s => s.course_code === courseCode && !s._deleted);
-        const updateCourseGroupField = (oldCode, field, newValue) => {
-            setSectionEdits(prev => prev.map(s => s.course_code === oldCode ? { ...s, [field]: newValue } : s));
-        };
-
         return (
             <div className="space-y-2">
                 <div className="flex items-center justify-between">
                     <div className="grid grid-cols-2 gap-3 flex-1 mr-3">
                         <div>
                             <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Code</label>
-                            <input type="text" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-bold focus:ring-2 focus:ring-violet-400 outline-none bg-white" placeholder="Course Code" value={courseCode} onChange={e => updateCourseGroupField(courseCode, 'course_code', e.target.value.toUpperCase())} />
+                            <input type="text" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-bold focus:ring-2 focus:ring-violet-400 outline-none bg-gray-50" value={courseCode} readOnly />
                         </div>
                         <div>
                             <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Name</label>
-                            <input type="text" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-violet-400 outline-none bg-white" placeholder="Optional Name" value={courseName || ''} title={courseName} onChange={e => updateCourseGroupField(courseCode, 'course_name', e.target.value)} />
+                            <input type="text" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-violet-400 outline-none bg-gray-50" value={courseName || ''} title={courseName} readOnly />
                         </div>
                     </div>
                     <button type="button" onClick={() => deleteEntireCourse(courseCode)}
@@ -592,16 +578,6 @@ const ManualEntryModal = ({ isOpen, onClose, onSave, initialData, allSections, i
                         <div className="grid grid-cols-2 gap-2">
                             {renderFacultyField(sec, sec._globalIdx)}
                             {renderVenueField(sec, sec._globalIdx)}
-                            <div>
-                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wide block mb-0.5">Students</label>
-                                <input type="number" min="1" className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-violet-400 outline-none" placeholder="e.g. 60" value={sec.student_count || ''} onChange={e => updateSection(sec._globalIdx, 'student_count', e.target.value ? parseInt(e.target.value) : null)} />
-                            </div>
-                            <div className="flex items-center justify-start h-full pt-4">
-                                <label className="flex items-center gap-2 cursor-pointer select-none bg-gray-100/50 hover:bg-gray-100 py-1.5 px-3 rounded-lg border border-gray-200 transition-all">
-                                    <input type="checkbox" className="w-4 h-4 text-violet-600 rounded cursor-pointer" checked={sec.is_locked || false} onChange={e => updateSection(sec._globalIdx, 'is_locked', e.target.checked)} />
-                                    <span className="text-[10px] font-bold text-gray-600 uppercase tracking-wide">Lock Slot</span>
-                                </label>
-                            </div>
                         </div>
                     </div>
                 ))}
@@ -641,7 +617,6 @@ const ManualEntryModal = ({ isOpen, onClose, onSave, initialData, allSections, i
                                             }}
                                             onBlur={() => setIsAddingCourse(false)}>
                                             <option value="">Select course...</option>
-                                            <option value="CUSTOM_NEW" className="font-bold text-violet-700">+ Create Custom Course</option>
                                             {allCourses.map(c => (
                                                 <option key={c.course_code} value={c.course_code} disabled={courseGroups.some(g => g.code === c.course_code)}>
                                                     {c.course_code} - {c.course_name}
@@ -671,7 +646,6 @@ const ManualEntryModal = ({ isOpen, onClose, onSave, initialData, allSections, i
                                         }}
                                         onBlur={() => setIsAddingCourse(false)}>
                                         <option value="">Select course to add...</option>
-                                        <option value="CUSTOM_NEW" className="font-bold text-violet-700">+ Create Custom Course</option>
                                         {allCourses.map(c => (
                                             <option key={c.course_code} value={c.course_code}>
                                                 {c.course_code} - {c.course_name}
@@ -823,16 +797,6 @@ export default function TimetableEditor({ department, semester, onSave, onExport
             setPaletteDept(department);
         } catch (err) { console.error('Load error:', err); }
     };
-    
-    // Track Alt key for Duplication
-    const [isAltPressed, setIsAltPressed] = useState(false);
-    useEffect(() => {
-        const up = (e) => setIsAltPressed(e.altKey);
-        const down = (e) => setIsAltPressed(e.altKey);
-        window.addEventListener('keydown', down);
-        window.addEventListener('keyup', up);
-        return () => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up); };
-    }, []);
 
     // Load courses when palette dept changes
     useEffect(() => {
@@ -1054,17 +1018,12 @@ export default function TimetableEditor({ department, semester, onSave, onExport
         if (activeData.type === 'new') {
             placeCourse(activeData.course, activeData.facultyName, activeData.venueName, targetDay, targetPeriod);
         } else if (activeData.type === 'placed') {
-            if (isAltPressed) {
-                // Duplicate (Alt+Drag)
-                placeCourse(activeData.entry, activeData.entry.faculty_name, activeData.entry.venue_name, targetDay, targetPeriod);
-            } else {
-                moveEntry(activeData.entry, targetDay, targetPeriod);
-            }
+            moveEntry(activeData.entry, targetDay, targetPeriod);
         }
     };
 
     const placeCourse = (course, facultyName, venueName, day, period) => {
-        const isLab = course.is_lab || course.session_type === 'LAB';
+        const isLab = course.is_lab;
         if (isLab) {
             if (!isValidPeriod(day, period)) return;
             if (!isContiguous(day, period, 2)) return;
@@ -1075,13 +1034,11 @@ export default function TimetableEditor({ department, semester, onSave, onExport
         const fName = facultyName || facultyMap[course.course_code] || 'Unassigned';
         const newEntry = {
             department_code: department, semester: parseInt(semester),
-            course_code: course.course_code || 'CUSTOM', course_name: course.course_name,
+            course_code: course.course_code, course_name: course.course_name,
             session_type: isLab ? 'LAB' : 'THEORY',
             faculty_id: null, faculty_name: fName, slot_id: 0,
             venue_name: venueName || '',
-            day_of_week: day, period_number: period,
-            is_locked: course.is_locked || false,
-            student_count: course.student_count || null
+            day_of_week: day, period_number: period
         };
 
         const newEntries = simpleInsert(newEntry, isLab ? 2 : 1, entries);
@@ -1552,9 +1509,7 @@ export default function TimetableEditor({ department, semester, onSave, onExport
                 venue_name: formData.venue_name || '',
                 slot_id: 0,
                 day_of_week: day,
-                period_number: period,
-                is_locked: !!formData.is_locked,
-                student_count: formData.student_count || null
+                period_number: period
             };
 
             if (entry) {

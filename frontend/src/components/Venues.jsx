@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import * as api from '../utils/api';
-import { Plus, Trash2, MapPin, Box, Users, Search } from 'lucide-react';
+import { Plus, Trash2, MapPin, Box, Users, Search, Edit2 } from 'lucide-react';
 const Venues = () => {
     const [venues, setVenues] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showAdd, setShowAdd] = useState(false);
+    const [editingVenue, setEditingVenue] = useState(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedBlock, setSelectedBlock] = useState('All');
     const [selectedType, setSelectedType] = useState('All'); // 'All', 'Class', 'Lab'
@@ -36,7 +37,7 @@ const Venues = () => {
         }
     };
 
-    const handleAdd = async (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
         const fd = new FormData(e.target);
         const data = {
@@ -46,12 +47,17 @@ const Venues = () => {
             capacity: parseInt(fd.get('capacity') || '60')
         };
         try {
-            await api.createVenue(data);
+            if (editingVenue) {
+                await api.updateVenue(editingVenue.venue_id, data);
+            } else {
+                await api.createVenue(data);
+            }
             setShowAdd(false);
+            setEditingVenue(null);
             fetchVenues();
             e.target.reset();
         } catch (err) {
-            alert("Create failed: " + (api.getErrorMessage(err)));
+            alert((editingVenue ? "Update failed: " : "Create failed: ") + (api.getErrorMessage(err)));
         }
     };
 
@@ -87,7 +93,10 @@ const Venues = () => {
                 <div className="flex items-center gap-3">
 
                     <button
-                        onClick={() => setShowAdd(true)}
+                        onClick={() => {
+                            setEditingVenue(null);
+                            setShowAdd(true);
+                        }}
                         className="flex items-center gap-2 px-4 py-2 bg-violet-600 text-white rounded-xl hover:bg-violet-700 font-semibold shadow-lg shadow-violet-200 transition-all hover:-translate-y-0.5"
                     >
                         <Plus className="w-4 h-4" /> Add Venue
@@ -202,6 +211,16 @@ const Venues = () => {
                                         <td className="p-4 text-center text-gray-600 font-mono text-sm">{venue.capacity}</td>
                                         <td className="p-4 text-right">
                                             <button
+                                                onClick={() => {
+                                                    setEditingVenue(venue);
+                                                    setShowAdd(true);
+                                                }}
+                                                className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all mr-2"
+                                                title="Edit Venue"
+                                            >
+                                                <Edit2 className="w-4 h-4" />
+                                            </button>
+                                            <button
                                                 onClick={() => handleDelete(venue.venue_id)}
                                                 className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
                                                 title="Delete Venue"
@@ -242,12 +261,23 @@ const Venues = () => {
                                         )}
                                     </div>
                                 </div>
-                                <button
-                                    onClick={() => handleDelete(venue.venue_id)}
-                                    className="absolute top-3 right-3 p-2 text-red-400 hover:bg-red-50 rounded-lg transition-colors"
-                                >
-                                    <Trash2 className="w-5 h-5" />
-                                </button>
+                                <div className="absolute top-3 right-3 flex gap-1">
+                                    <button
+                                        onClick={() => {
+                                            setEditingVenue(venue);
+                                            setShowAdd(true);
+                                        }}
+                                        className="p-2 text-blue-400 hover:bg-blue-50 rounded-lg transition-colors"
+                                    >
+                                        <Edit2 className="w-5 h-5" />
+                                    </button>
+                                    <button
+                                        onClick={() => handleDelete(venue.venue_id)}
+                                        className="p-2 text-red-400 hover:bg-red-50 rounded-lg transition-colors"
+                                    >
+                                        <Trash2 className="w-5 h-5" />
+                                    </button>
+                                </div>
                             </div>
                         ))
                     )}
@@ -259,17 +289,17 @@ const Venues = () => {
                 <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-end md:items-center justify-center md:p-4">
                     <div className="bg-white rounded-t-3xl md:rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in slide-in-from-bottom-5 md:zoom-in duration-200 safe-area-bottom">
                         <div className="p-6 bg-gray-50 border-b border-gray-100 flex justify-between items-center">
-                            <h3 className="font-bold text-lg text-gray-800">Add New Venue</h3>
+                            <h3 className="font-bold text-lg text-gray-800">{editingVenue ? 'Edit Venue' : 'Add New Venue'}</h3>
                             <button onClick={() => setShowAdd(false)} className="text-gray-400 hover:text-gray-600">✕</button>
                         </div>
-                        <form onSubmit={handleAdd} className="p-6 space-y-4">
+                        <form onSubmit={handleSubmit} className="p-6 space-y-4">
                             <div>
                                 <label className="block text-sm font-semibold text-gray-700 mb-1">Venue Name</label>
-                                <input name="venue_name" required className="w-full p-2.5 rounded-xl border border-gray-300 focus:border-violet-500 focus:ring-4 focus:ring-violet-50 outline-none transition-all" placeholder="e.g. LH-101" />
+                                <input name="venue_name" required defaultValue={editingVenue?.venue_name} className="w-full p-2.5 rounded-xl border border-gray-300 focus:border-violet-500 focus:ring-4 focus:ring-violet-50 outline-none transition-all" placeholder="e.g. LH-101" />
                             </div>
                             <div>
                                 <label className="block text-sm font-semibold text-gray-700 mb-1">Block / Loading</label>
-                                <select name="block" className="w-full p-2.5 rounded-xl border border-gray-300 focus:border-violet-500 focus:ring-4 focus:ring-violet-50 outline-none transition-all bg-white">
+                                <select name="block" defaultValue={editingVenue?.block || "AS"} className="w-full p-2.5 rounded-xl border border-gray-300 focus:border-violet-500 focus:ring-4 focus:ring-violet-50 outline-none transition-all bg-white">
                                     <option value="AS">AS</option>
                                     <option value="IB">IB</option>
                                     <option value="MECH">MECH</option>
@@ -279,18 +309,20 @@ const Venues = () => {
                             <div className="flex gap-4">
                                 <div className="flex-1">
                                     <label className="block text-sm font-semibold text-gray-700 mb-1">Capacity</label>
-                                    <input name="capacity" type="number" defaultValue="60" className="w-full p-2.5 rounded-xl border border-gray-300 focus:border-violet-500 focus:ring-4 focus:ring-violet-50 outline-none transition-all" />
+                                    <input name="capacity" type="number" defaultValue={editingVenue?.capacity || 60} className="w-full p-2.5 rounded-xl border border-gray-300 focus:border-violet-500 focus:ring-4 focus:ring-violet-50 outline-none transition-all" />
                                 </div>
                                 <div className="flex items-end pb-3">
                                     <label className="flex items-center gap-2 cursor-pointer">
-                                        <input name="is_lab" type="checkbox" className="w-5 h-5 text-violet-600 rounded focus:ring-violet-500 border-gray-300" />
+                                        <input name="is_lab" type="checkbox" defaultChecked={editingVenue?.is_lab} className="w-5 h-5 text-violet-600 rounded focus:ring-violet-500 border-gray-300" />
                                         <span className="text-sm font-medium text-gray-700">Is Lab?</span>
                                     </label>
                                 </div>
                             </div>
                             <div className="pt-2 flex justify-end gap-3">
                                 <button type="button" onClick={() => setShowAdd(false)} className="px-4 py-2 text-gray-600 font-semibold hover:bg-gray-100 rounded-lg transition-colors">Cancel</button>
-                                <button type="submit" className="px-6 py-2 bg-violet-600 text-white font-semibold rounded-xl hover:bg-violet-700 transition-colors shadow-lg shadow-violet-200">Add Venue</button>
+                                <button type="submit" className="px-6 py-2 bg-violet-600 text-white font-semibold rounded-xl hover:bg-violet-700 transition-colors shadow-lg shadow-violet-200">
+                                    {editingVenue ? 'Save Changes' : 'Add Venue'}
+                                </button>
                             </div>
                         </form>
                     </div>

@@ -1080,6 +1080,26 @@ def create_venue(req: schemas.VenueCreate, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail=str(e))
     return venue
 
+@app.put("/venues/{venue_id}", response_model=schemas.Venue)
+def update_venue(venue_id: int, req: schemas.VenueUpdate, db: Session = Depends(get_db)):
+    venue = db.query(models.VenueMaster).filter_by(venue_id=venue_id).first()
+    if not venue:
+        raise HTTPException(status_code=404, detail="Venue not found")
+        
+    if req.venue_name is not None:
+        if req.venue_name != venue.venue_name:
+            existing = db.query(models.VenueMaster).filter_by(venue_name=req.venue_name).first()
+            if existing:
+                raise HTTPException(status_code=400, detail=f"Venue '{req.venue_name}' already exists")
+        venue.venue_name = req.venue_name
+    if req.block is not None: venue.block = req.block
+    if req.is_lab is not None: venue.is_lab = req.is_lab
+    if req.capacity is not None: venue.capacity = req.capacity
+
+    db.commit()
+    db.refresh(venue)
+    return venue
+
 @app.delete("/venues/{venue_id}")
 def delete_venue(venue_id: int, db: Session = Depends(get_db)):
     venue = db.query(models.VenueMaster).filter_by(venue_id=venue_id).first()

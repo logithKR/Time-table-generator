@@ -149,6 +149,7 @@ export const exportTimetableExcel = (deptCode, sem) => {
 // --- Venues ---
 export const getVenues = () => axios.get(`${API_URL}/venues`);
 export const createVenue = (data) => axios.post(`${API_URL}/venues`, data);
+export const updateVenue = (id, data) => axios.put(`${API_URL}/venues/${id}`, data);
 export const deleteVenue = (id) => axios.delete(`${API_URL}/venues/${id}`);
 
 // --- Department Venues ---

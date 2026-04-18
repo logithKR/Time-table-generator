@@ -170,6 +170,12 @@ class VenueCreate(BaseModel):
     is_lab: bool = False
     capacity: int = 60
 
+class VenueUpdate(BaseModel):
+    venue_name: Optional[str] = None
+    block: Optional[str] = None
+    is_lab: Optional[bool] = None
+    capacity: Optional[int] = None
+
 class Venue(VenueCreate):
     venue_id: int
     class Config:

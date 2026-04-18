@@ -7,8 +7,8 @@ def check_my_permissions():
         connection = mysql.connector.connect(
             host='10.10.12.88',
             user='aca_dev1',
-            password='acadev1@!ogin123@!',
-            port=3306,
+            password='aca@!ogin',
+            port=3309,
             database='cms'
         )
 

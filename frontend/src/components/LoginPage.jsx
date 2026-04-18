@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import AccessDenied from './AccessDenied';
 
 function LoginPage() {
-    const { authError, clearError, initializeGoogle, GOOGLE_CLIENT_ID } = useAuth();
+    const { authError, isAccessDenied, clearError, initializeGoogle, GOOGLE_CLIENT_ID } = useAuth();
     const googleBtnRef = useRef(null);
     const [gsiReady, setGsiReady] = useState(false);
 
@@ -39,6 +40,10 @@ function LoginPage() {
 
         return () => clearInterval(checkGsi);
     }, [initializeGoogle, GOOGLE_CLIENT_ID]);
+
+    if (isAccessDenied) {
+        return <AccessDenied />;
+    }
 
     return (
         <div className="login-page">

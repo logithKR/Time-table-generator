@@ -11,3 +11,5 @@ python-dotenv
 PyJWT
 google-auth
 requests
+pymysql
+cryptography==41.0.7

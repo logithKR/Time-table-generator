@@ -8,6 +8,8 @@ Endpoints:
   GET  /auth/me       — return current user from session
 """
 
+import os
+import sqlite3
 import jwt
 from fastapi import APIRouter, Depends, HTTPException, Response, Request, status
 from pydantic import BaseModel
@@ -56,6 +58,28 @@ def login(body: LoginRequest, request: Request, response: Response):
     except HTTPException as exc:
         log_auth_event("login_failure", success=False, ip=ip, user_agent=ua, detail=exc.detail)
         raise
+
+    # 1.5 Verify RBAC (SQLite Users table)
+    email = user_data["email"]
+    local_db_path = os.getenv("LOCAL_DB_PATH", "./users.db")
+    try:
+        conn = sqlite3.connect(local_db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute("SELECT role, is_active FROM users WHERE email = ?", (email,))
+        db_user = cursor.fetchone()
+        conn.close()
+    except Exception as e:
+        log_auth_event("login_failure", success=False, ip=ip, user_agent=ua, detail=f"DB Error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error during authorization.")
+        
+    if not db_user:
+        log_auth_event("login_failure", success=False, ip=ip, user_agent=ua, detail="User not found in local DB.")
+        raise HTTPException(status_code=403, detail="Access Denied: Only registered faculty (teachers) can access this system.")
+        
+    if db_user["role"] != "teacher":
+        log_auth_event("login_failure", success=False, ip=ip, user_agent=ua, detail=f"Invalid role: {db_user['role']}")
+        raise HTTPException(status_code=403, detail="Access Denied: Only registered faculty (teachers) can access this system.")
 
     # 2. Create tokens
     access_token = create_access_token(user_data)

@@ -32,6 +32,15 @@ models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="BIT Scheduler Pro (Simplified)")
 
+@app.on_event("startup")
+def startup_event():
+    try:
+        from sync_engine import sync_users
+        sync_users()
+    except Exception as e:
+        print(f"Startup syncing failed: {e}")
+
+
 # ---------------------------------------------------------------------------
 # CORS — from env var, no wildcards, credentials always enabled
 # Production domain is always included to prevent lockout.

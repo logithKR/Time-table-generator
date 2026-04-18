@@ -15,6 +15,8 @@ export function AuthProvider({ children }) {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [authError, setAuthError] = useState('');
+    const [isAccessDenied, setIsAccessDenied] = useState(false);
+    const [deniedMessage, setDeniedMessage] = useState('');
 
     // Restore session from server via secure HTTP-only cookies on mount
     useEffect(() => {
@@ -49,7 +51,13 @@ export function AuthProvider({ children }) {
             setUser(res.data.user);
             setIsAuthenticated(true);
         } catch (err) {
-            setAuthError(err.response?.data?.detail || 'Authentication failed. Please check your credentials.');
+            const detailMsg = err.response?.data?.detail;
+            if (err.response?.status === 403) {
+                setIsAccessDenied(true);
+                setDeniedMessage(detailMsg || 'Access Denied.');
+            } else {
+                setAuthError(detailMsg || 'Authentication failed. Please check your credentials.');
+            }
             // Revoke the token so Google doesn't auto-select this account next time
             if (window.google?.accounts?.id) {
                 window.google.accounts.id.disableAutoSelect();
@@ -121,14 +129,26 @@ export function AuthProvider({ children }) {
 
     const clearError = useCallback(() => setAuthError(''), []);
 
+    const clearAccessDenied = useCallback(() => {
+        setIsAccessDenied(false);
+        setDeniedMessage('');
+        setAuthError('');
+        if (window.google?.accounts?.id) {
+            window.google.accounts.id.disableAutoSelect();
+        }
+    }, []);
+
     const value = {
         user,
         isAuthenticated,
         isLoading,
         authError,
+        isAccessDenied,
+        deniedMessage,
         login,
         logout,
         clearError,
+        clearAccessDenied,
         initializeGoogle,
         handleCredentialResponse,
         GOOGLE_CLIENT_ID,

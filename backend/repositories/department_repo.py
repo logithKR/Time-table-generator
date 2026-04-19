@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 from typing import Optional, List
-from models import DepartmentMaster
-from repositories.base import BaseRepository
+from backend.models import DepartmentMaster
+from backend.repositories.base import BaseRepository
 
 class DepartmentRepository(BaseRepository[DepartmentMaster]):
     def __init__(self, db: Session):

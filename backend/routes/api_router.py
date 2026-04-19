@@ -1,6 +1,6 @@
 from fastapi import APIRouter
-from config.settings import settings
-from controllers import department_controller, admin_controller
+from backend.config.settings import settings
+from backend.controllers import department_controller, admin_controller
 
 api_router = APIRouter()
 

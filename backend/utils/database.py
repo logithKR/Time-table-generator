@@ -1,12 +1,12 @@
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import declarative_base, sessionmaker
 from contextlib import contextmanager
 from typing import Generator
 import os
 from config.settings import settings
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DB_FILE = os.path.join(BASE_DIR, "college_scheduler.db")
+DB_FILE = os.path.abspath(os.path.join(BASE_DIR, "..", "database", "college_scheduler.db"))
 SQLALCHEMY_DATABASE_URL = f"sqlite:///{DB_FILE}"
 
 # Application DB Engine
@@ -14,6 +14,8 @@ engine = create_engine(
     SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
 )
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+Base = declarative_base()
 
 def get_db() -> Generator:
     """FastAPI Dependency for database sessions.

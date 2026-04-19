@@ -3,13 +3,13 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from contextlib import asynccontextmanager
 
-from config.settings import settings
-from config.cors import setup_cors
-from middleware.error_handler import setup_error_handlers
-from middleware.auth_middleware import AuthMiddleware
-from routes.api_router import api_router
-from utils.database import engine
-from models import Base
+from backend.config.settings import settings
+from backend.config.cors import setup_cors
+from backend.middleware.error_handler import setup_error_handlers
+from backend.middleware.auth_middleware import AuthMiddleware
+from backend.routes.api_router import api_router
+from backend.utils.database import engine
+from backend.models import Base
 import uvicorn
 
 # We can initialize DB metadata on startup
@@ -41,11 +41,20 @@ if settings.environment == "production":
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=["timetable.bitsathy.ac.in", "localhost"])
 
 # 4. Integrate API Routing
-# New API v1 prefix
+
+# Auth specific routing
+from backend.controllers.auth_controller import router as auth_router
+app.include_router(auth_router)
+
+# New API v1 prefix (Modern standard)
 app.include_router(api_router, prefix="/api/v1")
 
-# Backward-compatibility wrappers for the old frontend until fully migrated to /api/v1
-# In a full transition, we can map the exact same router without a prefix temporarily
+# Legacy mapping alias to prevent breaking existing frontend/system paths
+# This correctly satisfies the /api/ prefix requirement assuming older routes
+# were directly hit relative to the host, or we can explicitly mount at /api
+app.include_router(api_router, prefix="/api")
+
+# Backward compatibility: For any older routes completely un-prefixed in origin
 app.include_router(api_router)
 
 # 5. Default Health / Root

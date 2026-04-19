@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Query, Request, Response
 from pydantic import BaseModel
-from services.admin_service import AdminService
-from middleware.admin_guard import verify_admin_token
+from backend.services.admin_service import AdminService
+from backend.middleware.admin_guard import verify_admin_token
 
 router = APIRouter()
 

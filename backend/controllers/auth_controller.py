@@ -14,7 +14,7 @@ import jwt
 from fastapi import APIRouter, Depends, HTTPException, Response, Request, status
 from pydantic import BaseModel
 
-from auth import (
+from backend.core.auth import (
     verify_google_token,
     create_access_token,
     create_refresh_token,
@@ -25,7 +25,7 @@ from auth import (
     JWT_SECRET,
     ALGORITHM,
 )
-from audit_logger import log_auth_event
+from backend.logging.audit_logger import log_auth_event
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -61,7 +61,7 @@ def login(body: LoginRequest, request: Request, response: Response):
 
     # 1.5 Verify RBAC (SQLite Users table)
     email = user_data["email"]
-    local_db_path = os.getenv("LOCAL_DB_PATH", "./users.db")
+    local_db_path = os.getenv("LOCAL_DB_PATH", "../database/users.db")
     try:
         conn = sqlite3.connect(local_db_path)
         conn.row_factory = sqlite3.Row

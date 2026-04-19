@@ -1,7 +1,7 @@
 import os
 from distutils.util import strtobool
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing import List
+from typing import List, Optional
 
 class Settings(BaseSettings):
     # Base application configs
@@ -20,17 +20,17 @@ class Settings(BaseSettings):
     # Cookies Security
     cookie_secure: bool = False
     cookie_samesite: str = "lax"
-    cookie_domain: str | None = None
+    cookie_domain: Optional[str] = None
     
     # CMS Database Config
-    cms_db_host: str | None = None
-    cms_db_user: str | None = None
-    cms_db_password: str | None = None
+    cms_db_host: Optional[str] = None
+    cms_db_user: Optional[str] = None
+    cms_db_password: Optional[str] = None
     cms_db_port: int = 3306
     cms_db_name: str = "cms"
     
     # Local SQLite Config
-    local_db_path: str = "./users.db"
+    local_db_path: str = "../database/users.db"
     
     # Feature Flags
     enable_admin_login: bool = True
@@ -40,11 +40,11 @@ class Settings(BaseSettings):
     # Admin Credentials
     # Note: ADMIN_PASSWORD should be a bcrypt hash. A raw password here will trigger 
     # a warning or must be setup separately. 
-    admin_email: str | None = None
-    admin_password_hash: str | None = None
+    admin_email: Optional[str] = None
+    admin_password_hash: Optional[str] = None
 
     model_config = SettingsConfigDict(
-        env_file=".env.production" if os.getenv("ENVIRONMENT") == "production" else ".env",
+        env_file=os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".env.production") if os.getenv("ENVIRONMENT") == "production" else os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".env"),
         env_file_encoding="utf-8",
         extra="ignore"
     )

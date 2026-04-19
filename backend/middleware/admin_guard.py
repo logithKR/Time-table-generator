@@ -1,7 +1,7 @@
 from fastapi import Request, HTTPException
 import jwt
 from typing import Optional
-from config.settings import settings
+from backend.config.settings import settings
 
 def verify_admin_token(request: Request) -> str:
     """Dependency for Admin Routes. Verifies the JWT cookie/header and checks role."""

@@ -6,14 +6,14 @@ from fastapi.exceptions import RequestValidationError
 from sqlalchemy.exc import SQLAlchemyError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-# Assuming exceptions.py is in the root or accessible module
+# Assuming exceptions.py is in the core module
 try:
-    from exceptions import AppException
+    from core.exceptions import AppException
 except ImportError:
     # Fallback to local import if called dynamically
     import sys, os
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    from exceptions import AppException
+    from core.exceptions import AppException
 
 # Get specialized logger or fallback
 logger = logging.getLogger("middleware.error_handler")

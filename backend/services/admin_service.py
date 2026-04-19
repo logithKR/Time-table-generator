@@ -3,9 +3,9 @@ import json
 from datetime import datetime, timedelta
 import jwt
 from typing import Dict, Any, List
-from config.settings import settings
-from utils.security import verify_password, hash_password
-from exceptions import AppException
+from backend.config.settings import settings
+from backend.utils.security import verify_password, hash_password
+from backend.core.exceptions import AppException
 
 class AdminService:
     def __init__(self):

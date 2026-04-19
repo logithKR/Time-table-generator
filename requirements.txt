@@ -1,0 +1,16 @@
+fastapi
+uvicorn
+sqlalchemy
+python-multipart
+pandas
+openpyxl
+ortools
+pydantic
+pydantic-settings
+python-dotenv
+PyJWT
+google-auth
+requests
+pymysql
+cryptography==41.0.7
+bcrypt==4.1.2

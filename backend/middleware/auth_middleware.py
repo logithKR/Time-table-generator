@@ -2,7 +2,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi import Request
 from fastapi.responses import JSONResponse
 import time
-from config.settings import settings
+from backend.config.settings import settings
 
 class AuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):

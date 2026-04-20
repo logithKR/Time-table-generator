@@ -1,11 +1,11 @@
 import mysql.connector
+import sqlite3
 from mysql.connector import Error
 
-def fetch_users():
-    connection = None
+def transfer_students():
     try:
-        # Establish connection using your provided credentials
-        connection = mysql.connector.connect(
+        # 🔹 Connect to MySQL
+        mysql_conn = mysql.connector.connect(
             host='10.10.12.88',
             user='aca_dev1',
             password='aca@!ogin',
@@ -13,30 +13,63 @@ def fetch_users():
             database='cms'
         )
 
-        if connection.is_connected():
-            cursor = connection.cursor(dictionary=True) # Using dictionary=True for easier reading
-            
-            # CRITICAL: We must specify only the columns you have GRANT access to
-            query = "SELECT id, student_name, register_no, enrollment_no, department_id, year, status FROM students;"
-            
-            cursor.execute(query)
-            records = cursor.fetchall()
+        mysql_cursor = mysql_conn.cursor(dictionary=True)
 
-            print(f"Total records found: {len(records)}")
-            print("-" * 50)
-            
-            for row in records:
-                print(f"ID: {row['id']} | User: {row['username']} | Email: {row['email']} | Role: {row['role']}")
+        query = """
+        SELECT id, student_name, register_no, enrollment_no, department_id, year, status 
+        FROM students;
+        """
+        mysql_cursor.execute(query)
+        records = mysql_cursor.fetchall()
+
+        print(f"Fetched {len(records)} records from MySQL")
+
+        # 🔹 Create SQLite DB in current folder
+        sqlite_conn = sqlite3.connect("students.db")
+        sqlite_cursor = sqlite_conn.cursor()
+
+        # 🔹 Create table
+        sqlite_cursor.execute("""
+        CREATE TABLE IF NOT EXISTS students (
+            id INTEGER PRIMARY KEY,
+            student_name TEXT,
+            register_no TEXT,
+            enrollment_no TEXT,
+            department_id INTEGER,
+            year INTEGER,
+            status TEXT
+        );
+        """)
+
+        # 🔹 Insert data
+        for row in records:
+            sqlite_cursor.execute("""
+            INSERT OR REPLACE INTO students 
+            (id, student_name, register_no, enrollment_no, department_id, year, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?);
+            """, (
+                row['id'],
+                row['student_name'],
+                row['register_no'],
+                row['enrollment_no'],
+                row['department_id'],
+                row['year'],
+                row['status']
+            ))
+
+        sqlite_conn.commit()
+
+        print("✅ Data saved to students.db")
 
     except Error as e:
-        print(f"Error while connecting to MySQL: {e}")
-    
+        print(f"MySQL Error: {e}")
+
     finally:
-        if connection and connection.is_connected():
-            cursor.close()
-            connection.close()
-            print("-" * 50)
-            print("MySQL connection is closed.")
+        if mysql_conn.is_connected():
+            mysql_cursor.close()
+            mysql_conn.close()
+
+        sqlite_conn.close()
 
 if __name__ == "__main__":
-    fetch_users()
+    transfer_students()

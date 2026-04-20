@@ -42,8 +42,8 @@ class AuthLog(LoggingBase):
     email = Column(String(255), nullable=False, index=True)  # User email
     event_type = Column(String(50), nullable=False)  # "LOGIN", "LOGOUT", "TOKEN_REFRESH", etc.
     ip_address = Column(String(45), nullable=True)  # IPv4 or IPv6
-    timestamp_ist = Column(String(100), nullable=False)  # e.g., "2026-04-20 11:30 AM"
-    timestamp_gmt = Column(String(100), nullable=False)  # e.g., "2026-04-20 06:00 AM"
+    timestamp_ist = Column(String(100), nullable=False, default=get_ist_time)  # e.g., "2026-04-20 11:30 AM"
+    timestamp_gmt = Column(String(100), nullable=False, default=get_gmt_time)  # e.g., "2026-04-20 06:00 AM"
     user_agent = Column(String(512), nullable=True)  # Browser/client info
     
     # Indexes for faster queries
@@ -64,10 +64,10 @@ class ActivityLog(LoggingBase):
     user_id = Column(String(255), nullable=True)  # Internal user ID if available
     email = Column(String(255), nullable=True, index=True)  # User email (if authenticated)
     action = Column(String(255), nullable=False)  # API endpoint called (e.g., "/api/departments")
-    method = Column(String(10), nullable=False)  # HTTP method: GET, POST, PUT, DELETE, PATCH
+    method = Column(String(20), nullable=False)  # Mapped action type: Fetch, Generate, Edit, etc.
     status_code = Column(Integer, nullable=False)  # HTTP response code (200, 404, 500, etc.)
-    timestamp_ist = Column(String(100), nullable=False)  # e.g., "2026-04-20 11:30 AM"
-    timestamp_gmt = Column(String(100), nullable=False)  # e.g., "2026-04-20 06:00 AM"
+    timestamp_ist = Column(String(100), nullable=False, default=get_ist_time)  # e.g., "2026-04-20 11:30 AM"
+    timestamp_gmt = Column(String(100), nullable=False, default=get_gmt_time)  # e.g., "2026-04-20 06:00 AM"
     
     # Indexes for faster queries
     __table_args__ = (

@@ -1,45 +1,46 @@
-from fastapi import APIRouter, Depends, Query, Request, Response
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
-from utils.database import get_db
+from typing import Any, Dict, Optional
+
+# These dependencies are assumed to exist based on your project structure.
+# Ensure you have functions to get the log DB session and verify admin JWTs.
+from utils.log_database import get_log_db
+from core.security import admin_guard, get_current_admin_user
 from services.admin_service import AdminService
-from middleware.admin_guard import verify_admin_token
 
-router = APIRouter()
+router = APIRouter(
+    prefix="/api/admin",
+    tags=["Admin"],
+    dependencies=[Depends(admin_guard)] # Secures all routes in this controller
+)
 
-class AdminLoginRequest(BaseModel):
-    email: str
-    password: str
+@router.get("/me", response_model=Dict[str, str])
+def read_admin_me(admin_user: Dict[str, Any] = Depends(get_current_admin_user)):
+    """
+    Verifies the current admin's session from their JWT.
+    This resolves the 401 Unauthorized error on the frontend.
+    """
+    return {"email": admin_user.get("sub")}
 
-class AdminLoginResponse(BaseModel):
-    token: str
-    message: str
+@router.get("/logs/{log_type}", response_model=Dict[str, Any])
+def get_logs(
+    log_type: str,
+    page: int = Query(1, ge=1),
+    limit: int = Query(100, ge=1, le=200),
+    db: Session = Depends(get_log_db)
+):
+    """
+    Fetches authentication or activity logs with pagination.
+    This resolves the 500 Internal Server Error by correctly instantiating
+    the AdminService with a dedicated database session for log.db.
+    """
+    if log_type not in ["auth", "activity"]:
+        raise HTTPException(status_code=400, detail="Invalid log type. Use 'auth' or 'activity'.")
 
-def get_admin_service(db: Session = Depends(get_db)):
-    return AdminService(db)
+    # Correctly instantiate the service with the DB session.
+    admin_svc = AdminService(db=db)
 
-@router.post("/login", response_model=AdminLoginResponse)
-def login_admin(req: AdminLoginRequest, service: AdminService = Depends(get_admin_service)):
-    token = service.login(req.email, req.password)
-    return AdminLoginResponse(token=token, message="Admin login successful")
+    # The service correctly queries and formats the data.
+    logs_data = admin_svc.read_logs(log_type=log_type, page=page, limit=limit)
 
-@router.get("/logs", dependencies=[Depends(verify_admin_token)])
-def get_logs(type: str = Query("activity", pattern="^(auth|activity)$"), page: int = Query(1, ge=1), limit: int = Query(50, ge=1, le=200), service: AdminService = Depends(get_admin_service)):
-    return service.read_logs(type, page, limit)
-
-@router.post("/sync", dependencies=[Depends(verify_admin_token)])
-def sync_cms_data(service: AdminService = Depends(get_admin_service)):
-    service.sync_cms()
-    return {"status": "success", "message": "CMS data synced successfully"}
-
-@router.post("/logout")
-def logout_admin():
-    # Stateless logout. Frontend will drop token.
-    return {"message": "Logged out successfully"}
-
-# Bootstrap helper (Should be disabled or protected in extreme production environments)
-@router.post("/generate-hash")
-def generate_hash(password: str, service: AdminService = Depends(get_admin_service)):
-    """Utility to generate a bcrypt hash for the .env configuration."""
-    hashed = service.generate_hash(password)
-    return {"hashed_password": hashed}
+    return logs_data

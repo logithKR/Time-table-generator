@@ -64,15 +64,28 @@ class ActivityLoggingMiddleware(BaseHTTPMiddleware):
                 # Invalid token, user is unauthenticated
                 pass
         
+        # Strictly ignore all "FETCH" (GET) and non-state-changing requests to prevent database bloating
+        if method not in ["POST", "PUT", "PATCH", "DELETE"]:
+            return await call_next(request)
+
+        # Map HTTP methods to requested action verbs
+        method_mapping = {
+            "GET": "Fetch",
+            "POST": "Generate",
+            "PUT": "Edit",
+            "PATCH": "Edit",
+            "DELETE": "Delete"
+        }
+        mapped_action = method_mapping.get(method, method)
+
         # Proceed with the request
         response = await call_next(request)
         
         # Log the activity asynchronously (don't block response)
-        # In production, consider using a background task queue
         log_activity(
             email=user_email,
             action=path,
-            method=method,
+            method=mapped_action,
             status_code=response.status_code,
         )
         

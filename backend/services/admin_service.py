@@ -8,7 +8,7 @@ from config.settings import settings
 from utils.security import verify_password, hash_password
 from core.exceptions import AppException
 from sqlalchemy.orm import Session
-from models import ActivityLog
+from models.log_models import AuthLog, ActivityLog
 from utils.auth_logging import log_login, log_failed_login
 
 class AdminService:
@@ -64,28 +64,38 @@ class AdminService:
             return {"data": [], "total": 0, "page": page, "total_pages": 0}
             
         try:
-            query = self.db.query(ActivityLog)
             if log_type == "auth":
-                query = query.filter(ActivityLog.event.like("AUTH_%"))
-            else:
-                query = query.filter(~ActivityLog.event.like("AUTH_%"))
+                query = self.db.query(AuthLog)
+                total = query.count()
+                total_pages = math.ceil(total / limit) if total > 0 else 0
+                rows = query.order_by(AuthLog.id.desc()).offset((page - 1) * limit).limit(limit).all()
                 
-            total = query.count()
-            total_pages = math.ceil(total / limit) if total > 0 else 0
-            
-            # Descending order by id provides newest first
-            rows = query.order_by(ActivityLog.id.desc()).offset((page - 1) * limit).limit(limit).all()
-            
-            logs = []
-            for row in rows:
-                logs.append({
+                logs = [{
                     "id": row.id,
-                    "timestamp": row.timestamp.isoformat() if row.timestamp else None,
-                    "level": row.level,
-                    "event": row.event,
-                    "details": row.details,
-                    "user_email": row.user_email
-                })
+                    "user_id": row.user_id,
+                    "email": row.email,
+                    "event_type": row.event_type,
+                    "ip_address": row.ip_address,
+                    "timestamp_ist": row.timestamp_ist,
+                    "timestamp_gmt": row.timestamp_gmt,
+                    "user_agent": row.user_agent
+                } for row in rows]
+            else:
+                query = self.db.query(ActivityLog)
+                total = query.count()
+                total_pages = math.ceil(total / limit) if total > 0 else 0
+                rows = query.order_by(ActivityLog.id.desc()).offset((page - 1) * limit).limit(limit).all()
+                
+                logs = [{
+                    "id": row.id,
+                    "user_id": row.user_id,
+                    "email": row.email,
+                    "action": row.action,
+                    "method": row.method,
+                    "status_code": row.status_code,
+                    "timestamp_ist": row.timestamp_ist,
+                    "timestamp_gmt": row.timestamp_gmt
+                } for row in rows]
                 
             return {
                 "data": logs,

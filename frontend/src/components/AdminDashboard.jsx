@@ -97,7 +97,7 @@ function AdminDashboard({ onLogout }) {
             {/* Top bar */}
             <header className="admin-dashboard-header">
                 <div className="admin-dashboard-brand">
-                    <Shield className="w-6 h-6 text-indigo-400" />
+                    <Shield className="w-6 h-6 text-purple-400" />
                     <h1>Admin Dashboard</h1>
                 </div>
                 <button onClick={handleLogout} className="admin-dashboard-logout">
@@ -131,7 +131,7 @@ function AdminDashboard({ onLogout }) {
                     <div className="admin-sync-panel">
                         <div className="admin-panel-card">
                             <div className="admin-panel-card-header">
-                                <RefreshCw className="w-5 h-5 text-indigo-500" />
+                                <RefreshCw className="w-5 h-5 text-purple-500" />
                                 <h2>Sync Data from CMS</h2>
                             </div>
                             <p className="admin-panel-desc">
@@ -208,7 +208,7 @@ function AdminDashboard({ onLogout }) {
                         <div className="admin-logs-table-wrap">
                             {logsLoading ? (
                                 <div className="admin-logs-loading">
-                                    <Loader2 className="w-6 h-6 animate-spin text-indigo-500" />
+                                    <Loader2 className="w-6 h-6 animate-spin text-purple-500" />
                                     <span>Loading logs...</span>
                                 </div>
                             ) : logs.length === 0 ? (

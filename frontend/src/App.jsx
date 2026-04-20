@@ -1832,10 +1832,6 @@ function App() {
                         <Monitor className="w-5 h-5 text-violet-600" />
                         <span>Generate Timetable</span>
                     </h3>
-                    <button onClick={handleSyncCms} disabled={syncingCms} className={`px-4 py-2 text-sm rounded-xl text-white font-bold flex items-center gap-2 transition-all ${syncingCms ? 'bg-gray-400 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700 shadow-md shadow-emerald-200 hover:shadow-emerald-300 hover:-translate-y-0.5 active:scale-95'}`}>
-                        <RotateCw className={`w-4 h-4 ${syncingCms ? 'animate-spin' : ''}`} />
-                        <span>{syncingCms ? 'Syncing CMS...' : 'Sync CMS Data'}</span>
-                    </button>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                     <div>
@@ -2090,12 +2086,12 @@ function App() {
             )}
             {/* Desktop Sidebar (hidden on mobile, acts as slide-over if toggled) */}
             <aside className={`fixed inset-y-0 left-0 z-50 ${isCollapsed ? 'w-20' : 'w-64'} bg-white border-r border-purple-100 transform transition-all duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:relative lg:translate-x-0 shadow-xl shadow-purple-100/50 flex flex-col print:hidden`}>
-                <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'} ${isCollapsed ? 'p-4' : 'px-5 py-5'} bg-gradient-to-br from-purple-700 via-violet-600 to-purple-600 transition-all duration-300`}>
+                <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'} ${isCollapsed ? 'p-4' : 'px-5 py-5'} bg-white border-b border-purple-100 transition-all duration-300`}>
                     <div className="flex items-center space-x-3 overflow-hidden">
-                        <div className="w-9 h-9 flex items-center justify-center flex-shrink-0 bg-white/90 rounded-xl shadow-lg shadow-purple-900/20 p-1">
+                        <div className="w-9 h-9 flex items-center justify-center flex-shrink-0 bg-purple-100 rounded-xl shadow-lg shadow-purple-200/50 p-1">
                             <img src="/bitsathy-logo.png" alt="BITSATHY Logo" className="w-full h-full object-contain" />
                         </div>
-                        <span className={`text-xl font-bold tracking-tight text-white whitespace-nowrap transition-opacity duration-300 ${isCollapsed ? 'opacity-0 w-0 hidden' : 'opacity-100'}`}>
+                        <span className={`text-xl font-bold tracking-tight text-purple-700 whitespace-nowrap transition-opacity duration-300 ${isCollapsed ? 'opacity-0 w-0 hidden' : 'opacity-100'}`}>
                             BITSATHY
                         </span>
                     </div>
@@ -2128,7 +2124,7 @@ function App() {
                     ].map(item => (
                         <button key={item.id} onClick={() => switchTab(item.id)}
                             title={isCollapsed ? item.label : ''}
-                            className={`flex items-center ${isCollapsed ? 'justify-center px-0' : 'space-x-3 px-3'} w-full py-2.5 rounded-xl transition-all duration-200 font-medium ${activeTab === item.id ? 'bg-purple-600 text-white shadow-lg shadow-purple-200' : 'text-gray-500 hover:bg-purple-50 hover:text-purple-600'}`}>
+                            className={`flex items-center ${isCollapsed ? 'justify-center px-0' : 'space-x-3 px-3'} w-full py-2.5 rounded-xl transition-all duration-200 font-medium ${activeTab === item.id ? 'bg-purple-100 text-purple-700 shadow-md shadow-purple-200/50 border border-purple-200' : 'text-gray-500 hover:bg-purple-50 hover:text-purple-600'}`}>
                             <item.icon className="w-5 h-5 flex-shrink-0" />
                             <span className={`whitespace-nowrap transition-all duration-300 ${isCollapsed ? 'opacity-0 w-0 hidden' : 'opacity-100'}`}>{item.label}</span>
                         </button>

@@ -178,22 +178,22 @@ const VenueTimetable = ({ slots }) => {
                 }
             `}</style>
 
-            <div className="flex flex-wrap gap-3 items-center bg-teal-50 p-4 rounded-2xl border border-teal-100 shadow-sm no-print">
+            <div className="flex flex-wrap gap-3 items-center bg-violet-50 p-4 rounded-2xl border border-violet-100 shadow-sm no-print">
                 <div className="flex items-center gap-2">
-                    <Layers className="w-4 h-4 text-teal-500" />
-                    <span className="text-sm font-semibold text-teal-700">Filter:</span>
+                    <Layers className="w-4 h-4 text-violet-500" />
+                    <span className="text-sm font-semibold text-violet-700">Filter:</span>
                 </div>
 
                 {/* Search */}
                 <div className="flex-1 min-w-0">
                     <div className="relative group">
-                        <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-teal-500 transition-colors" />
+                        <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-violet-500 transition-colors" />
                         <input
                             type="text"
                             placeholder="Search venue name, block..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full pl-10 p-2.5 border border-teal-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-teal-100 focus:border-teal-400 focus:outline-none shadow-sm placeholder:text-gray-400 font-medium text-gray-700 transition-all hover:border-teal-300"
+                            className="w-full pl-10 p-2.5 border border-violet-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-violet-100 focus:border-violet-400 focus:outline-none shadow-sm placeholder:text-gray-400 font-medium text-gray-700 transition-all hover:border-violet-300"
                         />
                     </div>
                 </div>
@@ -202,7 +202,7 @@ const VenueTimetable = ({ slots }) => {
                 <select
                     value={selectedVenueName}
                     onChange={(e) => setSelectedVenueName(e.target.value)}
-                    className="p-2.5 border border-teal-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-teal-400 focus:border-teal-400 focus:outline-none shadow-sm font-medium text-gray-700 cursor-pointer transition-all hover:border-teal-300 max-w-xs"
+                    className="w-full sm:w-auto p-2.5 border border-violet-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-violet-400 focus:border-violet-400 focus:outline-none shadow-sm font-medium text-gray-700 cursor-pointer transition-all hover:border-violet-300 max-w-xs"
                 >
                     <option value="">Select Venue ({filteredVenues.length})</option>
                     {filteredVenues.map(v => (
@@ -211,36 +211,36 @@ const VenueTimetable = ({ slots }) => {
                 </select>
 
                 {/* View Toggles */}
-                <div className="flex flex-wrap items-center gap-3 bg-white px-3 py-2 rounded-xl border border-teal-200 shadow-sm w-full sm:w-auto sm:ml-auto">
-                    <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-gray-700 hover:text-teal-600 transition-colors">
-                        <input type="checkbox" checked={showLabels} onChange={e => setShowLabels(e.target.checked)} className="rounded text-teal-600 focus:ring-teal-500 w-4 h-4 cursor-pointer" />
+                <div className="flex flex-wrap items-center gap-3 bg-white px-3 py-2 rounded-xl border border-violet-200 shadow-sm w-full sm:w-auto sm:ml-auto">
+                    <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-gray-700 hover:text-violet-600 transition-colors">
+                        <input type="checkbox" checked={showLabels} onChange={e => setShowLabels(e.target.checked)} className="rounded text-violet-600 focus:ring-violet-500 w-4 h-4 cursor-pointer" />
                         Labels
                     </label>
-                    <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-gray-700 hover:text-teal-600 transition-colors">
-                        <input type="checkbox" checked={showCourseCode} onChange={e => setShowCourseCode(e.target.checked)} className="rounded text-teal-600 focus:ring-teal-500 w-4 h-4 cursor-pointer" />
+                    <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-gray-700 hover:text-violet-600 transition-colors">
+                        <input type="checkbox" checked={showCourseCode} onChange={e => setShowCourseCode(e.target.checked)} className="rounded text-violet-600 focus:ring-violet-500 w-4 h-4 cursor-pointer" />
                         Course
                     </label>
-                    <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-gray-700 hover:text-teal-600 transition-colors">
-                        <input type="checkbox" checked={showFaculty} onChange={e => setShowFaculty(e.target.checked)} className="rounded text-teal-600 focus:ring-teal-500 w-4 h-4 cursor-pointer" />
+                    <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-gray-700 hover:text-violet-600 transition-colors">
+                        <input type="checkbox" checked={showFaculty} onChange={e => setShowFaculty(e.target.checked)} className="rounded text-violet-600 focus:ring-violet-500 w-4 h-4 cursor-pointer" />
                         Faculty
                     </label>
-                    <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-gray-700 hover:text-teal-600 transition-colors">
-                        <input type="checkbox" checked={showBatchInfo} onChange={e => setShowBatchInfo(e.target.checked)} className="rounded text-teal-600 focus:ring-teal-500 w-4 h-4 cursor-pointer" />
+                    <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-gray-700 hover:text-violet-600 transition-colors">
+                        <input type="checkbox" checked={showBatchInfo} onChange={e => setShowBatchInfo(e.target.checked)} className="rounded text-violet-600 focus:ring-violet-500 w-4 h-4 cursor-pointer" />
                         Batch Info
                     </label>
-                    <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-gray-700 hover:text-teal-600 transition-colors">
-                        <input type="checkbox" checked={showStrength} onChange={e => setShowStrength(e.target.checked)} className="rounded text-teal-600 focus:ring-teal-500 w-4 h-4 cursor-pointer" />
+                    <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-gray-700 hover:text-violet-600 transition-colors">
+                        <input type="checkbox" checked={showStrength} onChange={e => setShowStrength(e.target.checked)} className="rounded text-violet-600 focus:ring-violet-500 w-4 h-4 cursor-pointer" />
                         Strength
                     </label>
                 </div>
 
                 {selectedVenueName && timetableData && timetableData.length > 0 && (
                     <div className="flex gap-2">
-                        <button onClick={handleDownloadPDF} disabled={downloading} className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-emerald-200 hover:bg-emerald-700 transition-all disabled:opacity-50">
+                        <button onClick={handleDownloadPDF} disabled={downloading} className="flex-1 sm:flex-none justify-center items-center flex gap-2 bg-emerald-600 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-emerald-200 hover:bg-emerald-700 transition-all disabled:opacity-50">
                             {downloading ? <Loader2 className="animate-spin" size={16} /> : <Download size={16} />}
                             PDF
                         </button>
-                        <button onClick={handlePrint} className="flex items-center gap-2 bg-teal-600 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-teal-200 hover:bg-teal-700 transition-all">
+                        <button onClick={handlePrint} className="flex-1 sm:flex-none justify-center items-center flex gap-2 bg-violet-600 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-violet-200 hover:bg-violet-700 transition-all">
                             <Printer size={16} /> Print
                         </button>
                     </div>
@@ -249,11 +249,11 @@ const VenueTimetable = ({ slots }) => {
 
             {loading ? (
                 <div className="flex justify-center p-20">
-                    <Loader2 className="w-10 h-10 text-teal-500 animate-spin" />
+                    <Loader2 className="w-10 h-10 text-violet-500 animate-spin" />
                 </div>
             ) : !selectedVenueName ? (
-                <div className="flex flex-col items-center justify-center p-20 bg-white rounded-2xl border border-teal-100 shadow-lg shadow-teal-50/50">
-                    <AlertCircle className="w-12 h-12 text-teal-200 mb-4" />
+                <div className="flex flex-col items-center text-center justify-center p-10 md:p-20 bg-white rounded-2xl border border-violet-100 shadow-lg shadow-violet-50/50">
+                    <AlertCircle className="w-12 h-12 text-violet-200 mb-4" />
                     <div className="text-gray-500 text-xl font-bold mb-2">No Venue Selected</div>
                     <p className="text-sm text-gray-400">Search boundaries and select a venue to view its scheduled classes.</p>
                 </div>
@@ -379,7 +379,7 @@ const VenueTimetable = ({ slots }) => {
                                                                                         </span>
                                                                                     ))}
                                                                                 </div>
-                                                                                <span className="text-[10px] font-extrabold bg-green-100 text-green-800 border border-green-200 px-2 py-0.5 rounded shadow-sm whitespace-nowrap">
+                                                                                <span className="text-[10px] font-extrabold bg-purple-100 text-purple-800 border border-purple-200 px-2 py-0.5 rounded shadow-sm whitespace-nowrap">
                                                                                     Total: {c.combined_strength}
                                                                                 </span>
                                                                             </div>
@@ -387,7 +387,7 @@ const VenueTimetable = ({ slots }) => {
 
                                                                         {/* Regular course: just show single strength */}
                                                                         {showStrength && !c.is_common_course && c.strength > 0 && (
-                                                                            <span className="text-[10px] font-bold bg-green-100 text-green-800 border border-green-200 px-2 py-0.5 rounded shadow-sm whitespace-nowrap">
+                                                                            <span className="text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200 px-2 py-0.5 rounded shadow-sm whitespace-nowrap">
                                                                                 Strength: {c.strength}
                                                                             </span>
                                                                         )}

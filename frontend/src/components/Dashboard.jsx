@@ -13,8 +13,6 @@ const Dashboard = ({
     mentorPeriod,
     setMentorPeriod,
     handleGenerate,
-    handleSyncCms,
-    syncingCms,
     loading,
     generationErrors,
     setGenerationErrors,
@@ -33,10 +31,6 @@ const Dashboard = ({
                         <Monitor className="w-5 h-5 text-violet-600" />
                         <span>Generate Timetable</span>
                     </h3>
-                    <button onClick={handleSyncCms} disabled={syncingCms} className={`px-4 py-2 text-sm rounded-xl text-white font-bold flex items-center gap-2 transition-all ${syncingCms ? 'bg-gray-400 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700 shadow-md shadow-emerald-200 hover:shadow-emerald-300 hover:-translate-y-0.5 active:scale-95'}`}>
-                        <RotateCw className={`w-4 h-4 ${syncingCms ? 'animate-spin' : ''}`} />
-                        <span>{syncingCms ? 'Syncing CMS...' : 'Sync CMS Data'}</span>
-                    </button>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                     <div>

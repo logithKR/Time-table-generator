@@ -51,7 +51,7 @@ frontend/dist/
 *.sqlite
 *.sqlite3
 backend/time_table.db
-
+database/
 # ===========================
 # SQL Dumps
 # ===========================

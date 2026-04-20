@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { getDepartments, getVenues, getDepartmentVenues, mapVenueToDepartment, removeVenueMapping, getCourses, getCourseVenues, mapVenueToCourse, removeCourseVenueMapping, getCommonCourses, setCommonCourseVenue, clearCommonCourseVenue } from '../utils/api';
 import { MapPin, Plus, Trash2, Building2, BookOpen, Search, ChevronDown, Lock, Users, Globe } from 'lucide-react';
 
-const SearchableSelect = ({ options, value, onChange, placeholder, icon: Icon, required, accentColor = "violet" }) => {
+const SearchableSelect = ({ options, value, onChange, placeholder, icon: Icon, required, accentColor = "purple" }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const wrapperRef = useRef(null);
@@ -24,38 +24,33 @@ const SearchableSelect = ({ options, value, onChange, placeholder, icon: Icon, r
 
     const selectedOption = options.find(opt => opt.value === value);
 
-    const ringClass = `ring-${accentColor}-500`;
-    const borderClass = `border-${accentColor}-500`;
-    const bgHoverClass = `hover:bg-${accentColor}-50`;
-    const bgSelectedClass = `bg-${accentColor}-50 text-${accentColor}-700`;
-
     return (
         <div ref={wrapperRef} className="relative w-full">
             <div 
-                className={`w-full p-2.5 border rounded-xl flex items-center justify-between cursor-pointer bg-slate-50 transition-all ${isOpen ? `ring-2 ${ringClass} ${borderClass}` : 'border-slate-200 hover:border-slate-300'}`}
+                className={`w-full p-2.5 border rounded-xl flex items-center justify-between cursor-pointer bg-slate-50 transition-all ${isOpen ? `ring-2 ring-purple-500 border-purple-500` : 'border-slate-200 hover:border-purple-300'}`}
                 onClick={() => {
                     setIsOpen(!isOpen);
                     if (!isOpen) setSearchQuery('');
                 }}
             >
                 <div className="flex items-center gap-2 overflow-hidden">
-                    {Icon && <Icon size={16} className="text-slate-400 flex-shrink-0" />}
+                    {Icon && <Icon size={16} className="text-purple-400 flex-shrink-0" />}
                     <span className={`truncate ${!selectedOption ? 'text-slate-400' : 'text-slate-800 font-medium'}`}>
                         {selectedOption ? selectedOption.label : placeholder} 
-                        {required && !selectedOption && <span className="text-red-500 ml-1">*</span>}
+                        {required && !selectedOption && <span className="text-purple-500 ml-1">*</span>}
                     </span>
                 </div>
-                <ChevronDown size={16} className={`text-slate-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+                <ChevronDown size={16} className={`text-purple-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
             </div>
 
             {isOpen && (
-                <div className="absolute z-[60] min-w-full w-[max-content] max-w-[90vw] mt-2 bg-white border border-slate-100 rounded-xl shadow-xl shadow-slate-200/50 max-h-64 overflow-hidden flex flex-col transform opacity-100 scale-100 transition-all origin-top">
-                    <div className="p-2 border-b border-slate-100 flex-shrink-0 bg-slate-50/50">
+                <div className="absolute z-[60] min-w-full w-[max-content] max-w-[90vw] mt-2 bg-white border border-purple-100 rounded-xl shadow-xl shadow-purple-200/50 max-h-64 overflow-hidden flex flex-col transform opacity-100 scale-100 transition-all origin-top">
+                    <div className="p-2 border-b border-purple-100 flex-shrink-0 bg-purple-50/50">
                         <div className="relative">
-                            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-purple-400" />
                             <input 
                                 type="text"
-                                className={`w-full pl-8 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 ${ringClass} transition-all`}
+                                className="w-full pl-8 pr-3 py-2 bg-white border border-purple-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all"
                                 placeholder="Search by name, code..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -71,7 +66,7 @@ const SearchableSelect = ({ options, value, onChange, placeholder, icon: Icon, r
                             filteredOptions.map(opt => (
                                 <div 
                                     key={opt.value}
-                                    className={`p-2.5 text-sm rounded-lg cursor-pointer transition-colors break-words whitespace-normal ${value === opt.value ? `${bgSelectedClass} font-semibold` : `text-slate-700 ${bgHoverClass}`}`}
+                                    className={`p-2.5 text-sm rounded-lg cursor-pointer transition-colors break-words whitespace-normal ${value === opt.value ? `bg-purple-50 text-purple-700 font-semibold` : `text-slate-700 hover:bg-purple-50`}`}
                                     onClick={() => {
                                         onChange(opt.value);
                                         setIsOpen(false);
@@ -104,7 +99,7 @@ const VenueMapping = () => {
 
     // Common course venue state
     const [commonCourses, setCommonCourses] = useState([]);
-    const [commonVenueAssigning, setCommonVenueAssigning] = useState(null); // course_code being assigned
+    const [commonVenueAssigning, setCommonVenueAssigning] = useState(null);
     const [commonVenueSelected, setCommonVenueSelected] = useState('');
     const [commonVenueType, setCommonVenueType] = useState('BOTH');
     const [showCommonSection, setShowCommonSection] = useState(true);
@@ -228,11 +223,9 @@ const VenueMapping = () => {
         }
     };
 
-    // Filter out venues that are already mapped to the *current* department/course
     const availableDeptVenues = venues.filter(v => !departmentVenues.find(dv => dv.venue_id === v.venue_id));
     const availableCourseVenues = venues.filter(v => !courseVenues.find(cv => cv.venue_id === v.venue_id && cv.course_code === selectedCourse));
 
-    // Split mapped venues by type for display
     const mappedLabs = departmentVenues.filter(v => v.is_lab);
     const mappedClassrooms = departmentVenues.filter(v => !v.is_lab);
 
@@ -281,7 +274,6 @@ const VenueMapping = () => {
                 venue_name: venueObj.venue_name,
                 venue_type: commonVenueType
             });
-            // Refresh common courses
             const ccRes = await getCommonCourses();
             setCommonCourses(ccRes.data);
             setCommonVenueAssigning(null);
@@ -305,7 +297,6 @@ const VenueMapping = () => {
         }
     };
 
-    // Filter out common courses from per-dept course-venue mapping
     const commonCourseCodes = new Set(commonCourses.map(cc => cc.course_code));
     const nonCommonCourses = courses.filter(c => !commonCourseCodes.has(c.course_code));
 
@@ -319,7 +310,7 @@ const VenueMapping = () => {
 
                 <div className="w-full md:w-auto flex flex-col sm:flex-row gap-3">
                     <select
-                        className="w-full sm:w-48 p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 outline-none bg-white font-medium"
+                        className="w-full sm:w-48 p-2.5 border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none bg-white font-medium text-slate-700"
                         value={selectedSemester}
                         onChange={(e) => setSelectedSemester(e.target.value)}
                     >
@@ -338,7 +329,7 @@ const VenueMapping = () => {
                             value={selectedDept}
                             onChange={(val) => setSelectedDept(val)}
                             placeholder="Select Department"
-                            accentColor="violet"
+                            accentColor="purple"
                         />
                     </div>
                 </div>
@@ -346,70 +337,70 @@ const VenueMapping = () => {
 
             {/* ===== COMMON COURSE VENUES (Global) ===== */}
             {commonCourses.length > 0 && (
-                <div className="bg-white rounded-2xl shadow-sm border-2 border-teal-200 overflow-hidden mb-2">
+                <div className="bg-white rounded-2xl shadow-sm border-2 border-purple-200 overflow-hidden mb-2">
                     <div
-                        className="bg-teal-50 px-5 py-3 border-b border-teal-200 flex justify-between items-center cursor-pointer"
+                        className="bg-purple-50 px-5 py-3 border-b border-purple-200 flex justify-between items-center cursor-pointer"
                         onClick={() => setShowCommonSection(!showCommonSection)}
                     >
-                        <h4 className="font-bold text-teal-800 flex items-center gap-2">
-                            <Globe size={18} className="text-teal-500" />
+                        <h4 className="font-bold text-purple-800 flex items-center gap-2">
+                            <Globe size={18} className="text-purple-500" />
                             Common Course Venues
-                            <span className="text-[10px] bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full font-bold uppercase">Global Lock</span>
+                            <span className="text-[10px] bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-bold uppercase">Global Lock</span>
                         </h4>
                         <div className="flex items-center gap-3">
-                            <span className="bg-teal-100 text-teal-700 text-xs font-bold px-2.5 py-1 rounded-full">{commonCourses.length}</span>
-                            <ChevronDown size={16} className={`text-teal-500 transition-transform ${showCommonSection ? 'rotate-180' : ''}`} />
+                            <span className="bg-purple-100 text-purple-700 text-xs font-bold px-2.5 py-1 rounded-full">{commonCourses.length}</span>
+                            <ChevronDown size={16} className={`text-purple-500 transition-transform ${showCommonSection ? 'rotate-180' : ''}`} />
                         </div>
                     </div>
                     {showCommonSection && (
                         <div className="p-5 space-y-3">
-                            <p className="text-xs text-teal-600 font-medium bg-teal-50 px-3 py-2 rounded-lg border border-teal-100">
+                            <p className="text-xs text-purple-600 font-medium bg-purple-50 px-3 py-2 rounded-lg border border-purple-100">
                                 <Lock size={12} className="inline mr-1" />
                                 Venues set here apply <strong>globally</strong> to all departments sharing the course. Individual departments cannot override this.
                             </p>
                             {commonCourses.map(cc => (
-                                <div key={`${cc.course_code}-${cc.semester}`} className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 hover:border-teal-300 transition-colors">
-                                    <div className="flex justify-between items-start gap-3">
+                                <div key={`${cc.course_code}-${cc.semester}`} className="p-4 rounded-xl border border-purple-100 bg-purple-50/30 hover:border-purple-300 transition-colors w-full">
+                                    <div className="flex flex-col sm:flex-row justify-between items-start gap-3 w-full">
                                         <div className="flex-1">
                                             <div className="flex items-center gap-2 flex-wrap">
                                                 <span className="font-bold text-slate-800">{cc.course_code}</span>
-                                                <span className="text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded font-bold">Sem {cc.semester}</span>
+                                                <span className="text-[10px] bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded font-bold">Sem {cc.semester}</span>
                                                 {cc.venue_name ? (
-                                                    <span className="text-[10px] bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                                                    <span className="text-[10px] bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
                                                         <Lock size={10} /> {cc.venue_name}
-                                                        <span className="text-teal-500">({cc.venue_type})</span>
+                                                        <span className="text-purple-500">({cc.venue_type})</span>
                                                     </span>
                                                 ) : (
-                                                    <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold">No Venue</span>
+                                                    <span className="text-[10px] bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-bold">No Venue</span>
                                                 )}
                                             </div>
                                             <div className="flex items-center gap-2 mt-2 flex-wrap">
-                                                <Users size={12} className="text-slate-400" />
-                                                <span className="text-xs text-slate-500 font-medium">Depts:</span>
+                                                <Users size={12} className="text-purple-400" />
+                                                <span className="text-xs text-purple-500 font-medium">Depts:</span>
                                                 {cc.departments.map(d => (
-                                                    <span key={d} className="text-[10px] bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.5 rounded font-bold">{d}</span>
+                                                    <span key={d} className="text-[10px] bg-purple-50 text-purple-700 border border-purple-200 px-1.5 py-0.5 rounded font-bold">{d}</span>
                                                 ))}
                                             </div>
                                             {cc.dept_student_counts && cc.dept_student_counts.length > 0 && (
                                                 <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                                                     {cc.dept_student_counts.map(d => (
-                                                        <span key={d.dept} className="text-[9px] bg-cyan-50 text-cyan-800 border border-cyan-200 px-1.5 py-0.5 rounded shadow-sm font-bold">
+                                                        <span key={d.dept} className="text-[9px] bg-white text-purple-800 border border-purple-200 px-1.5 py-0.5 rounded shadow-sm font-bold">
                                                             {d.dept}: {d.count}
                                                         </span>
                                                     ))}
-                                                    <span className="text-[9px] bg-green-100 text-green-800 border border-green-200 px-1.5 py-0.5 rounded shadow-sm font-extrabold">
+                                                    <span className="text-[9px] bg-purple-100 text-purple-800 border border-purple-200 px-1.5 py-0.5 rounded shadow-sm font-extrabold">
                                                         Total: {cc.dept_student_counts.reduce((s, d) => s + d.count, 0)}
                                                     </span>
                                                 </div>
                                             )}
                                         </div>
-                                        <div className="flex items-center gap-2 flex-shrink-0">
+                                        <div className="flex flex-wrap items-center gap-2 flex-shrink-0 w-full sm:w-auto mt-3 sm:mt-0">
                                             {commonVenueAssigning === `${cc.course_code}-${cc.semester}` ? (
-                                                <div className="flex items-center gap-2">
+                                                <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
                                                     <select
                                                         value={commonVenueSelected}
                                                         onChange={e => setCommonVenueSelected(e.target.value)}
-                                                        className="p-1.5 border border-teal-200 rounded-lg text-xs bg-white focus:ring-2 focus:ring-teal-400 outline-none"
+                                                        className="p-1.5 border border-purple-200 rounded-lg text-xs bg-white focus:ring-2 focus:ring-purple-400 outline-none flex-1 sm:flex-none min-w-[120px]"
                                                     >
                                                         <option value="">Choose venue</option>
                                                         {venues.map(v => (
@@ -421,7 +412,7 @@ const VenueMapping = () => {
                                                     <select
                                                         value={commonVenueType}
                                                         onChange={e => setCommonVenueType(e.target.value)}
-                                                        className="p-1.5 border border-teal-200 rounded-lg text-xs bg-white focus:ring-2 focus:ring-teal-400 outline-none"
+                                                        className="p-1.5 border border-purple-200 rounded-lg text-xs bg-white focus:ring-2 focus:ring-purple-400 outline-none flex-1 sm:flex-none"
                                                     >
                                                         <option value="BOTH">Both</option>
                                                         <option value="THEORY">Theory</option>
@@ -430,13 +421,13 @@ const VenueMapping = () => {
                                                     <button
                                                         onClick={() => handleAssignCommonVenue(cc.course_code, cc.semester)}
                                                         disabled={!commonVenueSelected}
-                                                        className="px-3 py-1.5 bg-teal-600 text-white text-xs font-bold rounded-lg hover:bg-teal-700 disabled:opacity-50 transition-all"
+                                                        className="px-3 py-1.5 bg-purple-600 text-white text-xs font-bold rounded-lg hover:bg-purple-700 disabled:opacity-50 transition-all"
                                                     >
                                                         Save
                                                     </button>
                                                     <button
                                                         onClick={() => { setCommonVenueAssigning(null); setCommonVenueSelected(''); }}
-                                                        className="px-2 py-1.5 bg-slate-200 text-slate-600 text-xs font-bold rounded-lg hover:bg-slate-300 transition-all"
+                                                        className="px-2 py-1.5 bg-purple-100 text-purple-600 text-xs font-bold rounded-lg hover:bg-purple-200 transition-all"
                                                     >
                                                         Cancel
                                                     </button>
@@ -445,14 +436,14 @@ const VenueMapping = () => {
                                                 <>
                                                     <button
                                                         onClick={() => setCommonVenueAssigning(`${cc.course_code}-${cc.semester}`)}
-                                                        className="px-3 py-1.5 bg-teal-100 text-teal-700 text-xs font-bold rounded-lg hover:bg-teal-200 transition-all flex items-center gap-1"
+                                                        className="w-full sm:w-auto justify-center px-3 py-1.5 bg-purple-100 text-purple-700 text-xs font-bold rounded-lg hover:bg-purple-200 transition-all flex items-center gap-1"
                                                     >
                                                         <MapPin size={12} /> {cc.venue_name ? 'Change' : 'Assign'}
                                                     </button>
                                                     {cc.venue_name && (
                                                         <button
                                                             onClick={() => handleClearCommonVenue(cc.course_code, cc.semester)}
-                                                            className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                            className="p-1.5 text-purple-400 hover:text-purple-700 hover:bg-purple-100 rounded-lg transition-colors"
                                                             title="Clear Venue"
                                                         >
                                                             <Trash2 size={14} />
@@ -473,10 +464,10 @@ const VenueMapping = () => {
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     {/* Map New Venue Form */}
                     <div className="lg:col-span-1">
-                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 sticky top-6 space-y-8">
+                        <div className="bg-white rounded-2xl shadow-sm border border-purple-200 p-5 lg:sticky lg:top-6 space-y-8">
                             <div>
                                 <h4 className="font-bold text-slate-800 flex items-center gap-2 mb-4">
-                                    <Plus size={18} className="text-violet-500" /> Map New Venue
+                                    <Plus size={18} className="text-purple-500" /> Map New Venue
                                 </h4>
                                 <form onSubmit={handleMapVenue} className="space-y-4">
                                     <div>
@@ -490,24 +481,24 @@ const VenueMapping = () => {
                                             onChange={(val) => setSelectedVenue(val)}
                                             placeholder="Choose a venue..."
                                             required={true}
-                                            accentColor="violet"
+                                            accentColor="purple"
                                         />
                                     </div>
                                     <button
                                         type="submit"
                                         disabled={!selectedVenue || isMapping}
-                                        className="w-full bg-violet-600 hover:bg-violet-700 text-white font-bold rounded-xl py-3 flex justify-center items-center gap-2 disabled:opacity-50 transition-all shadow-md shadow-violet-200"
+                                        className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl py-3 flex justify-center items-center gap-2 disabled:opacity-50 transition-all shadow-md shadow-purple-200"
                                     >
                                         {isMapping ? 'Mapping...' : 'Assign to Department'}
                                     </button>
                                 </form>
                             </div>
 
-                            <hr className="border-slate-100" />
+                            <hr className="border-purple-100" />
 
                             <div>
                                 <h4 className="font-bold text-slate-800 flex items-center gap-2 mb-4">
-                                    <BookOpen size={18} className="text-amber-500" /> Map Venue to Course
+                                    <BookOpen size={18} className="text-purple-500" /> Map Venue to Course
                                 </h4>
                                 <form onSubmit={handleMapCourseVenue} className="space-y-4">
                                     <div>
@@ -521,7 +512,7 @@ const VenueMapping = () => {
                                             onChange={(val) => setSelectedCourse(val)}
                                             placeholder="Choose a course..."
                                             required={true}
-                                            accentColor="amber"
+                                            accentColor="purple"
                                         />
                                     </div>
                                     <div>
@@ -535,13 +526,13 @@ const VenueMapping = () => {
                                             onChange={(val) => setSelectedCourseVenue(val)}
                                             placeholder="Choose a venue..."
                                             required={true}
-                                            accentColor="amber"
+                                            accentColor="purple"
                                         />
                                     </div>
                                     <div>
                                         <label className="block text-sm font-bold text-slate-700 mb-1.5 uppercase tracking-wider text-[11px]">Venue Used For</label>
                                         <select
-                                            className="w-full p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none bg-slate-50 text-sm font-medium text-slate-700"
+                                            className="w-full p-2.5 border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none bg-slate-50 text-sm font-medium text-slate-700"
                                             value={selectedVenueType}
                                             onChange={(e) => setSelectedVenueType(e.target.value)}
                                         >
@@ -553,7 +544,7 @@ const VenueMapping = () => {
                                     <button
                                         type="submit"
                                         disabled={!selectedCourse || !selectedCourseVenue || isMappingCourse}
-                                        className="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl py-3 flex justify-center items-center gap-2 disabled:opacity-50 transition-all shadow-md shadow-amber-200/50"
+                                        className="w-full bg-purple-500 hover:bg-purple-600 text-white font-bold rounded-xl py-3 flex justify-center items-center gap-2 disabled:opacity-50 transition-all shadow-md shadow-purple-200/50"
                                     >
                                         {isMappingCourse ? 'Mapping...' : 'Assign to Course'}
                                     </button>
@@ -565,16 +556,16 @@ const VenueMapping = () => {
                     {/* Mapped Venues Display */}
                     <div className="lg:col-span-2 space-y-6">
                         {/* Laboratories */}
-                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                            <div className="bg-slate-50 px-5 py-3 border-b border-slate-200 flex justify-between items-center">
+                        <div className="bg-white rounded-2xl shadow-sm border border-purple-200 overflow-hidden">
+                            <div className="bg-purple-50 px-5 py-3 border-b border-purple-200 flex justify-between items-center">
                                 <h4 className="font-bold text-slate-800 flex items-center gap-2">
-                                    <Building2 size={18} className="text-emerald-500" />
+                                    <Building2 size={18} className="text-purple-500" />
                                     Mapped Laboratories
                                 </h4>
                                 <div className="flex items-center gap-3">
-                                    <span className="bg-emerald-100 text-emerald-700 text-xs font-bold px-2.5 py-1 rounded-full">{mappedLabs.length}</span>
+                                    <span className="bg-purple-100 text-purple-700 text-xs font-bold px-2.5 py-1 rounded-full">{mappedLabs.length}</span>
                                     {mappedLabs.length > 0 && (
-                                        <button onClick={handleRemoveAllLabs} className="text-[10px] font-bold bg-white text-red-500 border border-red-200 hover:bg-red-50 hover:text-red-700 px-2.5 py-1 uppercase rounded-lg shadow-sm transition-colors flex items-center gap-1">
+                                        <button onClick={handleRemoveAllLabs} className="text-[10px] font-bold bg-white text-purple-500 border border-purple-200 hover:bg-purple-50 hover:text-purple-700 px-2.5 py-1 uppercase rounded-lg shadow-sm transition-colors flex items-center gap-1">
                                             <Trash2 size={12} /> Clear All
                                         </button>
                                     )}
@@ -586,14 +577,14 @@ const VenueMapping = () => {
                                 ) : (
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                         {mappedLabs.map(map => (
-                                            <div key={map.id} className="flex justify-between items-center p-3 rounded-xl border border-slate-100 bg-slate-50/50 hover:border-emerald-200 transition-colors group">
+                                            <div key={map.id} className="flex justify-between items-center p-3 rounded-xl border border-purple-100 bg-purple-50/30 hover:border-purple-300 transition-colors group">
                                                 <div>
                                                     <p className="font-semibold text-slate-800 text-sm">{map.venue_name}</p>
                                                     <p className="text-xs text-slate-500">Capacity: {map.capacity}</p>
                                                 </div>
                                                 <button
                                                     onClick={() => handleRemoveMapping(map.id)}
-                                                    className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors sm:opacity-0 sm:group-hover:opacity-100"
+                                                    className="p-2 text-purple-300 hover:text-purple-600 hover:bg-purple-100 rounded-lg transition-colors sm:opacity-0 sm:group-hover:opacity-100"
                                                     title="Remove Mapping"
                                                 >
                                                     <Trash2 size={16} />
@@ -606,16 +597,16 @@ const VenueMapping = () => {
                         </div>
 
                         {/* Classrooms */}
-                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                            <div className="bg-slate-50 px-5 py-3 border-b border-slate-200 flex justify-between items-center">
+                        <div className="bg-white rounded-2xl shadow-sm border border-purple-200 overflow-hidden">
+                            <div className="bg-purple-50 px-5 py-3 border-b border-purple-200 flex justify-between items-center">
                                 <h4 className="font-bold text-slate-800 flex items-center gap-2">
-                                    <MapPin size={18} className="text-blue-500" />
+                                    <MapPin size={18} className="text-purple-600" />
                                     Mapped Classrooms
                                 </h4>
                                 <div className="flex items-center gap-3">
-                                    <span className="bg-blue-100 text-blue-700 text-xs font-bold px-2.5 py-1 rounded-full">{mappedClassrooms.length}</span>
+                                    <span className="bg-purple-100 text-purple-700 text-xs font-bold px-2.5 py-1 rounded-full">{mappedClassrooms.length}</span>
                                     {mappedClassrooms.length > 0 && (
-                                        <button onClick={handleRemoveAllClassrooms} className="text-[10px] font-bold bg-white text-red-500 border border-red-200 hover:bg-red-50 hover:text-red-700 px-2.5 py-1 uppercase rounded-lg shadow-sm transition-colors flex items-center gap-1">
+                                        <button onClick={handleRemoveAllClassrooms} className="text-[10px] font-bold bg-white text-purple-500 border border-purple-200 hover:bg-purple-50 hover:text-purple-700 px-2.5 py-1 uppercase rounded-lg shadow-sm transition-colors flex items-center gap-1">
                                             <Trash2 size={12} /> Clear All
                                         </button>
                                     )}
@@ -627,14 +618,14 @@ const VenueMapping = () => {
                                 ) : (
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                         {mappedClassrooms.map(map => (
-                                            <div key={map.id} className="flex justify-between items-center p-3 rounded-xl border border-slate-100 bg-slate-50/50 hover:border-blue-200 transition-colors group">
+                                            <div key={map.id} className="flex justify-between items-center p-3 rounded-xl border border-purple-100 bg-purple-50/30 hover:border-purple-300 transition-colors group">
                                                 <div>
                                                     <p className="font-semibold text-slate-800 text-sm">{map.venue_name}</p>
                                                     <p className="text-xs text-slate-500">Capacity: {map.capacity}</p>
                                                 </div>
                                                 <button
                                                     onClick={() => handleRemoveMapping(map.id)}
-                                                    className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors sm:opacity-0 sm:group-hover:opacity-100"
+                                                    className="p-2 text-purple-300 hover:text-purple-600 hover:bg-purple-100 rounded-lg transition-colors sm:opacity-0 sm:group-hover:opacity-100"
                                                     title="Remove Mapping"
                                                 >
                                                     <Trash2 size={16} />
@@ -647,16 +638,16 @@ const VenueMapping = () => {
                         </div>
 
                         {/* Course Venues */}
-                        <div className="bg-white rounded-2xl shadow-sm border border-amber-200 overflow-hidden">
-                            <div className="bg-amber-50/30 px-5 py-3 border-b border-amber-100 flex justify-between items-center">
+                        <div className="bg-white rounded-2xl shadow-sm border border-purple-200 overflow-hidden">
+                            <div className="bg-purple-50/30 px-5 py-3 border-b border-purple-100 flex justify-between items-center">
                                 <h4 className="font-bold text-slate-800 flex items-center gap-2">
-                                    <BookOpen size={18} className="text-amber-500" />
+                                    <BookOpen size={18} className="text-purple-500" />
                                     Mapped Course-Specific Venues
                                 </h4>
                                 <div className="flex items-center gap-3">
-                                    <span className="bg-amber-100 text-amber-700 text-xs font-bold px-2.5 py-1 rounded-full">{courseVenues.length}</span>
+                                    <span className="bg-purple-100 text-purple-700 text-xs font-bold px-2.5 py-1 rounded-full">{courseVenues.length}</span>
                                     {courseVenues.length > 0 && (
-                                        <button onClick={handleRemoveAllCourseVenues} className="text-[10px] font-bold bg-white text-red-500 border border-red-200 hover:bg-red-50 hover:text-red-700 px-2.5 py-1 uppercase rounded-lg shadow-sm transition-colors flex items-center gap-1">
+                                        <button onClick={handleRemoveAllCourseVenues} className="text-[10px] font-bold bg-white text-purple-500 border border-purple-200 hover:bg-purple-50 hover:text-purple-700 px-2.5 py-1 uppercase rounded-lg shadow-sm transition-colors flex items-center gap-1">
                                             <Trash2 size={12} /> Clear All
                                         </button>
                                     )}
@@ -668,23 +659,19 @@ const VenueMapping = () => {
                                 ) : (
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                         {courseVenues.map(map => (
-                                            <div key={map.id} className="flex justify-between items-center p-3 rounded-xl border border-slate-100 bg-slate-50/50 hover:border-amber-300 transition-colors group">
+                                            <div key={map.id} className="flex justify-between items-center p-3 rounded-xl border border-purple-100 bg-purple-50/30 hover:border-purple-300 transition-colors group">
                                                 <div>
                                                     <p className="font-semibold text-slate-800 text-sm flex items-center gap-2">
                                                         {map.venue_name} {map.is_lab ? '(Lab)' : ''}
-                                                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wide ${
-                                                            map.venue_type === 'LAB' ? 'bg-emerald-100 text-emerald-700' :
-                                                            map.venue_type === 'THEORY' ? 'bg-blue-100 text-blue-700' :
-                                                            'bg-purple-100 text-purple-700'
-                                                        }`}>
+                                                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wide bg-purple-100 text-purple-700`}>
                                                             {map.venue_type === 'BOTH' ? 'Theory & Lab' : map.venue_type || 'Both'}
                                                         </span>
                                                     </p>
-                                                    <p className="text-xs text-slate-500 font-medium text-amber-600 mt-0.5">Course: {map.course_code}</p>
+                                                    <p className="text-xs text-purple-600 font-medium mt-0.5">Course: {map.course_code}</p>
                                                 </div>
                                                 <button
                                                     onClick={() => handleRemoveCourseMapping(map.id)}
-                                                    className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors sm:opacity-0 sm:group-hover:opacity-100"
+                                                    className="p-2 text-purple-300 hover:text-purple-600 hover:bg-purple-100 rounded-lg transition-colors sm:opacity-0 sm:group-hover:opacity-100"
                                                     title="Remove Course Mapping"
                                                 >
                                                     <Trash2 size={16} />

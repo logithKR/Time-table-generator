@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-// Use VITE_API_BASE_URL from environment, default to '/api/v1' for new REST format
-const API_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
+// Use VITE_API_BASE_URL from environment, default to '/api' (backend routes at /api/auth, /api/departments, etc.)
+const API_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
 // Global Axios configuration for Secure Cookies
 axios.defaults.withCredentials = true;
@@ -14,8 +14,12 @@ function getCookie(name) {
     return null;
 }
 
-// Request Interceptor to attach CSRF safely
+// Request Interceptor to attach CSRF safely and Bearer token
 axios.interceptors.request.use((config) => {
+    const token = localStorage.getItem('access_token');
+    if (token) {
+        config.headers['Authorization'] = `Bearer ${token}`;
+    }
     if (['post', 'put', 'delete', 'patch'].includes(config.method)) {
         const csrfToken = getCookie("csrf_token");
         if (csrfToken) {
@@ -57,7 +61,10 @@ axios.interceptors.response.use(
             isRefreshing = true;
 
             try {
-                await axios.post(`${API_URL}/auth/refresh`); // Refresh using cookie token
+                const res = await axios.post(`${API_URL}/auth/refresh`); // Refresh using cookie token
+                if (res.data && res.data.access_token) {
+                    localStorage.setItem('access_token', res.data.access_token);
+                }
                 isRefreshing = false;
                 processQueue(null);
                 
@@ -257,8 +264,17 @@ export const reorderUserConstraints = (order) => axios.post(`${API_URL}/api/user
 export const validateUserConstraint = (data) => axios.post(`${API_URL}/api/user-constraints/validate`, data);
 
 // --- Auth Endpoints ---
-export const loginGoogle = (credential) => axios.post(`${API_URL}/auth/login`, { credential });
-export const logout = () => axios.post(`${API_URL}/auth/logout`);
+export const loginGoogle = async (credential) => {
+    const res = await axios.post(`${API_URL}/auth/login`, { credential });
+    if (res.data && res.data.access_token) {
+        localStorage.setItem('access_token', res.data.access_token);
+    }
+    return res;
+};
+export const logout = () => {
+    localStorage.removeItem('access_token');
+    return axios.post(`${API_URL}/auth/logout`);
+};
 export const fetchSession = () => axios.get(`${API_URL}/auth/me`);
 
 // =============================================

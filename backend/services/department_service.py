@@ -30,10 +30,10 @@ class DepartmentService(BaseService):
             
             # Centralized Business Logging
             log_activity(
+                db=self.db,
                 user_email=user_email,
-                endpoint="/departments",
-                method="POST",
-                status_code=201,
+                event="DEPARTMENT_CREATED",
+                details=f"Created department {req.department_code}"
             )
             return dept
         

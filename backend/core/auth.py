@@ -172,13 +172,22 @@ def clear_auth_cookies(response):
 # FastAPI dependency — validate access token + CSRF
 # =====================================================================
 def get_current_user(request: Request):
-    if request.method in ("POST", "PUT", "DELETE", "PATCH"):
+    auth_header = request.headers.get("Authorization")
+    access_token = None
+    is_bearer = False
+    
+    if auth_header and auth_header.startswith("Bearer "):
+        access_token = auth_header.split(" ")[1]
+        is_bearer = True
+    else:
+        access_token = request.cookies.get("access_token")
+
+    if not is_bearer and request.method in ("POST", "PUT", "DELETE", "PATCH"):
         csrf_cookie = request.cookies.get("csrf_token")
         csrf_header = request.headers.get("x-csrf-token")
         if not csrf_cookie or not csrf_header or csrf_cookie != csrf_header:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="CSRF validation failed")
 
-    access_token = request.cookies.get("access_token")
     if not access_token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
 

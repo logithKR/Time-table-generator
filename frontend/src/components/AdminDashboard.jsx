@@ -12,7 +12,7 @@ function AdminDashboard({ onLogout }) {
     const [syncError, setSyncError] = useState(null);
 
     // Logs state
-    const [logType, setLogType] = useState('activity');
+    const [logType, setLogType] = useState('auth');  // Changed from 'activity' to 'auth' to show login events
     const [logs, setLogs] = useState([]);
     const [logsPage, setLogsPage] = useState(1);
     const [logsTotal, setLogsTotal] = useState(0);
@@ -224,6 +224,7 @@ function AdminDashboard({ onLogout }) {
                                             <th>Level</th>
                                             <th>Event</th>
                                             <th>Details</th>
+                                            <th>User</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -236,7 +237,10 @@ function AdminDashboard({ onLogout }) {
                                                 <td>{getLevelBadge(log.level || log.levelname)}</td>
                                                 <td className="admin-log-event">{log.event || log.message || log.msg || '—'}</td>
                                                 <td className="admin-log-detail">
-                                                    {log.user || log.email || log.ip || log.action || '—'}
+                                                    {log.details || log.action || '—'}
+                                                </td>
+                                                <td className="admin-log-user">
+                                                    {log.user_email || log.user || log.email || '—'}
                                                 </td>
                                             </tr>
                                         ))}

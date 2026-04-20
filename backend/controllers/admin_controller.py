@@ -1,5 +1,7 @@
 from fastapi import APIRouter, Depends, Query, Request, Response
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
+from utils.database import get_db
 from services.admin_service import AdminService
 from middleware.admin_guard import verify_admin_token
 
@@ -13,8 +15,8 @@ class AdminLoginResponse(BaseModel):
     token: str
     message: str
 
-def get_admin_service():
-    return AdminService()
+def get_admin_service(db: Session = Depends(get_db)):
+    return AdminService(db)
 
 @router.post("/login", response_model=AdminLoginResponse)
 def login_admin(req: AdminLoginRequest, service: AdminService = Depends(get_admin_service)):

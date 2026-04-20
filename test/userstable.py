@@ -17,7 +17,7 @@ def fetch_users():
             cursor = connection.cursor(dictionary=True) # Using dictionary=True for easier reading
             
             # CRITICAL: We must specify only the columns you have GRANT access to
-            query = "SELECT id, username, email, role, is_active FROM users"
+            query = "SELECT id, student_name, register_no, enrollment_no, department_id, year, status FROM students;"
             
             cursor.execute(query)
             records = cursor.fetchall()

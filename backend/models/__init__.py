@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Index, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Index, UniqueConstraint, DateTime
+from sqlalchemy.sql import func
 from utils.database import Base
 
 class DepartmentMaster(Base):
@@ -251,3 +252,13 @@ class TimetableData(Base):
     semester = Column(Integer, nullable=False)
     data = Column(String, nullable=False) # Store generated JSON string
     created_at = Column(String, nullable=False)
+
+class ActivityLog(Base):
+    __tablename__ = "activity_logs"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    timestamp = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    level = Column(String, default="INFO")
+    event = Column(String, nullable=False)
+    details = Column(String, nullable=True)
+    user_email = Column(String, nullable=True)

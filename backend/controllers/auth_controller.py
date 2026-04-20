@@ -1,11 +1,13 @@
 """
-Authentication API routes with integrated audit logging.
+Authentication API routes with integrated centralized logging.
 
 Endpoints:
   POST /auth/login   — verify Google credential, issue tokens
   POST /auth/refresh  — rotate access + refresh tokens
   POST /auth/logout   — clear all auth cookies
   GET  /auth/me       — return current user from session
+
+All authentication events are logged to the centralized log.db database.
 """
 
 import os
@@ -13,6 +15,8 @@ import sqlite3
 import jwt
 from fastapi import APIRouter, Depends, HTTPException, Response, Request, status
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
+from utils.database import get_db
 
 from core.auth import (
     verify_google_token,
@@ -25,7 +29,7 @@ from core.auth import (
     JWT_SECRET,
     ALGORITHM,
 )
-from logger.audit_logger import log_auth_event
+from utils.auth_logging import log_login, log_logout, log_token_refresh, log_failed_login
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -47,7 +51,7 @@ class LoginRequest(BaseModel):
 
 
 @router.post("/login")
-def login(body: LoginRequest, request: Request, response: Response):
+def login(body: LoginRequest, request: Request, response: Response, db: Session = Depends(get_db)):
     """Verify Google credential → issue dual tokens + CSRF cookie."""
     ip = _client_ip(request)
     ua = _user_agent(request)
@@ -56,7 +60,12 @@ def login(body: LoginRequest, request: Request, response: Response):
     try:
         user_data = verify_google_token(body.credential)
     except HTTPException as exc:
-        log_auth_event("login_failure", success=False, ip=ip, user_agent=ua, detail=exc.detail)
+        log_failed_login(
+            email=body.credential[:50],  # Log partial cred as identifier
+            reason="Invalid Google token",
+            ip_address=ip,
+            user_agent=ua
+        )
         raise
 
     # 1.5 Verify RBAC (SQLite Users table)
@@ -70,15 +79,30 @@ def login(body: LoginRequest, request: Request, response: Response):
         db_user = cursor.fetchone()
         conn.close()
     except Exception as e:
-        log_auth_event("login_failure", success=False, ip=ip, user_agent=ua, detail=f"DB Error: {str(e)}")
+        log_failed_login(
+            email=email,
+            reason="DB Error during RBAC check",
+            ip_address=ip,
+            user_agent=ua
+        )
         raise HTTPException(status_code=500, detail="Internal server error during authorization.")
         
     if not db_user:
-        log_auth_event("login_failure", success=False, ip=ip, user_agent=ua, detail="User not found in local DB.")
+        log_failed_login(
+            email=email,
+            reason="User not found in local DB",
+            ip_address=ip,
+            user_agent=ua
+        )
         raise HTTPException(status_code=403, detail="Access Denied: Only registered faculty (teachers) can access this system.")
         
     if db_user["role"] != "teacher":
-        log_auth_event("login_failure", success=False, ip=ip, user_agent=ua, detail=f"Invalid role: {db_user['role']}")
+        log_failed_login(
+            email=email,
+            reason=f"Invalid role: {db_user['role']}",
+            ip_address=ip,
+            user_agent=ua
+        )
         raise HTTPException(status_code=403, detail="Access Denied: Only registered faculty (teachers) can access this system.")
 
     # 2. Create tokens
@@ -89,21 +113,24 @@ def login(body: LoginRequest, request: Request, response: Response):
     # 3. Set cookies
     set_auth_cookies(response, access_token, refresh_token, csrf_token)
 
-    # 4. Audit log
-    log_auth_event("login_success", user_email=user_data["email"], ip=ip, user_agent=ua)
+    # 4. Log successful login to centralized log.db
+    log_login(
+        email=email,
+        ip_address=ip,
+        user_agent=ua
+    )
 
-    return {"message": "Login successful", "user": user_data}
+    return {"message": "Login successful", "user": user_data, "access_token": access_token}
 
 
 @router.post("/refresh")
-def refresh(request: Request, response: Response):
+def refresh(request: Request, response: Response, db: Session = Depends(get_db)):
     """Validate refresh token → rotate both tokens."""
     ip = _client_ip(request)
     ua = _user_agent(request)
 
     refresh_token_value = request.cookies.get("refresh_token")
     if not refresh_token_value:
-        log_auth_event("token_refresh", success=False, ip=ip, user_agent=ua, detail="missing")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token missing")
 
     try:
@@ -123,24 +150,27 @@ def refresh(request: Request, response: Response):
         csrf_token = create_csrf_token()
         set_auth_cookies(response, new_access, new_refresh, csrf_token)
 
-        log_auth_event("token_refresh", user_email=user_data["email"], ip=ip, user_agent=ua)
-        return {"message": "Token refreshed successfully"}
+        # Log token refresh to centralized log.db
+        log_token_refresh(
+            email=user_data["email"],
+            ip_address=ip,
+            user_agent=ua
+        )
+        return {"message": "Token refreshed successfully", "access_token": new_access}
 
     except jwt.ExpiredSignatureError:
-        log_auth_event("token_refresh", success=False, ip=ip, user_agent=ua, detail="expired")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token expired. Please login again.")
     except jwt.InvalidTokenError:
-        log_auth_event("token_refresh", success=False, ip=ip, user_agent=ua, detail="invalid")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
 
 
 @router.post("/logout")
-def logout(request: Request, response: Response):
+def logout(request: Request, response: Response, db: Session = Depends(get_db)):
     """Clear all authentication cookies."""
     ip = _client_ip(request)
     ua = _user_agent(request)
 
-    # Try to extract user email from access token for audit (best-effort)
+    # Try to extract user email from access token for logging (best-effort)
     user_email = ""
     access_token = request.cookies.get("access_token")
     if access_token:
@@ -152,16 +182,21 @@ def logout(request: Request, response: Response):
 
     clear_auth_cookies(response)
 
-    log_auth_event("logout", user_email=user_email, ip=ip, user_agent=ua)
+    # Log logout to centralized log.db
+    if user_email:
+        log_logout(
+            email=user_email,
+            ip_address=ip,
+            user_agent=ua
+        )
+    
     return {"message": "Successfully logged out"}
 
 
 @router.get("/me")
-def get_user_session(request: Request, user: dict = Depends(get_current_user)):
+def get_user_session(request: Request, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     """Return current user data from validated session."""
-    ip = _client_ip(request)
-    log_auth_event("session_check", user_email=user.get("email", ""), ip=ip, user_agent=_user_agent(request))
-
+    # Note: Session checks are implicitly logged via ActivityLoggingMiddleware
     return {
         "user": {
             "email": user.get("email"),

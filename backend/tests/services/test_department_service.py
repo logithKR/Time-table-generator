@@ -1,8 +1,8 @@
 import pytest
-from backend.services.department_service import DepartmentService
-from backend.core.exceptions import AppException
-from backend.schemas import DepartmentCreate, DepartmentUpdate
-from backend.models import DepartmentMaster
+from services.department_service import DepartmentService
+from core.exceptions import AppException
+from schemas import DepartmentCreate, DepartmentUpdate
+from models import DepartmentMaster
 
 class MockSession:
     def commit(self): pass

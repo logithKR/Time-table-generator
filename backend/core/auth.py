@@ -9,11 +9,12 @@ Security:
   - Tokens are never logged or returned in response bodies.
 """
 
-from dotenv import load_dotenv
-load_dotenv()
-
 import os
 import sys
+from dotenv import load_dotenv
+_env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".env")
+load_dotenv(_env_path)
+
 from datetime import datetime, timedelta, timezone
 import secrets
 import jwt
@@ -190,3 +191,7 @@ def get_current_user(request: Request):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expired")
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+
+# Alias for backward compatibility
+verify_token = get_current_user
+

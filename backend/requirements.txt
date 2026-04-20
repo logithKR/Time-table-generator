@@ -1,4 +1,4 @@
-fastapi
+cleafastapi
 uvicorn
 sqlalchemy
 python-multipart
@@ -12,5 +12,5 @@ PyJWT
 google-auth
 requests
 pymysql
-cryptography==41.0.7
-bcrypt==4.1.2
+cryptography==41.0.3
+bcrypt==4.0.1

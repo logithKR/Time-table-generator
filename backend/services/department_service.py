@@ -1,11 +1,11 @@
 from sqlalchemy.orm import Session
-from backend.repositories.department_repo import DepartmentRepository
-from backend.models import DepartmentMaster
-from backend.schemas import DepartmentCreate, DepartmentUpdate
-from backend.core.exceptions import AppException
-from backend.logging.audit_logger import log_activity
+from repositories.department_repo import DepartmentRepository
+from models import DepartmentMaster
+from schemas import DepartmentCreate, DepartmentUpdate
+from core.exceptions import AppException
+from logger.audit_logger import log_activity
 from sqlalchemy.exc import IntegrityError
-from backend.services.base import BaseService
+from services.base import BaseService
 
 class DepartmentService(BaseService):
     def __init__(self, db: Session):

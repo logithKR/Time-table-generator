@@ -108,8 +108,7 @@ export const updateCourse = (code, data) => axios.put(`${API_URL}/courses/${code
 export const createCourseFaculty = (data) => axios.post(`${API_URL}/course-faculty`, data);
 export const createSlot = (data) => axios.post(`${API_URL}/slots`, data);
 export const createBreak = (data) => axios.post(`${API_URL}/breaks`, data);
-export const syncCmsData = () => axios.post(`${API_URL}/api/sync-cms`);
-export const getSyncStatus = () => axios.get(`${API_URL}/api/sync-cms/status`);
+// Legacy sync endpoints removed — admin sync now lives under /admin/sync
 
 // --- PUT (Update) ---
 export const updateDepartment = (code, data) => axios.put(`${API_URL}/departments/${code}`, data);
@@ -261,3 +260,71 @@ export const validateUserConstraint = (data) => axios.post(`${API_URL}/api/user-
 export const loginGoogle = (credential) => axios.post(`${API_URL}/auth/login`, { credential });
 export const logout = () => axios.post(`${API_URL}/auth/logout`);
 export const fetchSession = () => axios.get(`${API_URL}/auth/me`);
+
+// =============================================
+// ADMIN API — Dedicated Axios instance
+// =============================================
+const adminApi = axios.create({
+    baseURL: `${API_URL}/admin`,
+    timeout: 30000, // 30s for sync operations
+});
+
+// Admin Request Interceptor — attach Bearer token
+adminApi.interceptors.request.use((config) => {
+    const token = localStorage.getItem('adminToken');
+    if (token) {
+        config.headers['Authorization'] = `Bearer ${token}`;
+    }
+    return config;
+}, (error) => Promise.reject(error));
+
+// Admin Response Interceptor — handle 401 expiry
+adminApi.interceptors.response.use(
+    (response) => response,
+    (error) => {
+        if (error.response?.status === 401) {
+            localStorage.removeItem('adminToken');
+            // Redirect to admin login (works for both SPA hash and path routing)
+            if (!window.location.hash.includes('admin/login') && !window.location.pathname.includes('admin/login')) {
+                window.location.hash = '#/admin/login';
+            }
+        }
+        return Promise.reject(error);
+    }
+);
+
+// --- Admin Endpoints ---
+export const adminLogin = (email, password) =>
+    adminApi.post('/login', { email, password });
+
+export const adminLogout = () => {
+    localStorage.removeItem('adminToken');
+    return Promise.resolve();
+};
+
+export const triggerAdminSync = () =>
+    adminApi.post('/sync');
+
+export const fetchAdminLogs = (type = 'activity', page = 1, limit = 50) =>
+    adminApi.get('/logs', { params: { type, page, limit } });
+
+export const getAdminToken = () => localStorage.getItem('adminToken');
+export const setAdminToken = (token) => localStorage.setItem('adminToken', token);
+export const clearAdminToken = () => localStorage.removeItem('adminToken');
+
+// --- Error Helper ---
+export const getErrorMessage = (err) => {
+    if (err?.response?.data?.detail) {
+        const detail = err.response.data.detail;
+        if (typeof detail === 'string') return detail;
+        if (typeof detail === 'object' && detail.message) return detail.message;
+        return JSON.stringify(detail);
+    }
+    if (err?.response?.data?.message) return err.response.data.message;
+    if (err?.message) return err.message;
+    return 'An unknown error occurred';
+};
+
+// --- CMS Sync ---
+export const syncCmsData = () => axios.post(`${API_URL}/sync-cms`);
+export const getSyncStatus = () => axios.get(`${API_URL}/sync-cms/status`);

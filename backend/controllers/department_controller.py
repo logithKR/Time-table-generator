@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session
 from typing import List
-from backend.utils.database import get_db
-from backend.services.department_service import DepartmentService
-from backend.schemas import Department, DepartmentCreate, DepartmentUpdate
-from backend.core.auth import verify_token
+from utils.database import get_db
+from services.department_service import DepartmentService
+from schemas import Department, DepartmentCreate, DepartmentUpdate
+from core.auth import verify_token
 
 router = APIRouter()
 

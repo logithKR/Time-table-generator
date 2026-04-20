@@ -26,6 +26,7 @@ __pycache__/
 venv/
 venv2/
 ttvenv/
+tivenv/
 .venv/
 backend/venv*/
 

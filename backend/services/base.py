@@ -1,6 +1,6 @@
 from typing import Callable, Any
 from sqlalchemy.orm import Session
-from backend.core.exceptions import AppException
+from core.exceptions import AppException
 
 class BaseService:
     def __init__(self, db: Session):

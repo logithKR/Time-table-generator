@@ -1,7 +1,7 @@
 from fastapi import Request, HTTPException
 import jwt
 from typing import Optional
-from backend.config.settings import settings
+from config.settings import settings
 
 def verify_admin_token(request: Request) -> str:
     """Dependency for Admin Routes. Verifies the JWT cookie/header and checks role."""
@@ -13,9 +13,6 @@ def verify_admin_token(request: Request) -> str:
     if auth_header and auth_header.startswith("Bearer "):
         token = auth_header.split(" ")[1]
     
-    if not token:
-        token = request.cookies.get("admin_session")
-
     if not token:
         raise HTTPException(status_code=401, detail="Missing admin token")
 

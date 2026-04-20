@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Index, UniqueConstraint
-from backend.utils.database import Base
+from utils.database import Base
 
 class DepartmentMaster(Base):
     __tablename__ = "department_master"
@@ -243,3 +243,11 @@ class UserConstraint(Base):
 Index('idx_user_constraint_type', UserConstraint.constraint_type)
 Index('idx_user_constraint_enabled', UserConstraint.enabled)
 
+class TimetableData(Base):
+    __tablename__ = "timetable"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    department = Column(String, nullable=False)
+    semester = Column(Integer, nullable=False)
+    data = Column(String, nullable=False) # Store generated JSON string
+    created_at = Column(String, nullable=False)

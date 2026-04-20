@@ -47,6 +47,8 @@ import StudentTimetable from './components/StudentTimetable';
 import BITTimetable from './components/BITTimetable';
 import VenueTimetable from './components/VenueTimetable';
 import LoginPage from './components/LoginPage';
+import AdminLogin from './components/AdminLogin';
+import AdminDashboard from './components/AdminDashboard';
 import { useAuth } from './contexts/AuthContext';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -54,6 +56,14 @@ import * as api from './utils/api';
 import { formatTime } from './utils/timeFormat';
 
 function App() {
+    // --- Routing & Admin Guard ---
+    const [currentHash, setCurrentHash] = useState(window.location.hash || '#/');
+    useEffect(() => {
+        const onHashChange = () => setCurrentHash(window.location.hash || '#/');
+        window.addEventListener('hashchange', onHashChange);
+        return () => window.removeEventListener('hashchange', onHashChange);
+    }, []);
+
     // --- Authentication Gate ---
     const { user, isAuthenticated, isLoading: authLoading, logout } = useAuth();
 
@@ -2038,6 +2048,19 @@ function App() {
                 </div>
             </div>
         );
+    }
+
+    // --- Admin Routes ---
+    if (currentHash === '#/admin/login') {
+        return <AdminLogin onLoginSuccess={() => window.location.hash = '#/admin'} onBack={() => window.location.hash = '#/'} />;
+    }
+    
+    if (currentHash === '#/admin') {
+        if (!api.getAdminToken()) {
+            window.location.hash = '#/admin/login';
+            return null;
+        }
+        return <AdminDashboard onLogout={() => window.location.hash = '#/'} />;
     }
 
     // Show login page if not authenticated

@@ -38,10 +38,9 @@ class Settings(BaseSettings):
     enable_management_apis: bool = True  # Useful to toggle CRUD routes in prod
     
     # Admin Credentials
-    # Note: ADMIN_PASSWORD should be a bcrypt hash. A raw password here will trigger 
-    # a warning or must be setup separately. 
+    # Note: Using plain text password as requested by the user.
     admin_email: Optional[str] = None
-    admin_password_hash: Optional[str] = None
+    admin_password: Optional[str] = None
 
     model_config = SettingsConfigDict(
         env_file=os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".env.production") if os.getenv("ENVIRONMENT") == "production" else os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".env"),

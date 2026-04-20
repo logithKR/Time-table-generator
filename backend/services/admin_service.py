@@ -2,26 +2,27 @@ import os
 import json
 from datetime import datetime, timedelta
 import jwt
+import math
 from typing import Dict, Any, List
-from backend.config.settings import settings
-from backend.utils.security import verify_password, hash_password
-from backend.core.exceptions import AppException
+from config.settings import settings
+from utils.security import verify_password, hash_password
+from core.exceptions import AppException
 
 class AdminService:
     def __init__(self):
         # We simulate finding admin user configuration.
         self.admin_email = settings.admin_email
-        self.admin_password_hash = settings.admin_password_hash
+        self.admin_password = settings.admin_password
 
     def login(self, email: str, password: str) -> str:
-        if not self.admin_email or not self.admin_password_hash:
+        if not self.admin_email or not self.admin_password:
             # For demonstration/bootstrap: if not configured, block or log
             raise AppException(500, "ADMIN_MISCONFIGURED", "Admin credentials are not fully configured in settings.")
             
         if email != self.admin_email:
             raise AppException(401, "ADMIN_UNAUTHORIZED", "Invalid admin credentials")
             
-        if not verify_password(password, self.admin_password_hash):
+        if password != self.admin_password:
             raise AppException(401, "ADMIN_UNAUTHORIZED", "Invalid admin credentials")
             
         # Success - generate JWT
@@ -42,7 +43,7 @@ class AdminService:
         log_path = os.path.join(os.environ.get("LOG_DIR", "./logs"), log_file)
         
         if not os.path.exists(log_path):
-            return {"logs": [], "total": 0, "page": page, "limit": limit}
+            return {"data": [], "total": 0, "page": page, "total_pages": 0}
             
         logs = []
         try:
@@ -62,10 +63,17 @@ class AdminService:
                         except json.JSONDecodeError:
                             pass
                 return {
-                    "logs": logs,
+                    "data": logs,
                     "total": len(lines),
                     "page": page,
-                    "limit": limit
+                    "total_pages": math.ceil(len(lines) / limit)
                 }
         except Exception as e:
             raise AppException(500, "LOG_READ_ERROR", "Failed to read log files", str(e))
+
+    def sync_cms(self) -> None:
+        """Simulates synchronous CMS data execution."""
+        import time
+        # In a real scenario, this delegates to the sync engine
+        time.sleep(2)
+        return

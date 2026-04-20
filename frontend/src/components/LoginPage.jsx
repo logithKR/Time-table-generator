@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import AccessDenied from './AccessDenied';
+import { Shield } from 'lucide-react';
 
 function LoginPage() {
     const { authError, isAccessDenied, clearError, initializeGoogle, GOOGLE_CLIENT_ID } = useAuth();
@@ -120,6 +121,20 @@ function LoginPage() {
                         <p>
                             Only <strong>@bitsathy.ac.in</strong> email IDs are allowed
                         </p>
+                    </div>
+
+                    {/* Admin Access Link */}
+                    <div className="login-admin-section" style={{ marginTop: '1.5rem', textAlign: 'center', borderTop: '1px solid #e5e7eb', paddingTop: '1rem' }}>
+                        <button
+                            type="button"
+                            onClick={() => window.location.hash = '#/admin/login'}
+                            style={{ display: 'inline-flex', itemsCenter: 'center', gap: '0.5rem', color: '#6b7280', fontSize: '0.875rem', background: 'none', border: 'none', cursor: 'pointer' }}
+                            onMouseOver={(e) => e.target.style.color = '#4f46e5'}
+                            onMouseOut={(e) => e.target.style.color = '#6b7280'}
+                        >
+                            <Shield style={{ width: '1rem', height: '1rem' }} />
+                            Login as Admin
+                        </button>
                     </div>
                 </div>
 

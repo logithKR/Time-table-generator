@@ -14,7 +14,7 @@ import jwt
 from fastapi import APIRouter, Depends, HTTPException, Response, Request, status
 from pydantic import BaseModel
 
-from backend.core.auth import (
+from core.auth import (
     verify_google_token,
     create_access_token,
     create_refresh_token,
@@ -25,7 +25,7 @@ from backend.core.auth import (
     JWT_SECRET,
     ALGORITHM,
 )
-from backend.logging.audit_logger import log_auth_event
+from logger.audit_logger import log_auth_event
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 

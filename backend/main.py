@@ -12,7 +12,6 @@ from utils.log_database import log_engine, LoggingBase
 from routes.legacy_routes import router as legacy_router
 from controllers.auth_controller import router as auth_router
 from controllers.admin_controller import router as admin_router
-from controllers.logging_controller import router as logging_router
 import uvicorn
 
 
@@ -24,7 +23,7 @@ async def lifespan(app: FastAPI):
     import models.log_models  # noqa - Initialize logging models
     Base.metadata.create_all(bind=engine)
     LoggingBase.metadata.create_all(bind=log_engine)
-    print("[STARTUP] ✅ All database tables initialized (college_scheduler.db and log.db)")
+    print("[STARTUP] All database tables initialized (college_scheduler.db and log.db)")
     yield
 
 
@@ -49,11 +48,8 @@ app.add_middleware(AuthMiddleware)  # Handles authentication checks
 # 4. Mount Auth routes at /api/auth  (frontend calls /api/auth/login, /api/auth/me etc.)
 app.include_router(auth_router, prefix="/api")
 
-# 5. Mount Admin routes at /api/admin  (frontend calls /api/admin/login, /api/admin/logs etc.)
+# 5. Mount Admin routes at /api/admin  (frontend calls /api/admin/login, /api/admin/me, /api/admin/logs)
 app.include_router(admin_router, prefix="/api/admin", tags=["Admin"])
-
-# 5a. Mount Logging routes at /api/admin/logs  (logging-specific admin endpoints)
-app.include_router(logging_router, prefix="/api/admin", tags=["Admin Logs"])
 
 # 6. Mount ALL legacy data routes at /api  (frontend calls /api/departments, /api/generate etc.)
 app.include_router(legacy_router, prefix="/api")

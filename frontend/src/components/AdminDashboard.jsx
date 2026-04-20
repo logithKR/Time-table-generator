@@ -220,28 +220,79 @@ function AdminDashboard({ onLogout }) {
                                 <table className="admin-logs-table">
                                     <thead>
                                         <tr>
-                                            <th>Timestamp</th>
-                                            <th>Level</th>
-                                            <th>Event</th>
-                                            <th>Details</th>
-                                            <th>User</th>
+                                            <th>Time (IST)</th>
+                                            <th>Time (GMT)</th>
+                                            <th>Email</th>
+                                            {logType === 'auth' ? (
+                                                <>
+                                                    <th>Event</th>
+                                                    <th>IP Address</th>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <th>Action Type</th>
+                                                    <th>Endpoint</th>
+                                                    <th>Status</th>
+                                                </>
+                                            )}
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {logs.map((log, idx) => (
-                                            <tr key={idx}>
+                                            <tr key={log.id || idx}>
                                                 <td className="admin-log-ts">
                                                     <Clock className="w-3.5 h-3.5 text-gray-400" />
-                                                    {formatTimestamp(log.timestamp || log.time)}
+                                                    {log.timestamp_ist || '—'}
                                                 </td>
-                                                <td>{getLevelBadge(log.level || log.levelname)}</td>
-                                                <td className="admin-log-event">{log.event || log.message || log.msg || '—'}</td>
-                                                <td className="admin-log-detail">
-                                                    {log.details || log.action || '—'}
+                                                <td className="admin-log-ts" style={{ color: '#9ca3af' }}>
+                                                    {log.timestamp_gmt || '—'}
                                                 </td>
                                                 <td className="admin-log-user">
-                                                    {log.user_email || log.user || log.email || '—'}
+                                                    {log.email || '—'}
                                                 </td>
+
+                                                {logType === 'auth' ? (
+                                                    <>
+                                                        <td className="admin-log-event">
+                                                            <span className={`admin-log-badge ${
+                                                                log.event_type === 'LOGIN' ? 'admin-log-badge-info' :
+                                                                log.event_type === 'LOGOUT' ? 'admin-log-badge-warning' :
+                                                                log.event_type?.includes('FAILED') ? 'admin-log-badge-error' :
+                                                                'admin-log-badge-debug'
+                                                            }`}>
+                                                                {log.event_type}
+                                                            </span>
+                                                        </td>
+                                                        <td style={{ color: '#6b7280', fontSize: '0.85rem' }}>
+                                                            {log.ip_address || '—'}
+                                                        </td>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <td className="admin-log-event">
+                                                            <span className={`admin-log-badge ${
+                                                                log.method === 'GENERATE' ? 'admin-log-badge-info' :
+                                                                log.method === 'EDIT' ? 'admin-log-badge-warning' :
+                                                                log.method === 'DELETE' ? 'admin-log-badge-error' :
+                                                                'admin-log-badge-debug'
+                                                            }`}>
+                                                                {log.method}
+                                                            </span>
+                                                        </td>
+                                                        <td className="admin-log-detail">
+                                                            {log.action || '—'}
+                                                        </td>
+                                                        <td>
+                                                            <span className={`admin-log-badge ${
+                                                                log.status_code >= 500 ? 'admin-log-badge-error' :
+                                                                log.status_code >= 400 ? 'admin-log-badge-warning' :
+                                                                'admin-log-badge-info'
+                                                            }`}>
+                                                                {log.status_code}
+                                                            </span>
+                                                        </td>
+                                                    </>
+                                                )}
                                             </tr>
                                         ))}
                                     </tbody>

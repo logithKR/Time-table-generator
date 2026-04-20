@@ -1,46 +1,121 @@
-from fastapi import APIRouter, Depends, Query, HTTPException
+"""
+Admin Controller — handles admin login, session verification, and log queries.
+
+Endpoints (all prefixed with /api/admin by main.py):
+  POST /login           — authenticate admin with email/password, return JWT
+  GET  /me              — verify admin session (returns admin email)
+  GET  /logs            — fetch auth or activity logs from log.db (query param: type)
+"""
+
+from fastapi import APIRouter, Depends, Query, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import Any, Dict, Optional
+from sqlalchemy import desc
+from typing import Any, Dict
+import math
 
-# These dependencies are assumed to exist based on your project structure.
-# Ensure you have functions to get the log DB session and verify admin JWTs.
+from middleware.admin_guard import verify_admin_token
 from utils.log_database import get_log_db
-from core.security import admin_guard, get_current_admin_user
+from models.log_models import AuthLog, ActivityLog
 from services.admin_service import AdminService
+from pydantic import BaseModel
 
-router = APIRouter(
-    prefix="/api/admin",
-    tags=["Admin"],
-    dependencies=[Depends(admin_guard)] # Secures all routes in this controller
-)
 
-@router.get("/me", response_model=Dict[str, str])
-def read_admin_me(admin_user: Dict[str, Any] = Depends(get_current_admin_user)):
+router = APIRouter(tags=["Admin"])  # NO prefix here — main.py provides /api/admin
+
+
+class AdminLoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+# ===================================================================
+# Admin Login
+# ===================================================================
+@router.post("/login")
+def admin_login(body: AdminLoginRequest):
+    """
+    Authenticate admin with email and password.
+    Returns a JWT token for subsequent admin API calls.
+    """
+    svc = AdminService()
+    token = svc.login(body.email, body.password)
+    return {"token": token, "message": "Admin login successful"}
+
+
+# ===================================================================
+# Session Verification
+# ===================================================================
+@router.get("/me")
+def read_admin_me(admin_email: str = Depends(verify_admin_token)):
     """
     Verifies the current admin's session from their JWT.
-    This resolves the 401 Unauthorized error on the frontend.
+    Returns the admin's email if the token is valid.
     """
-    return {"email": admin_user.get("sub")}
+    return {"email": admin_email}
 
-@router.get("/logs/{log_type}", response_model=Dict[str, Any])
+
+# ===================================================================
+# Unified Logs Endpoint
+# ===================================================================
+@router.get("/logs", dependencies=[Depends(verify_admin_token)])
 def get_logs(
-    log_type: str,
-    page: int = Query(1, ge=1),
-    limit: int = Query(100, ge=1, le=200),
-    db: Session = Depends(get_log_db)
-):
+    type: str = Query("auth", pattern="^(auth|activity)$", description="Log type: 'auth' or 'activity'"),
+    page: int = Query(1, ge=1, description="Page number"),
+    limit: int = Query(50, ge=1, le=500, description="Items per page"),
+    log_db: Session = Depends(get_log_db),
+) -> Dict[str, Any]:
     """
-    Fetches authentication or activity logs with pagination.
-    This resolves the 500 Internal Server Error by correctly instantiating
-    the AdminService with a dedicated database session for log.db.
+    Fetch logs from log.db.
+
+    Query Parameters:
+    - type: 'auth' for authentication logs, 'activity' for activity logs
+    - page: Page number (default 1)
+    - limit: Items per page (default 50, max 500)
+
+    Returns paginated log data with IST/GMT timestamps.
     """
-    if log_type not in ["auth", "activity"]:
-        raise HTTPException(status_code=400, detail="Invalid log type. Use 'auth' or 'activity'.")
+    try:
+        if type == "auth":
+            query = log_db.query(AuthLog)
+            total = query.count()
+            total_pages = math.ceil(total / limit) if total > 0 else 0
+            rows = query.order_by(desc(AuthLog.id)).offset((page - 1) * limit).limit(limit).all()
 
-    # Correctly instantiate the service with the DB session.
-    admin_svc = AdminService(db=db)
+            logs = [{
+                "id": row.id,
+                "user_id": row.user_id,
+                "email": row.email,
+                "event_type": row.event_type,
+                "ip_address": row.ip_address,
+                "timestamp_ist": row.timestamp_ist,
+                "timestamp_gmt": row.timestamp_gmt,
+                "user_agent": row.user_agent,
+            } for row in rows]
+        else:
+            query = log_db.query(ActivityLog)
+            total = query.count()
+            total_pages = math.ceil(total / limit) if total > 0 else 0
+            rows = query.order_by(desc(ActivityLog.id)).offset((page - 1) * limit).limit(limit).all()
 
-    # The service correctly queries and formats the data.
-    logs_data = admin_svc.read_logs(log_type=log_type, page=page, limit=limit)
+            logs = [{
+                "id": row.id,
+                "user_id": row.user_id,
+                "email": row.email,
+                "action": row.action,
+                "method": row.method,
+                "status_code": row.status_code,
+                "timestamp_ist": row.timestamp_ist,
+                "timestamp_gmt": row.timestamp_gmt,
+            } for row in rows]
 
-    return logs_data
+        return {
+            "data": logs,
+            "total": total,
+            "page": page,
+            "total_pages": total_pages,
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch {type} logs: {str(e)}"
+        )

@@ -51,10 +51,12 @@ def _run_sync_job():
     SYNC_STATE["is_running"] = True
     SYNC_STATE["status"] = "syncing"
     SYNC_STATE["error"] = None
+    SYNC_STATE["result"] = None
     try:
         from services.sync_cms_to_local import sync_databases
-        sync_databases()
+        result = sync_databases()
         SYNC_STATE["status"] = "complete"
+        SYNC_STATE["result"] = result
     except Exception as e:
         SYNC_STATE["status"] = "error"
         SYNC_STATE["error"] = str(e)

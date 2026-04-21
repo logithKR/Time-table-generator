@@ -321,6 +321,9 @@ export const adminLogout = () => {
 export const triggerAdminSync = () =>
     adminApi.post('/sync');
 
+export const getAdminSyncStatus = () =>
+    adminApi.get('/sync/status');
+
 export const fetchAdminLogs = (type = 'auth', page = 1, limit = 50) =>
     adminApi.get('/logs', { params: { type, page, limit } });
 

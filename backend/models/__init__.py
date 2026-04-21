@@ -50,6 +50,7 @@ class CourseMaster(Base):
     is_minor = Column(Boolean, default=False)
     is_add_course = Column(Boolean, default=False)
     enrolled_students = Column(Integer, default=0)
+    enrollment_data = Column(String, nullable=True)  # JSON breakdown for learning modes
 
 
 class StudentMaster(Base):
@@ -59,6 +60,7 @@ class StudentMaster(Base):
     name = Column(String, nullable=False)
     email = Column(String, nullable=True)
     department_code = Column(String, ForeignKey('department_master.department_code'), nullable=False)
+    learning_mode_id = Column(Integer, default=1)
 
 class CourseRegistration(Base):
     __tablename__ = "course_registrations"
@@ -170,6 +172,11 @@ class DepartmentSemesterCount(Base):
     department_code = Column(String, ForeignKey('department_master.department_code'), nullable=False)
     semester = Column(Integer, nullable=False)
     student_count = Column(Integer, default=0, nullable=False)
+    student_count_data = Column(String, nullable=True) # JSON breakdown for learning modes
+
+    __table_args__ = (
+        UniqueConstraint('department_code', 'semester', name='uix_dept_sem_count'),
+    )
 
 # Index for fast retrieval by dept/sem
 Index('idx_dept_sem_count', DepartmentSemesterCount.department_code, DepartmentSemesterCount.semester)

@@ -10,6 +10,7 @@ function AdminDashboard({ onLogout }) {
     const [isSyncing, setIsSyncing] = useState(false);
     const [syncMessage, setSyncMessage] = useState(null);
     const [syncError, setSyncError] = useState(null);
+    const [syncLogs, setSyncLogs] = useState([]);
 
     // Logs state
     const [logType, setLogType] = useState('auth');  // Changed from 'activity' to 'auth' to show login events
@@ -42,24 +43,65 @@ function AdminDashboard({ onLogout }) {
         }
     }, [logType, logsPage]);
 
+    const pollSyncStatus = useCallback(async () => {
+        try {
+            const res = await api.getAdminSyncStatus();
+            const data = res.data;
+            if (data.logs) {
+                setSyncLogs(data.logs);
+            }
+            
+            if (data.status === 'complete') {
+                setIsSyncing(false);
+                setSyncMessage('CMS data synced successfully');
+            } else if (data.status === 'error') {
+                setIsSyncing(false);
+                setSyncError(data.error || 'Sync failed.');
+            } else if (data.status === 'syncing') {
+                setIsSyncing(true);
+                setTimeout(pollSyncStatus, 2000); // Poll every 2 seconds
+            }
+        } catch (err) {
+            setIsSyncing(false);
+            setSyncError('Failed to fetch sync status.');
+        }
+    }, []);
+
     useEffect(() => {
         if (activeTab === 'logs') {
             fetchLogs();
         }
     }, [activeTab, fetchLogs]);
 
+    useEffect(() => {
+        // Check if sync is already running when component mounts
+        api.getAdminSyncStatus().then(res => {
+            if (res.data.status === 'syncing') {
+                setIsSyncing(true);
+                setSyncLogs(res.data.logs || []);
+                pollSyncStatus();
+            } else if (res.data.logs && res.data.logs.length > 0) {
+                setSyncLogs(res.data.logs);
+                if (res.data.status === 'error') setSyncError(res.data.error || 'Sync failed.');
+                if (res.data.status === 'complete') setSyncMessage('CMS data synced successfully');
+            }
+        }).catch(err => console.error("Error checking sync status:", err));
+    }, [pollSyncStatus]);
+
     // Sync handler
     const handleSync = async () => {
         setIsSyncing(true);
         setSyncMessage(null);
         setSyncError(null);
+        setSyncLogs([]);
         try {
             const res = await api.triggerAdminSync();
-            setSyncMessage(res.data.message || 'CMS data synced successfully');
+            if (res.data.status === "started" || res.data.status === "already_running") {
+                pollSyncStatus();
+            }
         } catch (err) {
             if (err.response?.status === 401) return;
-            setSyncError(err.response?.data?.detail || 'Sync failed. Please try again.');
-        } finally {
+            setSyncError(err.response?.data?.detail || 'Sync failed to start.');
             setIsSyncing(false);
         }
     };
@@ -150,6 +192,45 @@ function AdminDashboard({ onLogout }) {
                                 <div className="admin-alert admin-alert-error">
                                     <AlertCircle className="w-4 h-4 flex-shrink-0" />
                                     <span>{syncError}</span>
+                                </div>
+                            )}
+
+                            {/* Live Logs Terminal */}
+                            {syncLogs.length > 0 && (
+                                <div className="admin-sync-logs-terminal" style={{ 
+                                    backgroundColor: '#111827', 
+                                    color: '#d1d5db', 
+                                    padding: '1rem', 
+                                    borderRadius: '0.5rem', 
+                                    minHeight: '100px',
+                                    maxHeight: '350px',
+                                    overflowY: 'auto',
+                                    fontFamily: 'monospace',
+                                    fontSize: '0.85rem',
+                                    boxShadow: 'inset 0 2px 4px 0 rgba(0, 0, 0, 0.06)',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                }}>
+                                    {syncLogs.map((log, idx) => {
+                                        let color = '#d1d5db'; // default / info
+                                        if (log.level === 'error') color = '#ef4444';
+                                        else if (log.level === 'success') color = '#10b981';
+                                        else if (log.level === 'warning') color = '#f59e0b';
+                                        else if (log.level === 'info') color = '#60a5fa';
+
+                                        return (
+                                            <div key={idx} style={{ marginBottom: '6px', lineHeight: '1.4' }}>
+                                                <span style={{ color: '#6b7280', marginRight: '8px' }}>[{log.ts}]</span>
+                                                <span style={{ color }}>{log.message}</span>
+                                            </div>
+                                        );
+                                    })}
+                                    {isSyncing && (
+                                        <div style={{ marginTop: '8px', color: '#6b7280', display: 'flex', alignItems: 'center' }}>
+                                            <Loader2 className="w-3 h-3 animate-spin" style={{ marginRight: '6px' }} />
+                                            Working...
+                                        </div>
+                                    )}
                                 </div>
                             )}
 

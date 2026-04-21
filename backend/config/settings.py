@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     cms_db_host: Optional[str] = None
     cms_db_user: Optional[str] = None
     cms_db_password: Optional[str] = None
+    cms_db_pass: Optional[str] = None
     cms_db_port: int = 3306
     cms_db_name: str = "cms"
     

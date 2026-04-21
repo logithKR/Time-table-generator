@@ -7,7 +7,7 @@ Endpoints (all prefixed with /api/admin by main.py):
   GET  /logs            — fetch auth or activity logs from log.db (query param: type)
 """
 
-from fastapi import APIRouter, Depends, Query, HTTPException, status
+from fastapi import APIRouter, Depends, Query, HTTPException, status, BackgroundTasks
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 from typing import Any, Dict
@@ -21,6 +21,62 @@ from pydantic import BaseModel
 
 
 router = APIRouter(tags=["Admin"])  # NO prefix here — main.py provides /api/admin
+
+
+# ===================================================================
+# CMS Sync  (frontend calls POST /api/admin/sync)
+# ===================================================================
+
+ADMIN_SYNC_STATE = {
+    "is_running": False,
+    "status": "idle",   # idle | syncing | complete | error
+    "error": None,
+    "result": None,
+    "logs": [],         # list of {level, message, ts}
+}
+
+def _emit(level: str, message: str):
+    """Append a log entry to ADMIN_SYNC_STATE['logs']."""
+    from datetime import datetime
+    ADMIN_SYNC_STATE["logs"].append({
+        "level": level,       # info | success | warning | error
+        "message": message,
+        "ts": datetime.now().strftime("%H:%M:%S"),
+    })
+
+def _run_admin_sync_job():
+    global ADMIN_SYNC_STATE
+    ADMIN_SYNC_STATE["is_running"] = True
+    ADMIN_SYNC_STATE["status"] = "syncing"
+    ADMIN_SYNC_STATE["error"] = None
+    ADMIN_SYNC_STATE["result"] = None
+    ADMIN_SYNC_STATE["logs"] = []
+    try:
+        from services.sync_cms_to_local import sync_databases
+        result = sync_databases(emit=_emit)
+        ADMIN_SYNC_STATE["status"] = "complete"
+        ADMIN_SYNC_STATE["result"] = result
+        _emit("success", "All sync steps completed successfully.")
+    except Exception as e:
+        ADMIN_SYNC_STATE["status"] = "error"
+        ADMIN_SYNC_STATE["error"] = str(e)
+        _emit("error", f"Sync failed: {e}")
+    finally:
+        ADMIN_SYNC_STATE["is_running"] = False
+
+@router.post("/sync", dependencies=[Depends(verify_admin_token)])
+async def trigger_admin_sync(background_tasks: BackgroundTasks):
+    """Kick off a full CMS sync (MySQL → cms_local.db + sem-4 migration + users.db)."""
+    global ADMIN_SYNC_STATE
+    if ADMIN_SYNC_STATE["is_running"]:
+        return {"status": "already_running", "message": "A sync is already in progress."}
+    background_tasks.add_task(_run_admin_sync_job)
+    return {"status": "started", "message": "CMS sync started in the background."}
+
+@router.get("/sync/status", dependencies=[Depends(verify_admin_token)])
+def get_admin_sync_status():
+    """Returns the current sync state including live logs."""
+    return ADMIN_SYNC_STATE
 
 
 class AdminLoginRequest(BaseModel):

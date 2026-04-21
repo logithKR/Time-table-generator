@@ -126,7 +126,6 @@ const AdminLogs = () => {
                 {activeTab === 'auth' ? (
                   <>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Event</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">IP Address</th>
                   </>
                 ) : (
                   <>
@@ -152,7 +151,6 @@ const AdminLogs = () => {
                     {activeTab === 'auth' ? (
                       <>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600 font-semibold">{log.event_type}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{log.ip_address}</td>
                       </>
                     ) : (
                       <>

@@ -9,8 +9,9 @@ Endpoints (all prefixed with /api/admin by main.py):
 
 from fastapi import APIRouter, Depends, Query, HTTPException, status, BackgroundTasks
 from sqlalchemy.orm import Session
-from sqlalchemy import desc
+from sqlalchemy import desc, func
 from typing import Any, Dict
+from typing import Optional
 import math
 
 from middleware.admin_guard import verify_admin_token
@@ -118,6 +119,7 @@ def get_logs(
     type: str = Query("auth", pattern="^(auth|activity)$", description="Log type: 'auth' or 'activity'"),
     page: int = Query(1, ge=1, description="Page number"),
     limit: int = Query(50, ge=1, le=500, description="Items per page"),
+    date: Optional[str] = Query(None, description="Filter by date (YYYY-MM-DD)"),
     log_db: Session = Depends(get_log_db),
 ) -> Dict[str, Any]:
     """
@@ -133,6 +135,9 @@ def get_logs(
     try:
         if type == "auth":
             query = log_db.query(AuthLog)
+            if date:
+                query = query.filter(func.substr(AuthLog.timestamp_ist, 1, 10) == date)
+                
             total = query.count()
             total_pages = math.ceil(total / limit) if total > 0 else 0
             rows = query.order_by(desc(AuthLog.id)).offset((page - 1) * limit).limit(limit).all()
@@ -142,13 +147,14 @@ def get_logs(
                 "user_id": row.user_id,
                 "email": row.email,
                 "event_type": row.event_type,
-                "ip_address": row.ip_address,
                 "timestamp_ist": row.timestamp_ist,
                 "timestamp_gmt": row.timestamp_gmt,
                 "user_agent": row.user_agent,
             } for row in rows]
         else:
             query = log_db.query(ActivityLog)
+            if date:
+                query = query.filter(func.substr(ActivityLog.timestamp_ist, 1, 10) == date)
             total = query.count()
             total_pages = math.ceil(total / limit) if total > 0 else 0
             rows = query.order_by(desc(ActivityLog.id)).offset((page - 1) * limit).limit(limit).all()

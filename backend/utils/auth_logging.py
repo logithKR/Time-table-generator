@@ -13,7 +13,6 @@ from typing import Optional
 def log_auth_event(
     email: str,
     event_type: str,  # "LOGIN", "LOGOUT", "TOKEN_REFRESH", etc.
-    ip_address: Optional[str] = None,
     user_agent: Optional[str] = None,
     user_id: Optional[str] = None,
 ) -> bool:
@@ -23,7 +22,6 @@ def log_auth_event(
     Args:
         email: User's email address
         event_type: Type of event (LOGIN, LOGOUT, TOKEN_REFRESH, etc.)
-        ip_address: Client IP address
         user_agent: Browser/client user agent string
         user_id: Optional internal user ID
     
@@ -36,7 +34,6 @@ def log_auth_event(
                 user_id=user_id,
                 email=email,
                 event_type=event_type,
-                ip_address=ip_address,
                 timestamp_ist=get_ist_time(),
                 timestamp_gmt=get_gmt_time(),
                 user_agent=user_agent,
@@ -51,7 +48,6 @@ def log_auth_event(
 
 def log_login(
     email: str,
-    ip_address: Optional[str] = None,
     user_agent: Optional[str] = None,
     user_id: Optional[str] = None,
 ) -> bool:
@@ -59,7 +55,6 @@ def log_login(
     return log_auth_event(
         email=email,
         event_type="LOGIN",
-        ip_address=ip_address,
         user_agent=user_agent,
         user_id=user_id,
     )
@@ -67,7 +62,6 @@ def log_login(
 
 def log_logout(
     email: str,
-    ip_address: Optional[str] = None,
     user_agent: Optional[str] = None,
     user_id: Optional[str] = None,
 ) -> bool:
@@ -75,7 +69,6 @@ def log_logout(
     return log_auth_event(
         email=email,
         event_type="LOGOUT",
-        ip_address=ip_address,
         user_agent=user_agent,
         user_id=user_id,
     )
@@ -83,7 +76,6 @@ def log_logout(
 
 def log_token_refresh(
     email: str,
-    ip_address: Optional[str] = None,
     user_agent: Optional[str] = None,
     user_id: Optional[str] = None,
 ) -> bool:
@@ -91,7 +83,6 @@ def log_token_refresh(
     return log_auth_event(
         email=email,
         event_type="TOKEN_REFRESH",
-        ip_address=ip_address,
         user_agent=user_agent,
         user_id=user_id,
     )
@@ -100,13 +91,11 @@ def log_token_refresh(
 def log_failed_login(
     email: str,
     reason: str,
-    ip_address: Optional[str] = None,
     user_agent: Optional[str] = None,
 ) -> bool:
     """Log a failed login attempt."""
     return log_auth_event(
         email=email,
         event_type=f"LOGIN_FAILED ({reason})",
-        ip_address=ip_address,
         user_agent=user_agent,
     )

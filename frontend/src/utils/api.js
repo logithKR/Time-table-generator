@@ -324,8 +324,11 @@ export const triggerAdminSync = () =>
 export const getAdminSyncStatus = () =>
     adminApi.get('/sync/status');
 
-export const fetchAdminLogs = (type = 'auth', page = 1, limit = 50) =>
-    adminApi.get('/logs', { params: { type, page, limit } });
+export const fetchAdminLogs = (type = 'auth', page = 1, limit = 50, date = null) => {
+    const params = { type, page, limit };
+    if (date) params.date = date;
+    return adminApi.get('/logs', { params });
+};
 
 export const getAdminToken = () => localStorage.getItem('adminToken');
 export const setAdminToken = (token) => localStorage.setItem('adminToken', token);

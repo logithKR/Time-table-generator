@@ -43,7 +43,7 @@ def get_auth_logs(
     - page: Page number (default 1)
     - limit: Items per page (default 50, max 500)
     
-    Response includes: id, email, event_type, ip_address, timestamp_ist, timestamp_gmt, user_agent
+    Response includes: id, email, event_type, timestamp_ist, timestamp_gmt, user_agent
     """
     try:
         query = log_db.query(AuthLog)
@@ -68,7 +68,6 @@ def get_auth_logs(
                 "user_id": log.user_id,
                 "email": log.email,
                 "event_type": log.event_type,
-                "ip_address": log.ip_address,
                 "timestamp_ist": log.timestamp_ist,
                 "timestamp_gmt": log.timestamp_gmt,
                 "user_agent": log.user_agent,

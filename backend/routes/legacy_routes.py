@@ -1058,10 +1058,12 @@ def get_venue_timetable(venue_name: str, db: Session = Depends(get_db)):
 # ============================================
 
 @router.get("/students", response_model=List[schemas.StudentResponse])
-def get_students(department_code: Optional[str] = None, db: Session = Depends(get_db)):
+def get_students(department_code: Optional[str] = None, semester: Optional[int] = None, db: Session = Depends(get_db)):
     query = db.query(models.StudentMaster)
     if department_code:
         query = query.filter_by(department_code=department_code)
+    if semester:
+        query = query.filter_by(semester=semester)
     return query.all()
 
 @router.post("/students", response_model=schemas.StudentResponse)

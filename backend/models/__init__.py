@@ -60,6 +60,7 @@ class StudentMaster(Base):
     name = Column(String, nullable=False)
     email = Column(String, nullable=True)
     department_code = Column(String, ForeignKey('department_master.department_code'), nullable=False)
+    semester = Column(Integer, default=1)
     learning_mode_id = Column(Integer, default=1)
 
 class CourseRegistration(Base):

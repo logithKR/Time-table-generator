@@ -2006,7 +2006,11 @@ function App() {
                             department={editorDept}
                             semester={editorSem}
                             selectedModes={selectedLearningModes}
-                            onModesChange={setSelectedLearningModes}
+                            onModesChange={(newModes) => {
+                                setSelectedLearningModes(newModes);
+                                // Auto-refresh the print data when modes change
+                                fetchPrintData(editorDept, editorSem, newModes.sort().join(','));
+                            }}
                         />
                     </div>
                     <div className="pb-0.5">

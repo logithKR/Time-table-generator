@@ -289,11 +289,13 @@ class StudentBase(BaseModel):
     name: str
     email: Optional[str] = None
     department_code: str
+    semester: int = 1
 
 class StudentCreate(StudentBase):
     pass
 
 class StudentResponse(StudentBase):
+    semester: int = 1
     class Config:
         orm_mode = True
 

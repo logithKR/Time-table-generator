@@ -11,6 +11,7 @@ const StudentTimetable = ({ slots }) => {
 
     const [departments, setDepartments] = useState([]);
     const [selectedDept, setSelectedDept] = useState('');
+    const [selectedSem, setSelectedSem] = useState('');
     const [breakConfigs, setBreakConfigs] = useState([]);
 
     const [students, setStudents] = useState([]);
@@ -39,12 +40,12 @@ const StudentTimetable = ({ slots }) => {
 
     useEffect(() => {
         setLoadingStudents(true);
-        getStudents(selectedDept || '').then(res => {
+        getStudents(selectedDept || '', selectedSem || '').then(res => {
             setStudents(res.data);
             setSelectedStudentId('');
             setTimetableData(null);
         }).catch(console.error).finally(() => setLoadingStudents(false));
-    }, [selectedDept]);
+    }, [selectedDept, selectedSem]);
 
     const fetchTimetable = async () => {
         if (!selectedStudentId) return;
@@ -211,6 +212,18 @@ const StudentTimetable = ({ slots }) => {
                     <option value="">All Departments</option>
                     {departments.map(d => (
                         <option key={d.department_code} value={d.department_code}>{d.department_code}</option>
+                    ))}
+                </select>
+
+                {/* Semester */}
+                <select
+                    value={selectedSem}
+                    onChange={(e) => { setSelectedSem(e.target.value); setSelectedStudentId(''); setTimetableData(null); }}
+                    className="p-2.5 border border-violet-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-violet-400 focus:border-violet-400 focus:outline-none shadow-sm font-medium text-gray-700 cursor-pointer transition-all hover:border-violet-300"
+                >
+                    <option value="">All Semesters</option>
+                    {[1,2,3,4,5,6,7,8].map(s => (
+                        <option key={s} value={s}>Semester {s}</option>
                     ))}
                 </select>
 

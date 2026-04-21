@@ -418,7 +418,9 @@ function App() {
             setActiveTab('print');
         } catch (e) {
             console.error("Print Load Error:", e);
-            alert("Failed to load data. If viewing 'All Departments', ensure Backend supports empty parameters.");
+            // Silently handle — show empty state instead of alert
+            setTimetableEntries([]);
+            setDetectedConflicts({ faculty_conflicts: [], venue_conflicts: [] });
         } finally {
             setLoading(false);
         }
@@ -1999,19 +2001,41 @@ function App() {
                         </select>
                     </div>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end mt-4">
-                    <div className="md:col-span-3">
+                <div className="flex flex-wrap gap-3 items-end mt-4">
+                    <div className="flex-1">
                         <label className="block text-sm font-semibold text-gray-700 mb-1.5">Learning Mode</label>
-                        <LearningModeSelector 
-                            department={editorDept}
-                            semester={editorSem}
-                            selectedModes={selectedLearningModes}
-                            onModesChange={(newModes) => {
-                                setSelectedLearningModes(newModes);
-                                // Auto-refresh the print data when modes change
-                                fetchPrintData(editorDept, editorSem, newModes.sort().join(','));
-                            }}
-                        />
+                        <div className="flex flex-wrap items-center gap-2 bg-violet-50/50 p-2 border border-violet-100 rounded-xl">
+                            {[
+                                { modes: [1], label: 'UAL Only', modeStr: '1', dotColor: 'bg-blue-500' },
+                                { modes: [2], label: 'PBL Only', modeStr: '2', dotColor: 'bg-emerald-500' },
+                                { modes: [1, 2], label: 'Combined', modeStr: '1,2', dotColor: 'bg-violet-500' }
+                            ].map(opt => {
+                                const currentStr = selectedLearningModes.sort().join(',');
+                                const isActive = currentStr === opt.modeStr;
+                                return (
+                                    <button
+                                        key={opt.modeStr}
+                                        onClick={() => {
+                                            setSelectedLearningModes(opt.modes);
+                                            fetchPrintData(editorDept, editorSem, opt.modeStr);
+                                        }}
+                                        disabled={loading}
+                                        className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all border-2 ${
+                                            isActive
+                                                ? 'bg-violet-600 text-white border-violet-600 shadow-md'
+                                                : 'bg-white text-gray-500 border-violet-100 hover:border-violet-300'
+                                        } disabled:opacity-50 disabled:cursor-not-allowed`}
+                                    >
+                                        <div className={`w-2 h-2 rounded-full ${isActive ? 'bg-white' : opt.dotColor}`} />
+                                        <span>{opt.label}</span>
+                                        {loading && isActive && <RotateCw className="w-3 h-3 animate-spin" />}
+                                    </button>
+                                );
+                            })}
+                            <span className="ml-auto text-[10px] text-violet-400 font-bold uppercase tracking-widest pr-1 hidden sm:inline-block">
+                                {selectedLearningModes.length === 2 ? 'All Students' : selectedLearningModes.includes(1) ? 'UAL Students' : 'PBL Students'}
+                            </span>
+                        </div>
                     </div>
                     <div className="pb-0.5">
                         <button

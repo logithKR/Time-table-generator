@@ -44,6 +44,8 @@ SYNC_STATE = {
     "error": None
 }
 
+from fastapi.concurrency import run_in_threadpool
+
 def _run_sync_job():
     global SYNC_STATE
     SYNC_STATE["is_running"] = True
@@ -60,10 +62,11 @@ def _run_sync_job():
         SYNC_STATE["is_running"] = False
 
 @router.post("/sync-cms")
-def run_sync_cms(background_tasks: BackgroundTasks):
+async def run_sync_cms(background_tasks: BackgroundTasks):
     global SYNC_STATE
     if SYNC_STATE["is_running"]:
         return {"status": "started", "message": "A sync is already in progress."}
+    # FastAPI background tasks execute in threadpool, ensuring event loop is free
     background_tasks.add_task(_run_sync_job)
     return {"status": "started", "message": "CMS Data sync started in the background."}
 
@@ -764,10 +767,10 @@ def merge_configs(default_c, saved_c):
 
 
 @router.post("/generate")
-def generate_timetable(request: schemas.GenerateRequest, db: Session = Depends(get_db)):
+async def generate_timetable(request: schemas.GenerateRequest, db: Session = Depends(get_db)):
     from services.solver_engine import generate_schedule
 
-    config_record = db.query(models.SchedulerConfig).first()
+    config_record = await run_in_threadpool(lambda: db.query(models.SchedulerConfig).first())
     config = DEFAULT_CONFIG
     if config_record and config_record.config_json:
         if isinstance(config_record.config_json, str):
@@ -782,22 +785,24 @@ def generate_timetable(request: schemas.GenerateRequest, db: Session = Depends(g
     except (KeyError, AttributeError):
         pass
 
-    result = generate_schedule(
+    # Process CP-SAT solver in a separate thread so it doesn't block the async event loop
+    result = await run_in_threadpool(
+        generate_schedule,
         db,
-        department_code=request.department_code,
-        semester=request.semester,
-        mentor_day=request.mentor_day,
-        mentor_period=request.mentor_period,
-        hard_mode=hard_mode
+        request.department_code,
+        request.semester,
+        request.mentor_day,
+        request.mentor_period,
+        hard_mode
     )
 
     if isinstance(result, bool):
         if result:
             return {"status": "success", "message": "Timetable generated successfully", "warnings": []}
         else:
-            courses = db.query(models.CourseMaster).filter_by(
+            courses = await run_in_threadpool(lambda: db.query(models.CourseMaster).filter_by(
                 department_code=request.department_code, semester=request.semester, is_open_elective=False
-            ).all()
+            ).all())
             if not courses:
                 raise HTTPException(status_code=400, detail=f"No courses found for {request.department_code} Sem {request.semester}.")
             total_ws = sum(c.weekly_sessions for c in courses)

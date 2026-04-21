@@ -5,6 +5,7 @@ This maintains complete isolation from the main application database.
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy.pool import SingletonThreadPool
 from contextlib import contextmanager
 from typing import Generator
 import os
@@ -16,10 +17,14 @@ LOG_DATABASE_URL = f"sqlite:///{DB_FILE}"
 
 print(f"[LOG_DB] Using database: {DB_FILE}")
 
-# Logging DB Engine - Separate from main application DB
+# Logging DB Engine - Separate from main application DB with recycling
 log_engine = create_engine(
     LOG_DATABASE_URL, 
-    connect_args={"check_same_thread": False}
+    connect_args={"check_same_thread": False},
+    poolclass=SingletonThreadPool,
+    pool_size=20,
+    pool_recycle=1800,
+    pool_pre_ping=True
 )
 
 LoggingBase = declarative_base()

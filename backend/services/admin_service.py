@@ -106,9 +106,9 @@ class AdminService:
         except Exception as e:
             raise AppException(500, "LOG_READ_ERROR", "Failed to read logs from database", str(e))
 
-    def sync_cms(self) -> None:
+    async def sync_cms(self) -> None:
         """Simulates synchronous CMS data execution."""
-        import time
+        import asyncio
         # In a real scenario, this delegates to the sync engine
-        time.sleep(2)
+        await asyncio.sleep(2)
         return

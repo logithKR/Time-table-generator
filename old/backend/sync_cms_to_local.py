@@ -6,14 +6,15 @@ import os
 # Load .env file if python-dotenv is available
 try:
     from dotenv import load_dotenv
-    load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '.env'))
+    env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'backend', '.env')
+    load_dotenv(env_path)
 except ImportError:
     pass  # python-dotenv not installed, rely on system env vars
 
 SOURCE_DB_CONFIG = {
     "host": os.getenv("CMS_DB_HOST", ""),
     "user": os.getenv("CMS_DB_USER", ""),
-    "password": os.getenv("CMS_DB_PASSWORD", ""),
+    "password": os.getenv("CMS_DB_PASS", ""),
     "port": int(os.getenv("CMS_DB_PORT", "3306")),
     "database": os.getenv("CMS_DB_NAME", "cms")
 }
@@ -62,32 +63,30 @@ def sync_databases():
             database=SOURCE_DB_CONFIG['database']
         )
     except Exception as e:
-        print(f"❌ Failed to connect to MySQL: {e}")
+        print(f"[X] Failed to connect to MySQL: {e}")
         return
 
     print(f"Connecting to local SQLite Database ({LOCAL_DB_NAME})...")
     sqlite_conn = sqlite3.connect(LOCAL_DB_NAME)
 
-    try:
-        total = len(QUERIES)
-        for i, (table_name, query) in enumerate(QUERIES.items(), 1):
-            print(f"[{i}/{total}] Syncing table: {table_name}...")
-            
+    total = len(QUERIES)
+    for i, (table_name, query) in enumerate(QUERIES.items(), 1):
+        print(f"[{i}/{total}] Syncing table: {table_name}...")
+        try:
             # Fetch from MySQL
             df = pd.read_sql(query, mysql_conn)
             
             # Save to SQLite (replaces the table if it exists)
             df.to_sql(table_name, sqlite_conn, if_exists='replace', index=False)
+            sqlite_conn.commit()
             
             print(f"  -> Successfully imported {len(df)} rows to local DB.")
+        except Exception as e:
+            print(f"  [X] Skipping {table_name} due to an error: {e}")
             
-        print("\n✅ All tables synchronized successfully into local database!")
-        
-    except Exception as e:
-        print(f"❌ Error occurred during sync: {e}")
-    finally:
-        mysql_conn.close()
-        sqlite_conn.close()
+    print("\n[*] All accessible tables synchronized successfully into local database!")
+    mysql_conn.close()
+    sqlite_conn.close()
 
 if __name__ == "__main__":
     sync_databases()

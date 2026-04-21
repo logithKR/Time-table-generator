@@ -1,4 +1,4 @@
-cleafastapi
+fastapi
 uvicorn
 sqlalchemy
 python-multipart

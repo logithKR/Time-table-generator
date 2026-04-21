@@ -34,12 +34,7 @@ from utils.auth_logging import log_login, log_logout, log_token_refresh, log_fai
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-def _client_ip(request: Request) -> str:
-    """Extract client IP, respecting X-Forwarded-For behind a proxy."""
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    return request.client.host if request.client else ""
+
 
 
 def _user_agent(request: Request) -> str:
@@ -53,7 +48,6 @@ class LoginRequest(BaseModel):
 @router.post("/login")
 def login(body: LoginRequest, request: Request, response: Response, db: Session = Depends(get_db)):
     """Verify Google credential → issue dual tokens + CSRF cookie."""
-    ip = _client_ip(request)
     ua = _user_agent(request)
 
     # 1. Verify Google token (raises 401 on failure)
@@ -121,7 +115,6 @@ def login(body: LoginRequest, request: Request, response: Response, db: Session 
 @router.post("/refresh")
 def refresh(request: Request, response: Response, db: Session = Depends(get_db)):
     """Validate refresh token → rotate both tokens."""
-    ip = _client_ip(request)
     ua = _user_agent(request)
 
     refresh_token_value = request.cookies.get("refresh_token")
@@ -161,7 +154,6 @@ def refresh(request: Request, response: Response, db: Session = Depends(get_db))
 @router.post("/logout")
 def logout(request: Request, response: Response, db: Session = Depends(get_db)):
     """Clear all authentication cookies."""
-    ip = _client_ip(request)
     ua = _user_agent(request)
 
     # Try to extract user email from access token for logging (best-effort)

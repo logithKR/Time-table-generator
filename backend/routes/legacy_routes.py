@@ -44,9 +44,9 @@ SYNC_STATE = {
     "error": None
 }
 
-from fastapi.concurrency import run_in_threadpool
+import asyncio
 
-def _run_sync_job():
+async def _run_sync_job():
     global SYNC_STATE
     SYNC_STATE["is_running"] = True
     SYNC_STATE["status"] = "syncing"
@@ -54,7 +54,7 @@ def _run_sync_job():
     SYNC_STATE["result"] = None
     try:
         from services.sync_cms_to_local import sync_databases
-        result = sync_databases()
+        result = await asyncio.to_thread(sync_databases)
         SYNC_STATE["status"] = "complete"
         SYNC_STATE["result"] = result
     except Exception as e:
@@ -771,8 +771,12 @@ def merge_configs(default_c, saved_c):
 @router.post("/generate")
 async def generate_timetable(request: schemas.GenerateRequest, db: Session = Depends(get_db)):
     from services.solver_engine import generate_schedule
+    import asyncio
 
-    config_record = await run_in_threadpool(lambda: db.query(models.SchedulerConfig).first())
+    def _get_config():
+        return db.query(models.SchedulerConfig).first()
+
+    config_record = await asyncio.to_thread(_get_config)
     config = DEFAULT_CONFIG
     if config_record and config_record.config_json:
         if isinstance(config_record.config_json, str):
@@ -788,7 +792,7 @@ async def generate_timetable(request: schemas.GenerateRequest, db: Session = Dep
         pass
 
     # Process CP-SAT solver in a separate thread so it doesn't block the async event loop
-    result = await run_in_threadpool(
+    result = await asyncio.to_thread(
         generate_schedule,
         db,
         request.department_code,

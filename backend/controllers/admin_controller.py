@@ -45,7 +45,7 @@ def _emit(level: str, message: str):
         "ts": datetime.now().strftime("%H:%M:%S"),
     })
 
-def _run_admin_sync_job():
+async def _run_admin_sync_job():
     global ADMIN_SYNC_STATE
     ADMIN_SYNC_STATE["is_running"] = True
     ADMIN_SYNC_STATE["status"] = "syncing"
@@ -54,7 +54,8 @@ def _run_admin_sync_job():
     ADMIN_SYNC_STATE["logs"] = []
     try:
         from services.sync_cms_to_local import sync_databases
-        result = sync_databases(emit=_emit)
+        import asyncio
+        result = await asyncio.to_thread(sync_databases, emit=_emit)
         ADMIN_SYNC_STATE["status"] = "complete"
         ADMIN_SYNC_STATE["result"] = result
         _emit("success", "All sync steps completed successfully.")

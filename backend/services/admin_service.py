@@ -75,7 +75,6 @@ class AdminService:
                     "user_id": row.user_id,
                     "email": row.email,
                     "event_type": row.event_type,
-                    "ip_address": row.ip_address,
                     "timestamp_ist": row.timestamp_ist,
                     "timestamp_gmt": row.timestamp_gmt,
                     "user_agent": row.user_agent

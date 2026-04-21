@@ -6,11 +6,19 @@ export default defineConfig({
     base: './',
 
     server: {
+        headers: {
+            'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
+        },
         proxy: {
             '/api': {
                 target: 'http://127.0.0.1:8000',
                 changeOrigin: true
             }
+        }
+    },
+    preview: {
+        headers: {
+            'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
         }
     }
 })

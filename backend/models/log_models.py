@@ -41,7 +41,6 @@ class AuthLog(LoggingBase):
     user_id = Column(String(255), nullable=True)  # Internal user ID if available
     email = Column(String(255), nullable=False, index=True)  # User email
     event_type = Column(String(50), nullable=False)  # "LOGIN", "LOGOUT", "TOKEN_REFRESH", etc.
-    ip_address = Column(String(45), nullable=True)  # IPv4 or IPv6
     timestamp_ist = Column(String(100), nullable=False, default=get_ist_time)  # e.g., "2026-04-20 11:30 AM"
     timestamp_gmt = Column(String(100), nullable=False, default=get_gmt_time)  # e.g., "2026-04-20 06:00 AM"
     user_agent = Column(String(512), nullable=True)  # Browser/client info

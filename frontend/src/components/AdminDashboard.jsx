@@ -21,6 +21,10 @@ function AdminDashboard({ onLogout }) {
     const [logsError, setLogsError] = useState(null);
     const logsLimit = 25;
 
+    // Date filters
+    const today = new Date().toISOString().split('T')[0];
+    const [filterDate, setFilterDate] = useState(today);
+
     // Active tab
     const [activeTab, setActiveTab] = useState('sync');
 
@@ -29,7 +33,7 @@ function AdminDashboard({ onLogout }) {
         setLogsLoading(true);
         setLogsError(null);
         try {
-            const res = await api.fetchAdminLogs(logType, logsPage, logsLimit);
+            const res = await api.fetchAdminLogs(logType, logsPage, logsLimit, filterDate);
             const payload = res.data;
             setLogs(payload.data || []);
             setLogsTotal(payload.total || 0);
@@ -40,7 +44,7 @@ function AdminDashboard({ onLogout }) {
         } finally {
             setLogsLoading(false);
         }
-    }, [logType, logsPage]);
+    }, [logType, logsPage, filterDate]);
 
     useEffect(() => {
         if (activeTab === 'logs') {
@@ -177,23 +181,59 @@ function AdminDashboard({ onLogout }) {
                 {/* ===== LOGS TAB ===== */}
                 {activeTab === 'logs' && (
                     <div className="admin-logs-panel">
-                        {/* Filter bar */}
-                        <div className="admin-logs-filter-bar">
-                            <div className="admin-logs-filter-group">
-                                <Filter className="w-4 h-4 text-gray-500" />
-                                <select
-                                    value={logType}
-                                    onChange={(e) => { setLogType(e.target.value); setLogsPage(1); }}
-                                    className="admin-logs-select"
-                                >
-                                    <option value="activity">Activity Logs</option>
-                                    <option value="auth">Auth Logs</option>
-                                </select>
-                            </div>
-                            <button onClick={fetchLogs} className="admin-logs-refresh-btn" disabled={logsLoading}>
-                                <RefreshCw className={`w-4 h-4 ${logsLoading ? 'animate-spin' : ''}`} />
-                                Refresh
+                        <div className="admin-logs-tab-bar" style={{ display: 'flex', gap: '4px', background: '#f3f4f6', padding: '4px', borderRadius: '12px', marginBottom: '1.5rem' }}>
+                            <button
+                                onClick={() => { setLogType('auth'); setLogsPage(1); }}
+                                style={{
+                                    flex: 1, padding: '8px 16px', borderRadius: '10px', fontSize: '14px', fontWeight: '600', transition: 'all 0.2s',
+                                    background: logType === 'auth' ? 'white' : 'transparent',
+                                    color: logType === 'auth' ? '#4f46e5' : '#6b7280',
+                                    boxShadow: logType === 'auth' ? '0 4px 6px -1px rgba(0,0,0,0.1)' : 'none',
+                                    border: 'none', cursor: 'pointer'
+                                }}
+                            >
+                                Authentication Logs
                             </button>
+                            <button
+                                onClick={() => { setLogType('activity'); setLogsPage(1); }}
+                                style={{
+                                    flex: 1, padding: '8px 16px', borderRadius: '10px', fontSize: '14px', fontWeight: '600', transition: 'all 0.2s',
+                                    background: logType === 'activity' ? 'white' : 'transparent',
+                                    color: logType === 'activity' ? '#4f46e5' : '#6b7280',
+                                    boxShadow: logType === 'activity' ? '0 4px 6px -1px rgba(0,0,0,0.1)' : 'none',
+                                    border: 'none', cursor: 'pointer'
+                                }}
+                            >
+                                System Activity Logs
+                            </button>
+                        </div>
+
+                        {/* Filter bar */}
+                        <div className="admin-logs-filter-bar" style={{ display: 'flex', flexWrap: 'wrap', gap: '15px', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                            <div className="admin-logs-filter-group" style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'white', padding: '6px 12px', borderRadius: '10px', border: '1px solid #e5e7eb' }}>
+                                    <Filter className="w-4 h-4 text-gray-400" />
+                                    <span style={{ fontSize: '13px', fontWeight: '500', color: '#6b7280' }}>Select Date:</span>
+                                    <input 
+                                        type="date" 
+                                        value={filterDate} 
+                                        onChange={(e) => { setFilterDate(e.target.value); setLogsPage(1); }}
+                                        style={{ border: 'none', outline: 'none', fontSize: '13px', color: '#111827', fontWeight: '600', cursor: 'pointer' }}
+                                    />
+                                </div>
+                            </div>
+                            <div style={{ display: 'flex', gap: '10px' }}>
+                                <button onClick={() => {
+                                    setFilterDate(today);
+                                    setLogsPage(1);
+                                }} className="admin-logs-refresh-btn" style={{ backgroundColor: '#f3f4f6', color: '#4b5563', border: '1px solid #d1d5db' }}>
+                                    Reset to Today
+                                </button>
+                                <button onClick={fetchLogs} className="admin-logs-refresh-btn" disabled={logsLoading}>
+                                    <RefreshCw className={`w-4 h-4 ${logsLoading ? 'animate-spin' : ''}`} />
+                                    Refresh
+                                </button>
+                            </div>
                         </div>
 
                         {/* Error */}
@@ -226,7 +266,6 @@ function AdminDashboard({ onLogout }) {
                                             {logType === 'auth' ? (
                                                 <>
                                                     <th>Event</th>
-                                                    <th>IP Address</th>
                                                 </>
                                             ) : (
                                                 <>
@@ -240,14 +279,16 @@ function AdminDashboard({ onLogout }) {
                                     <tbody>
                                         {logs.map((log, idx) => (
                                             <tr key={log.id || idx}>
-                                                <td className="admin-log-ts">
-                                                    <Clock className="w-3.5 h-3.5 text-gray-400" />
-                                                    {log.timestamp_ist || '—'}
+                                                <td>
+                                                    <div className="admin-log-ts" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                        <Clock className="w-3.5 h-3.5 text-gray-400" />
+                                                        <span>{log.timestamp_ist || '—'}</span>
+                                                    </div>
                                                 </td>
-                                                <td className="admin-log-ts" style={{ color: '#9ca3af' }}>
+                                                <td style={{ color: '#9ca3af' }}>
                                                     {log.timestamp_gmt || '—'}
                                                 </td>
-                                                <td className="admin-log-user">
+                                                <td className="admin-log-user" style={{ fontWeight: '500' }}>
                                                     {log.email || '—'}
                                                 </td>
 
@@ -262,9 +303,6 @@ function AdminDashboard({ onLogout }) {
                                                             }`}>
                                                                 {log.event_type}
                                                             </span>
-                                                        </td>
-                                                        <td style={{ color: '#6b7280', fontSize: '0.85rem' }}>
-                                                            {log.ip_address || '—'}
                                                         </td>
                                                     </>
                                                 ) : (

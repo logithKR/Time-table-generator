@@ -138,6 +138,7 @@ class TimetableEntry(Base):
     period_number = Column(Integer)
     venue_name = Column(String, nullable=True) # Override venue specifically for this class
     section_number = Column(Integer, default=1, nullable=True) # For multi-section classes
+    learning_mode_ids = Column(String, default="1,2", nullable=False) # e.g., "1", "2", "1,2"
     
     created_at = Column(String)
 
@@ -257,6 +258,7 @@ class TimetableData(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     department = Column(String, nullable=False)
     semester = Column(Integer, nullable=False)
+    learning_mode_ids = Column(String, default="1,2", nullable=False)
     data = Column(String, nullable=False) # Store generated JSON string
     created_at = Column(String, nullable=False)
 

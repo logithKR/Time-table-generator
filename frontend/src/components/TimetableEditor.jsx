@@ -3,6 +3,7 @@ import { DndContext, useDroppable, useDraggable, DragOverlay, MouseSensor, Touch
 import { CSS } from '@dnd-kit/utilities';
 import * as api from '../utils/api';
 import { Search, Save, Trash2, Download, Undo2, Coffee, X, BookOpen, FlaskConical, Users2, LayoutTemplate, Palette, ArrowLeftRight, Plus, ChevronDown, Pencil, Type, AlertTriangle, Eye, Merge } from 'lucide-react';
+import LearningModeSelector from './LearningModeSelector';
 
 // ─── Simplified Color Palette (Preserved) ───
 const THEORY_STYLE = {
@@ -743,10 +744,13 @@ const ManualEntryModal = ({ isOpen, onClose, onSave, initialData, allSections, i
 // ═══════════════════════════════════════════
 // MAIN COMPONENT
 // ═══════════════════════════════════════════
-export default function TimetableEditor({ department, semester, onSave, onExportPDF }) {
+export default function TimetableEditor({ department, semester, initialData, masterData, onSave, onExportPDF, selectedLearningModes: initialLearningModes }) {
     const [allCourses, setAllCourses] = useState([]);
-    const [entries, setEntries] = useState([]);
+    const [entries, setEntries] = useState(initialData || []);
+    const [localLearningModes, setLocalLearningModes] = useState(initialLearningModes || [1, 2]);
+    const [isSaving, setIsSaving] = useState(false);
     const [history, setHistory] = useState([]);
+    const [historyIndex, setHistoryIndex] = useState(0);
     const [redoStack, setRedoStack] = useState([]);
     const [slots, setSlots] = useState([]);
     const [departments, setDepartments] = useState([]);
@@ -786,8 +790,9 @@ export default function TimetableEditor({ department, semester, onSave, onExport
 
     const loadData = async () => {
         try {
+            const modeIdsStr = localLearningModes.sort().join(',');
             const [tRes, sRes, dRes] = await Promise.all([
-                api.getTimetable(department, semester),
+                api.getTimetable(department, semester, modeIdsStr),
                 api.getSlots(),
                 api.getDepartments()
             ]);
@@ -795,6 +800,9 @@ export default function TimetableEditor({ department, semester, onSave, onExport
             setSlots(sRes.data || []);
             setDepartments(dRes.data?.map(d => d.department_code) || []);
             setPaletteDept(department);
+            // Reset history when loading new data
+            setHistory([{ entries: [...(tRes.data || [])], action: 'Initial Load' }]);
+            setHistoryIndex(0);
         } catch (err) { console.error('Load error:', err); }
     };
 
@@ -1173,11 +1181,41 @@ export default function TimetableEditor({ department, semester, onSave, onExport
     };
 
     const handleSave = async () => {
+        setIsSaving(true);
         try {
-            await api.saveTimetable({ department_code: department, semester: parseInt(semester), entries });
-            alert('Timetable Saved Successfully!');
+            await onSave(entries, localLearningModes);
+            setHistory([{ entries: [...entries], action: 'Initial Save' }]);
+            setHistoryIndex(0);
+        } catch (error) {
+            console.error("Save error:", error);
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const handleModeSwitch = async (modeId) => {
+        const updated = localLearningModes.includes(modeId)
+            ? localLearningModes.filter(id => id !== modeId)
+            : [...localLearningModes, modeId];
+        
+        if (updated.length === 0) return; // Must select at least one
+
+        if (historyIndex > 0 && !confirm("You have unsaved changes. Switching modes will load the saved timetable for that mode and discard current edits. Proceed?")) {
+            return;
+        }
+
+        setLocalLearningModes(updated);
+        
+        // Fetch data for the new mode combination
+        try {
+            const modeIdsStr = updated.sort().join(',');
+            const res = await api.getTimetableEntries(department, semester, modeIdsStr);
+            setEntries(res.data || []);
+            setHistory([{ entries: [...(res.data || [])], action: `Loaded ${modeIdsStr}` }]);
+            setHistoryIndex(0);
         } catch (err) {
-            alert('Failed to save: ' + err.message);
+            console.error("Failed to fetch mode-specific timetable:", err);
+            alert("Failed to load timetable for selected modes.");
         }
     };
 
@@ -1552,10 +1590,24 @@ export default function TimetableEditor({ department, semester, onSave, onExport
                             <span className="text-violet-200 h-5 w-px bg-violet-200"></span>
                             <span className="text-base font-medium text-gray-500">Sem {semester}</span>
                         </div>
-                        <div className="flex items-center gap-2 px-3 py-1.5 bg-violet-50 text-violet-700 rounded-lg border border-violet-100">
-                            <LayoutTemplate className="w-4 h-4 text-violet-500" />
-                            <span className="text-xs font-bold tracking-wide uppercase">{entries.length} Classes</span>
-                        </div>
+                        <LearningModeSelector 
+                            department={department}
+                            semester={semester}
+                            selectedModes={localLearningModes}
+                            onModesChange={(newModes) => {
+                                // LearningModeSelector passes the full updated array;
+                                // find which id was toggled and pass it to handleModeSwitch
+                                const added = newModes.find(id => !localLearningModes.includes(id));
+                                const removed = localLearningModes.find(id => !newModes.includes(id));
+                                if (added !== undefined) handleModeSwitch(added);
+                                else if (removed !== undefined) handleModeSwitch(removed);
+                            }}
+                            className="scale-95"
+                        />
+                        <div className="h-6 w-px bg-gray-200 mx-2 hidden md:block"></div>
+                        <button onClick={handleSave} disabled={isSaving} className="flex items-center gap-2 bg-emerald-600 text-white px-5 py-2 rounded-xl text-sm font-bold shadow-lg shadow-emerald-200 hover:bg-emerald-700 transition-all hover:-translate-y-0.5 active:scale-95 disabled:bg-gray-400">
+                            <Save className="w-4 h-4" /> Save Changes
+                        </button>
                         {/* View Options (Fix 6) */}
                         <div className="flex items-center gap-3 bg-white p-2 border border-gray-200 rounded-lg shadow-sm text-xs">
                             <span className="font-semibold text-gray-500 flex items-center gap-1 pr-2 border-r border-gray-200">

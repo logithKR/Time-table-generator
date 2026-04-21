@@ -16,7 +16,9 @@ def print(*args, **kwargs):
             safe_args.append(s.encode(sys.stdout.encoding or 'utf-8', errors='replace').decode(sys.stdout.encoding or 'utf-8', errors='replace'))
         _builtin_print(*safe_args, **kwargs)
 
-def generate_schedule(db: Session, department_code: str, semester: int, mentor_day: str, mentor_period: int = 8, hard_mode: bool = False):
+from typing import List, Optional
+
+def generate_schedule(db: Session, department_code: str, semester: int, mentor_day: str, mentor_period: int = 8, hard_mode: bool = False, learning_mode_ids: Optional[List[int]] = None):
     """
     Generates a timetable matching real BIT college pattern, driven by SchedulerConfig.
     """
@@ -24,6 +26,9 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
     DEFAULT_CONFIG = {}
     
     print(f"🚀 Starting Solver for Dept: {department_code}, Sem: {semester}...")
+    
+    learning_mode_str = ",".join(sorted(map(str, learning_mode_ids))) if learning_mode_ids else "1,2"
+    db.query(models.TimetableEntry).filter_by(department_code=department_code, semester=semester, learning_mode_ids=learning_mode_str).delete()
 
     # =========================================================
     # 0. FETCH CONFIG
@@ -124,6 +129,17 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
     # Reject Language Electives with no faculty
     valid_courses = []
     for course in courses:
+        # --- NEW: Learning Mode Filter ---
+        if learning_mode_ids:
+            try:
+                enroll_data = json.loads(course.enrollment_data) if course.enrollment_data else {}
+                mode_total = sum(enroll_data.get(str(m_id), 0) for m_id in learning_mode_ids)
+                if mode_total == 0:
+                    print(f"⏩ Skipping {course.course_code} - zero registrations for modes {learning_mode_ids}")
+                    continue
+            except Exception as e:
+                print(f"⚠️ Error parsing enrollment_data for {course.course_code}: {e}")
+
         is_lang = course.course_category and "LANGUAGE" in course.course_category.upper()
         has_fac = len(course_faculty.get(course.course_code, [])) > 0
         if is_lang and not has_fac:
@@ -213,7 +229,19 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
     sem_count = db.query(models.DepartmentSemesterCount).filter_by(
         department_code=department_code, semester=semester
     ).first()
-    student_count = sem_count.student_count if sem_count and sem_count.student_count > 0 else 60
+    
+    student_count = 60
+    if sem_count:
+        if learning_mode_ids:
+            try:
+                count_data = json.loads(sem_count.student_count_data) if sem_count.student_count_data else {}
+                student_count = sum(count_data.get(str(m_id), 0) for m_id in learning_mode_ids)
+            except:
+                student_count = sem_count.student_count
+        else:
+            student_count = sem_count.student_count
+    
+    if student_count <= 0: student_count = 60
 
     max_classroom_cap = max((c[1] for c in classroom_venues_info), default=c_default_cap)
     max_lab_cap = max((c[1] for c in lab_venues_info), default=c_default_cap)
@@ -221,7 +249,17 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
     # Helper to calculate sections dynamically per course based on accurate enrollment counts
     def get_course_sections(course_code, is_lab_req):
         course_obj = next((c for c in courses if c.course_code == course_code), None)
-        enrolled = course_obj.enrolled_students if course_obj and course_obj.enrolled_students else 0
+        if not course_obj: return 1
+
+        enrolled = 0
+        if learning_mode_ids:
+            try:
+                enroll_data = json.loads(course_obj.enrollment_data) if course_obj.enrollment_data else {}
+                enrolled = sum(enroll_data.get(str(m_id), 0) for m_id in learning_mode_ids)
+            except:
+                enrolled = course_obj.enrolled_students or 0
+        else:
+            enrolled = course_obj.enrolled_students or 0
         
         # Cap enrolled at student_count to prevent global course enrollments
         base_count = min(enrolled, student_count) if enrolled > 0 else student_count
@@ -1054,7 +1092,7 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                             display_name = gc_name
                             
                             entry = models.TimetableEntry(
-                                department_code=department_code, semester=semester,
+                                department_code=department_code, semester=semester, learning_mode_ids=learning_mode_str,
                                 course_code=gc.course_code, course_name=display_name,
                                 faculty_id=fac_assigned[0], faculty_name=fac_assigned[1],
                                 session_type='THEORY',
@@ -1119,7 +1157,7 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                                     display_name = gc_name
                                     
                                     entry = models.TimetableEntry(
-                                        department_code=department_code, semester=semester,
+                                        department_code=department_code, semester=semester, learning_mode_ids=learning_mode_str,
                                         course_code=gc.course_code, course_name=display_name,
                                         faculty_id=fac_assigned[0], faculty_name=fac_assigned[1],
                                         session_type='LAB',
@@ -1184,7 +1222,7 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                         slot_obj = slot_lookup.get((day, p))
                         if slot_obj:
                             db.add(models.TimetableEntry(
-                                department_code=department_code, semester=semester,
+                                department_code=department_code, semester=semester, learning_mode_ids=learning_mode_str,
                                 course_code=c.course_code,
                                 course_name=f"B{batch_idx+1}: {cname}" if len(core_lab_courses_to_merge) > 1 else cname,
                                 faculty_id=fac_assigned[0], faculty_name=fac_assigned[1],
@@ -1223,7 +1261,7 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                         slot_obj = slot_lookup.get((day, p))
                         if slot_obj:
                             db.add(models.TimetableEntry(
-                                department_code=department_code, semester=semester,
+                                department_code=department_code, semester=semester, learning_mode_ids=learning_mode_str,
                                 course_code=c.course_code,
                                 course_name=f"{cname} (Theory)",
                                 faculty_id=fac_assigned[0], faculty_name=fac_assigned[1],
@@ -1304,7 +1342,7 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                 sec_num = 2 if already_there else 1
                 c_venue = assign_venue(day, period, c.course_code, False, count)
                 db.add(models.TimetableEntry(
-                    department_code=department_code, semester=semester,
+                    department_code=department_code, semester=semester, learning_mode_ids=learning_mode_str,
                     course_code=c.course_code, course_name=cname,
                     faculty_id=fid, faculty_name=fname,
                     session_type=stype,
@@ -1339,7 +1377,7 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                 slot_obj = slot_lookup[(day, period)]
                 c_venue = assign_venue(day, period, c.course_code, False, count)
                 db.add(models.TimetableEntry(
-                    department_code=department_code, semester=semester,
+                    department_code=department_code, semester=semester, learning_mode_ids=learning_mode_str,
                     course_code=c.course_code, course_name=cname,
                     faculty_id=fid, faculty_name=fname,
                     session_type=stype,
@@ -1414,7 +1452,7 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
             cname = course_names.get(course.course_code, course.course_code)
             c_venue = assign_venue(day, period, course.course_code, False, count)
             db.add(models.TimetableEntry(
-                department_code=department_code, semester=semester,
+                department_code=department_code, semester=semester, learning_mode_ids=learning_mode_str,
                 course_code=course.course_code, course_name=cname,
                 faculty_id=fid, faculty_name=fname,
                 session_type=stype,
@@ -1494,7 +1532,7 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
     if (mentor_day_clean, mentor_period) in slot_lookup:
         slot_obj = slot_lookup[(mentor_day_clean, mentor_period)]
         entry = models.TimetableEntry(
-            department_code=department_code, semester=semester,
+            department_code=department_code, semester=semester, learning_mode_ids=learning_mode_str,
             course_code='MENTOR', course_name='Mentor Interaction',
             faculty_id=None, faculty_name=None,
             session_type='MENTOR',
@@ -1587,7 +1625,7 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                     c_v = assign_venue(day, p, mp.course_code, True, count + sec)
                     if slot_obj:
                         db.add(models.TimetableEntry(
-                            department_code=department_code, semester=semester,
+                            department_code=department_code, semester=semester, learning_mode_ids=learning_mode_str,
                             course_code=mp.course_code, course_name=mp.course_name,
                             faculty_id=fac_assigned[0], faculty_name=fac_assigned[1],
                             session_type='LAB',
@@ -1647,7 +1685,7 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                         c_v = assign_venue(day, p, c.course_code, True, count + sec)
                         if slot_obj:
                             db.add(models.TimetableEntry(
-                                department_code=department_code, semester=semester,
+                                department_code=department_code, semester=semester, learning_mode_ids=learning_mode_str,
                                 course_code=c.course_code, course_name=c.course_name,
                                 faculty_id=fac_assigned[0], faculty_name=fac_assigned[1],
                                 session_type='LAB',
@@ -1701,7 +1739,7 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                     c_venue = assign_venue(day, p, c.course_code, False, count + sec)
                     if slot_obj:
                         db.add(models.TimetableEntry(
-                            department_code=department_code, semester=semester,
+                            department_code=department_code, semester=semester, learning_mode_ids=learning_mode_str,
                             course_code=c.course_code, course_name=c.course_name,
                             faculty_id=fac_assigned[0], faculty_name=fac_assigned[1],
                             session_type='THEORY',
@@ -1749,7 +1787,7 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
             
             if slot_obj:
                 db.add(models.TimetableEntry(
-                    department_code=department_code, semester=semester,
+                    department_code=department_code, semester=semester, learning_mode_ids=learning_mode_str,
                     course_code=global_oe.course_code, course_name=global_oe.course_name,
                     faculty_id=None, faculty_name="Unassigned",
                     session_type='OPEN_ELECTIVE',
@@ -1791,7 +1829,7 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
                     c_venue = assign_venue(day, p, c.course_code, False, count + sec)
                     if slot_obj:
                         db.add(models.TimetableEntry(
-                            department_code=department_code, semester=semester,
+                            department_code=department_code, semester=semester, learning_mode_ids=learning_mode_str,
                             course_code=c.course_code, course_name=c.course_name,
                             faculty_id=fac_assigned[0], faculty_name=fac_assigned[1],
                             session_type='THEORY',

@@ -132,7 +132,11 @@ export const deleteBreak = (breakId) => axios.delete(`${API_URL}/breaks/${breakI
 
 // --- Timetable ---
 export const generateTimetable = (data) => axios.post(`${API_URL}/generate`, data);
-export const getTimetable = (deptCode, sem) => axios.get(`${API_URL}/timetable?department_code=${deptCode}&semester=${sem}`);
+export const getTimetable = (deptCode, sem, modeIds) => {
+    let url = `${API_URL}/timetable?department_code=${deptCode}&semester=${sem}`;
+    if (modeIds) url += `&learning_mode_ids=${modeIds}`;
+    return axios.get(url);
+};
 export const getTimetableEntries = getTimetable;
 export const getConflicts = (deptCode, sem) => {
     let url = `${API_URL}/api/conflicts`;

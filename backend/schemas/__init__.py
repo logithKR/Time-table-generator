@@ -5,8 +5,9 @@ from typing import List, Optional
 class GenerateRequest(BaseModel):
     department_code: str
     semester: int
-    mentor_day: str 
+    mentor_day: str
     mentor_period: int = 8
+    learning_mode_ids: Optional[List[int]] = None  # None means all modes (combined)
 
 class SemesterConfigUpdate(BaseModel):
     academic_year: str
@@ -205,6 +206,7 @@ class TimetableEntry(BaseModel):
     dept_breakdown: Optional[list] = None  # [{dept: "CSE", count: 60}, ...] for common courses
     combined_strength: Optional[int] = None  # total across all depts in a common course
     is_common_course: Optional[bool] = False
+    learning_mode_ids: Optional[str] = '1,2'
     
     class Config:
         orm_mode = True
@@ -223,10 +225,12 @@ class TimetableEntryCreate(BaseModel):
     period_number: int
     venue_name: Optional[str] = None
     section_number: Optional[int] = 1
+    learning_mode_ids: Optional[str] = '1,2'
 
 class TimetableSaveRequest(BaseModel):
     department_code: str
     semester: int
+    learning_mode_ids: Optional[str] = '1,2'  # comma-separated, e.g. "1", "2", "1,2"
     entries: List[TimetableEntryCreate]
 
 class DepartmentVenueCreate(BaseModel):
@@ -273,6 +277,7 @@ class DepartmentSemesterCountResponse(BaseModel):
     department_code: str
     semester: int
     student_count: int
+    student_count_data: Optional[str] = None
     
     class Config:
         orm_mode = True

@@ -795,7 +795,8 @@ async def generate_timetable(request: schemas.GenerateRequest, db: Session = Dep
         request.semester,
         request.mentor_day,
         request.mentor_period,
-        hard_mode
+        hard_mode,
+        request.learning_mode_ids
     )
 
     if isinstance(result, bool):
@@ -829,20 +830,32 @@ async def generate_timetable(request: schemas.GenerateRequest, db: Session = Dep
 
 
 @router.get("/timetable", response_model=List[schemas.TimetableEntry])
-def get_timetable(department_code: Optional[str] = None, semester: Optional[int] = None, db: Session = Depends(get_db)):
+def get_timetable(department_code: Optional[str] = None, semester: Optional[int] = None, learning_mode_ids: Optional[str] = None, db: Session = Depends(get_db)):
     query = db.query(models.TimetableEntry)
     if department_code and department_code.strip():
         query = query.filter(models.TimetableEntry.department_code == department_code)
     if semester:
         query = query.filter(models.TimetableEntry.semester == semester)
+    if learning_mode_ids:
+        query = query.filter(models.TimetableEntry.learning_mode_ids == learning_mode_ids)
     return query.all()
 
 @router.post("/timetable/save")
 def save_timetable(request: schemas.TimetableSaveRequest, db: Session = Depends(get_db)):
+    # Standardize mode string
+    mode_str = request.learning_mode_ids or '1,2'
+    
+    # Delete only the specific mode's entries for this dept/sem
     db.query(models.TimetableEntry).filter_by(
-        department_code=request.department_code, semester=request.semester
+        department_code=request.department_code, semester=request.semester,
+        learning_mode_ids=mode_str
     ).delete()
+    
     new_entries = [models.TimetableEntry(**entry.dict()) for entry in request.entries]
+    # Ensure all saved entries have the correct mode string
+    for e in new_entries:
+        e.learning_mode_ids = mode_str
+        
     db.add_all(new_entries)
     try:
         db.commit()

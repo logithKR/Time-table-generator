@@ -63,7 +63,6 @@ def login(body: LoginRequest, request: Request, response: Response, db: Session 
         log_failed_login(
             email=body.credential[:50],  # Log partial cred as identifier
             reason="Invalid Google token",
-            ip_address=ip,
             user_agent=ua
         )
         raise
@@ -82,7 +81,6 @@ def login(body: LoginRequest, request: Request, response: Response, db: Session 
         log_failed_login(
             email=email,
             reason="DB Error during RBAC check",
-            ip_address=ip,
             user_agent=ua
         )
         raise HTTPException(status_code=500, detail="Internal server error during authorization.")
@@ -91,7 +89,6 @@ def login(body: LoginRequest, request: Request, response: Response, db: Session 
         log_failed_login(
             email=email,
             reason="User not found in local DB",
-            ip_address=ip,
             user_agent=ua
         )
         raise HTTPException(status_code=403, detail="Access Denied: Only registered faculty (teachers) can access this system.")
@@ -100,7 +97,6 @@ def login(body: LoginRequest, request: Request, response: Response, db: Session 
         log_failed_login(
             email=email,
             reason=f"Invalid role: {db_user['role']}",
-            ip_address=ip,
             user_agent=ua
         )
         raise HTTPException(status_code=403, detail="Access Denied: Only registered faculty (teachers) can access this system.")
@@ -116,7 +112,6 @@ def login(body: LoginRequest, request: Request, response: Response, db: Session 
     # 4. Log successful login to centralized log.db
     log_login(
         email=email,
-        ip_address=ip,
         user_agent=ua
     )
 
@@ -153,7 +148,6 @@ def refresh(request: Request, response: Response, db: Session = Depends(get_db))
         # Log token refresh to centralized log.db
         log_token_refresh(
             email=user_data["email"],
-            ip_address=ip,
             user_agent=ua
         )
         return {"message": "Token refreshed successfully", "access_token": new_access}
@@ -186,7 +180,6 @@ def logout(request: Request, response: Response, db: Session = Depends(get_db)):
     if user_email:
         log_logout(
             email=user_email,
-            ip_address=ip,
             user_agent=ua
         )
     

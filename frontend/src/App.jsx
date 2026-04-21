@@ -49,6 +49,7 @@ import VenueTimetable from './components/VenueTimetable';
 import LoginPage from './components/LoginPage';
 import AdminLogin from './components/AdminLogin';
 import AdminDashboard from './components/AdminDashboard';
+import LearningModeSelector from './components/LearningModeSelector';
 import { useAuth } from './contexts/AuthContext';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -119,6 +120,7 @@ function App() {
     const [selectedSem, setSelectedSem] = useState('');
     const [mentorDay, setMentorDay] = useState('Friday');
     const [mentorPeriod, setMentorPeriod] = useState(7);
+    const [selectedLearningModes, setSelectedLearningModes] = useState([1, 2]); // 1: UAL, 2: PBL
 
     const [timetableEntries, setTimetableEntries] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -296,7 +298,8 @@ function App() {
     const fetchTimetable = async () => {
         if (!selectedDept || !selectedSem) return;
         try {
-            const t_res = await api.getTimetable(selectedDept, parseInt(selectedSem));
+            const modeIdsStr = selectedLearningModes.sort().join(',');
+            const t_res = await api.getTimetable(selectedDept, parseInt(selectedSem), modeIdsStr);
             setTimetableEntries(t_res.data);
             const c_res = await api.getCourses(selectedDept, parseInt(selectedSem));
             setAllCourses(c_res.data); // IMPORTANT: sets allCourses for badge checks
@@ -320,7 +323,8 @@ function App() {
         try {
             const res = await api.generateTimetable({
                 department_code: selectedDept, semester: parseInt(selectedSem),
-                mentor_day: mentorDay, mentor_period: parseInt(mentorPeriod)
+                mentor_day: mentorDay, mentor_period: parseInt(mentorPeriod),
+                learning_mode_ids: selectedLearningModes
             });
             
             if (res.data.status === 'success') {
@@ -384,15 +388,16 @@ function App() {
     };
 
     // --- NEW HELPER: Fetch Data for Print View (Supports Master View) ---
-    const fetchPrintData = async (dept, sem) => {
+    const fetchPrintData = async (dept, sem, modesStr = '') => {
         setLoading(true);
         try {
             const d = dept || '';
             const s = sem || '';
+            const modes = modesStr || selectedLearningModes.sort().join(',');
             
             // Fetch timetable entries and conflicts in parallel
             const [entryRes, conflictRes] = await Promise.all([
-                api.getTimetableEntries(d, s),
+                api.getTimetableEntries(d, s, modes),
                 api.getConflicts(d, s)
             ]);
             
@@ -1317,12 +1322,19 @@ function App() {
                             semester={editorSem}
                             initialData={timetableEntries}
                             masterData={{ departments, semesters, slots, courses: allCourses, faculty: allFaculty }}
-                            onSave={async (updatedEntries) => {
+                            selectedLearningModes={selectedLearningModes}
+                            onSave={async (updatedEntries, overrideModes) => {
                                 try {
-                                    await api.saveTimetable({ department_code: editorDept, semester: parseInt(editorSem), entries: updatedEntries });
+                                    const modeIdsStr = (overrideModes || selectedLearningModes).sort().join(',');
+                                    await api.saveTimetable({ 
+                                        department_code: editorDept, 
+                                        semester: parseInt(editorSem), 
+                                        entries: updatedEntries,
+                                        learning_mode_ids: modeIdsStr
+                                    });
                                     alert('Timetable saved successfully!');
                                     // Re-fetch to ensure state is consistent
-                                    const res = await api.getTimetableEntries(editorDept, editorSem);
+                                    const res = await api.getTimetableEntries(editorDept, editorSem, modeIdsStr);
                                     setTimetableEntries(res.data);
                                 } catch (error) {
                                     console.error("Error saving timetable:", error);
@@ -1858,6 +1870,17 @@ function App() {
                         <label className="block text-sm font-semibold text-gray-700 mb-1.5">Mentor Period</label>
                         <input type="number" className="w-full p-2.5 border border-violet-200 rounded-xl focus:ring-2 focus:ring-violet-400 focus:border-violet-400 focus:outline-none shadow-sm bg-white font-medium text-gray-700" value={mentorPeriod} onChange={e => setMentorPeriod(e.target.value)} min="1" max="8" />
                     </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end mt-4">
+                    <div className="md:col-span-3">
+                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">Learning Mode</label>
+                        <LearningModeSelector 
+                            department={selectedDept}
+                            semester={selectedSem}
+                            selectedModes={selectedLearningModes}
+                            onModesChange={setSelectedLearningModes}
+                        />
+                    </div>
                     <button onClick={handleGenerate} disabled={loading} className={`w-full py-2.5 px-4 rounded-xl text-white font-bold flex items-center justify-center space-x-2 transition-all ${loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-violet-600 hover:bg-violet-700 shadow-lg shadow-violet-200 hover:shadow-violet-300 hover:-translate-y-0.5 active:scale-95'}`}>
                         {loading ? <RotateCw className="w-5 h-5 animate-spin" /> : <Monitor className="w-5 h-5" />}
                         <span>{loading ? 'Processing...' : 'Generate'}</span>
@@ -1975,15 +1998,25 @@ function App() {
                             {semesters.map(s => <option key={s.semester_number} value={s.semester_number}>Semester {s.semester_number}</option>)}
                         </select>
                     </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end mt-4">
+                    <div className="md:col-span-3">
+                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">Learning Mode</label>
+                        <LearningModeSelector 
+                            department={editorDept}
+                            semester={editorSem}
+                            selectedModes={selectedLearningModes}
+                            onModesChange={setSelectedLearningModes}
+                        />
+                    </div>
                     <div className="pb-0.5">
                         <button
-                            // Calls fetchPrintData with the *current* dropdown values
                             onClick={() => fetchPrintData(editorDept, editorSem)}
                             disabled={loading}
-                            className="flex items-center gap-2 bg-blue-600 text-white px-6 py-2.5 rounded-lg text-sm font-bold shadow hover:bg-blue-700 transition-all disabled:bg-gray-400"
+                            className="bg-blue-600 w-full flex items-center justify-center gap-2 text-white px-6 py-2.5 rounded-lg text-sm font-bold shadow hover:bg-blue-700 transition-all disabled:bg-gray-400"
                         >
                             {loading ? <RotateCw className="w-4 h-4 animate-spin" /> : <RotateCw className="w-4 h-4" />}
-                            Load / Refresh Data
+                            Load / Refresh
                         </button>
                     </div>
                 </div>

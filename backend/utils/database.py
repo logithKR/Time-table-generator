@@ -1,5 +1,6 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy.pool import QueuePool, SingletonThreadPool
 from contextlib import contextmanager
 from typing import Generator
 import os
@@ -9,10 +10,16 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB_FILE = os.path.abspath(os.path.join(BASE_DIR, "..", "database", "college_scheduler.db"))
 SQLALCHEMY_DATABASE_URL = f"sqlite:///{DB_FILE}"
 
-# Application DB Engine
+# Application DB Engine with customized recycling logic
 engine = create_engine(
-    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
+    SQLALCHEMY_DATABASE_URL, 
+    connect_args={"check_same_thread": False},
+    poolclass=SingletonThreadPool,
+    pool_size=20,
+    pool_recycle=1800,  # Recycle connection every 30 minutes to avoid memory leaks
+    pool_pre_ping=True
 )
+
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()

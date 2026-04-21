@@ -97,13 +97,22 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
     # Faculty lookups — now with delivery_type for priority sorting
     course_faculty = {}     # course_code -> [(fac_id, fac_name, delivery_type), ...]
     course_names = {}
+    
+    course_codes = [c.course_code for c in courses]
+    all_mappings = db.query(models.CourseFacultyMap).filter(models.CourseFacultyMap.course_code.in_(course_codes)).all()
+    all_fac_vids = list(set(m.faculty_id for m in all_mappings))
+    all_faculties = db.query(models.FacultyMaster).filter(models.FacultyMaster.faculty_id.in_(all_fac_vids)).all()
+    fac_dict = {f.faculty_id: f.faculty_name for f in all_faculties}
+    
+    mapping_dict = {}
+    for m in all_mappings:
+        mapping_dict.setdefault(m.course_code, []).append(m)
+        
     for course in courses:
         course_names[course.course_code] = course.course_name
-        mappings = db.query(models.CourseFacultyMap).filter_by(course_code=course.course_code).all()
         f_list = []
-        for m in mappings:
-            fac = db.query(models.FacultyMaster).filter_by(faculty_id=m.faculty_id).first()
-            fname = fac.faculty_name if fac else m.faculty_id
+        for m in mapping_dict.get(course.course_code, []):
+            fname = fac_dict.get(m.faculty_id, m.faculty_id)
             dtype = (m.delivery_type or 'OFFLINE').strip().upper()
             f_list.append((m.faculty_id, fname, dtype))
         course_faculty[course.course_code] = f_list
@@ -139,9 +148,13 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
 
     # Pre-fetch course-specific venues (venue_type aware)
     course_venues = db.query(models.CourseVenueMap).filter_by(department_code=department_code).all()
+    cv_venue_ids = list(set(cv.venue_id for cv in course_venues))
+    cv_venues = db.query(models.VenueMaster).filter(models.VenueMaster.venue_id.in_(cv_venue_ids)).all()
+    cv_vdict = {v.venue_id: v for v in cv_venues}
+    
     cv_lookup = {}  # {course_code: {'theory': venue_name, 'lab': venue_name}}
     for cv in course_venues:
-        v = db.query(models.VenueMaster).filter_by(venue_id=cv.venue_id).first()
+        v = cv_vdict.get(cv.venue_id)
         if v:
             vtype = (cv.venue_type or 'BOTH').upper()
             if cv.course_code not in cv_lookup:
@@ -174,13 +187,22 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
     dept_venue_maps = db.query(models.DepartmentVenueMap).filter_by(department_code=department_code, semester=semester).all()
     default_labs = []
     default_classrooms = []
+    classroom_venues_info = []  # [(venue_name, capacity), ...]
+    lab_venues_info = []
+    
+    dvm_vids = list(set(dvm.venue_id for dvm in dept_venue_maps))
+    dvm_venues = db.query(models.VenueMaster).filter(models.VenueMaster.venue_id.in_(dvm_vids)).all()
+    dvm_vdict = {v.venue_id: v for v in dvm_venues}
+    
     for dvm in dept_venue_maps:
-        v = db.query(models.VenueMaster).filter_by(venue_id=dvm.venue_id).first()
+        v = dvm_vdict.get(dvm.venue_id)
         if v:
             if v.is_lab:
                 default_labs.append(v.venue_name)
+                lab_venues_info.append((v.venue_name, v.capacity or c_default_cap))
             else:
                 default_classrooms.append(v.venue_name)
+                classroom_venues_info.append((v.venue_name, v.capacity or c_default_cap))
     
     # We will no longer concatenate default_classrooms into a single string.
     # Keep them as lists default_classrooms and default_labs.
@@ -192,17 +214,6 @@ def generate_schedule(db: Session, department_code: str, semester: int, mentor_d
         department_code=department_code, semester=semester
     ).first()
     student_count = sem_count.student_count if sem_count and sem_count.student_count > 0 else 60
-
-    # Get venue capacity info for classrooms and labs
-    classroom_venues_info = []  # [(venue_name, capacity), ...]
-    lab_venues_info = []
-    for dvm in dept_venue_maps:
-        v = db.query(models.VenueMaster).filter_by(venue_id=dvm.venue_id).first()
-        if v:
-            if v.is_lab:
-                lab_venues_info.append((v.venue_name, v.capacity or c_default_cap))
-            else:
-                classroom_venues_info.append((v.venue_name, v.capacity or c_default_cap))
 
     max_classroom_cap = max((c[1] for c in classroom_venues_info), default=c_default_cap)
     max_lab_cap = max((c[1] for c in lab_venues_info), default=c_default_cap)

@@ -387,23 +387,19 @@ const ConstraintsManager = () => {
     );
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-violet-50/30">
+        <div className="space-y-6">
             {/* ─── Header ─── */}
-            <div className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-gray-100 shadow-sm">
-                <div className="max-w-5xl mx-auto px-8 py-4 flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                        <div className="p-2.5 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl shadow-lg shadow-violet-200">
-                            <Settings className="w-6 h-6 text-white" />
-                        </div>
-                        <div>
-                            <h1 className="text-lg font-black text-gray-800 tracking-tight">Constraint Configuration</h1>
-                            <p className="text-xs text-gray-400 font-medium">
-                                {enabledConstraints}/{totalConstraints} constraints active
-                            </p>
-                        </div>
-                    </div>
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                    <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                        <Settings className="w-6 h-6 text-violet-600" /> Constraint Configuration
+                    </h3>
+                    <p className="text-sm text-slate-500 mt-1">
+                        {enabledConstraints}/{totalConstraints} constraints active
+                    </p>
+                </div>
 
-                    <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3">
                         {/* Unsaved changes indicator */}
                         {hasChanges && (
                             <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-lg">
@@ -450,11 +446,10 @@ const ConstraintsManager = () => {
                             }
                         </button>
                     </div>
-                </div>
             </div>
 
             {/* ─── Info Banner ─── */}
-            <div className="max-w-5xl mx-auto px-8 mt-6">
+            <div>
                 <div className="flex items-start gap-3 p-4 bg-blue-50/50 border border-blue-100 rounded-xl">
                     <Info className="w-4 h-4 text-blue-400 mt-0.5 shrink-0" />
                     <div className="text-xs text-blue-600 leading-relaxed">
@@ -467,7 +462,7 @@ const ConstraintsManager = () => {
             </div>
 
             {/* ─── Categories ─── */}
-            <div className="max-w-5xl mx-auto px-8 py-6 space-y-4">
+            <div className="space-y-4">
                 {Object.keys(CATEGORIES).map(catKey => (
                     config[catKey] && (
                         <CategorySection
@@ -482,7 +477,7 @@ const ConstraintsManager = () => {
             </div>
 
             {/* ─── Mini Project Display Section ─── */}
-            <div className="max-w-5xl mx-auto px-8 pb-4">
+            <div>
                 <div className="rounded-2xl border border-gray-100 bg-white overflow-hidden shadow-sm hover:shadow-md transition-all duration-300">
                     <div className="px-6 py-4 flex items-center gap-4 border-b border-gray-50">
                         <div className="p-2.5 rounded-xl bg-amber-50 text-amber-500">
@@ -530,7 +525,7 @@ const ConstraintsManager = () => {
             </div>
 
             {/* ─── Footer ─── */}
-            <div className="max-w-5xl mx-auto px-8 pb-10">
+            <div className="pb-4">
                 <div className="flex items-center justify-center gap-2 text-[10px] text-gray-300 font-medium">
                     <Sparkles className="w-3 h-3" />
                     <span>Powered by OR-Tools CP-SAT Solver</span>

@@ -100,7 +100,7 @@ class Department(BaseModel):
     student_count: Optional[int] = 0
     pair_add_course_miniproject: Optional[bool] = False
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class Faculty(BaseModel):
     faculty_id: str
@@ -109,7 +109,7 @@ class Faculty(BaseModel):
     department_code: str
     status: Optional[str] = "Active"
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class Course(BaseModel):
     course_code: str
@@ -129,7 +129,7 @@ class Course(BaseModel):
     is_add_course: Optional[bool] = False
     enrolled_students: Optional[int] = 0
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class Slot(BaseModel):
     slot_id: int
@@ -141,7 +141,7 @@ class Slot(BaseModel):
     is_active: bool = True
     semester_ids: Optional[List[int]] = []
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class BreakConfigCreate(BaseModel):
     break_type: str
@@ -163,7 +163,7 @@ class BreakConfig(BaseModel):
     semester_ids: Optional[List[int]] = []
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class VenueCreate(BaseModel):
     venue_name: str
@@ -180,7 +180,7 @@ class VenueUpdate(BaseModel):
 class Venue(VenueCreate):
     venue_id: int
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class TimetableEntry(BaseModel):
     id: int
@@ -209,7 +209,7 @@ class TimetableEntry(BaseModel):
     learning_mode_ids: Optional[str] = '1,2'
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class TimetableEntryCreate(BaseModel):
@@ -248,7 +248,7 @@ class DepartmentVenueResponse(BaseModel):
     capacity: Optional[int] = 60
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class CourseVenueCreate(BaseModel):
     department_code: str
@@ -267,7 +267,7 @@ class CourseVenueResponse(BaseModel):
     venue_type: Optional[str] = 'BOTH'
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class DepartmentSemesterCountUpdate(BaseModel):
     student_count: int
@@ -280,7 +280,7 @@ class DepartmentSemesterCountResponse(BaseModel):
     student_count_data: Optional[str] = None
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # --- Students & Registrations ---
 
@@ -297,7 +297,7 @@ class StudentCreate(StudentBase):
 class StudentResponse(StudentBase):
     semester: int = 1
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class CourseRegistrationBase(BaseModel):
     student_id: str
@@ -311,7 +311,7 @@ class CourseRegistrationResponse(CourseRegistrationBase):
     id: int
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class PersonalTimetableResponse(BaseModel):
@@ -319,7 +319,7 @@ class PersonalTimetableResponse(BaseModel):
     timetable: List[TimetableEntry]
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 # --- Conflict Check ---
@@ -378,7 +378,7 @@ class UserConstraintResponse(BaseModel):
     order_index: int
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class UserConstraintReorderRequest(BaseModel):
     order: List[str]   # list of UUIDs in desired order
